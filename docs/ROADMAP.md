@@ -12,7 +12,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 2 | Event-log writer (minimal synthetic app) | ✅ |
 | 3 | Cluster, cost model, scheduler → Scenario 00 at production scale | ✅ |
 | 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ✅ |
-| 5 | YARN realism: IDs, containers, executor logs, Environment tab | ⬜ |
+| 5 | YARN realism: IDs, containers, executor logs, Environment tab | ✅ |
 | 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ⬜ |
 | 7 | Scenario portal + one-command startup | ⬜ |
 | 8+ | Scenario library (one or two scenarios per session) | ⬜ |
@@ -97,14 +97,26 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
 - **Done when:** Scenario 00's SQL tab shows plan graphs with coherent metrics that link to its jobs and stages. ✅
   (checked in HS 3.5.9: SQL list, all three plan graphs with Details, job ↔ query links; screenshots reviewed)
 
-## Phase 5 — YARN realism
+## Phase 5 — YARN realism ✅
 
-- [ ] YARN app, attempt and container IDs; NodeManager hosts and ports; executor attributes
-- [ ] `services/nm-logs/`: mock NodeManager log server; generated stdout/stderr per container that match its tasks
-- [ ] Executor removal with YARN wording and exit codes; memoryOverhead modeling
-- [ ] Environment tab: realistic Spark, Hadoop and system properties and classpath
-- [ ] Dynamic allocation (executors added and removed over time)
-- **Done when:** clicking any executor's stderr in HS opens a log that matches what that executor did.
+- [x] YARN app, attempt and container IDs (RM epoch `e23`, HA `CLUSTER_ID`); NodeManager hosts and ports;
+      executor attributes; FQDN driver host. YARN allocation now runs inside the simulation (`engine/yarn_am.py`:
+      Spark's AM allocate loop, RM grants per NodeManager heartbeat, YARN's absolute-ask over-allocation; ADR-021)
+- [x] `services/nm-logs/`: mock NodeManager log server; `sparksim/yarnlogs` writes stdout/stderr per container that
+      match its tasks (executors: tasks, broadcasts, file splits, shuffle fetches, writes, spills, kills; the AM
+      container: the driver log with YarnAllocator / DAGScheduler / TaskSetManager lines); the History Server's
+      `spark.history.custom.executor.log.url` points every link at the mock (ADR-024)
+- [x] Executor removal with YARN wording and exit codes: container RSS model (`model/memory.py`), NodeManager pmem
+      kills (-104, SIGTERM 143, Hadoop diagnostics), ExecutorLostFailure + re-run, replacement containers,
+      ExecutorRemoved twice for unexpected exits (ADR-022)
+- [x] Environment tab: full Hadoop 3.3.6 configuration from a real driver + production site files, the cluster's
+      spark-defaults, JDK 17 system properties, real classpath (ADR-025)
+- [x] Dynamic allocation: ExecutorAllocationManager port (backlog ramp-up, idle timeout, "Executor killed by
+      driver."; ADR-023)
+- **Done when:** clicking any executor's stderr in HS opens a log that matches what that executor did. ✅
+  (`tests/test_scenario00_hs.py`: all 41 links of Scenario 00, opened through HS 3.5.9, list exactly the
+  tasks the REST API shows for that executor; screenshots of the Executors tab, a log page and the
+  Environment tab reviewed)
 
 ## Phase 6 — Scenario DSL + fault injection → Scenario 01 (join skew)
 

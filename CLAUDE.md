@@ -60,7 +60,7 @@ incident ticket and investigates the same way they would at work.
    - append an entry to `docs/SESSION_LOG.md` (date, done, next, gotchas);
    - record any design choice in `docs/DECISIONS.md` as a new ADR;
    - update this file only if a non-negotiable, the layout or a command changed.
-4. Never hand-edit generated output (`event-logs/`, `build/`).
+4. Never hand-edit generated output (`event-logs/`, `yarn-logs/`, `build/`).
 5. Don't stop at a guess when the question is "what would real Spark emit?":
    check a real event log in `reference/` or the Spark 3.5 source
    (`JsonProtocol.scala`, `AppStatusListener.scala`, `SQLAppStatusListener.scala`).
@@ -69,27 +69,31 @@ incident ticket and investigates the same way they would at work.
 
 ```
 src/sparksim/          Python package: eventlog/ (typed events, JsonProtocol bytes, DriverLedger, Timeline, JVM orders),
-                       model/ (cluster/YARN, HDFS, file splits, workload, shuffle), cost/ (calibration.py, model.py),
-                       sched/ (event kernel, TaskScheduler), sql/ (DataFrame API + planner, AQE, explain, plan info,
-                       RDD scopes, SQL metrics), engine/ (driver runtime, emit),
-                       apps/ (tiny smoke app, daily_enrichment = Scenario 00), yarn.py, environment.py, cli.py
-                       (planned: yarnlogs/)
+                       model/ (cluster, container memory, HDFS, file splits, workload, shuffle), cost/ (calibration.py,
+                       model.py), sched/ (event kernel, TaskScheduler), sql/ (DataFrame API + planner, AQE, explain,
+                       plan info, RDD scopes, SQL metrics), engine/ (driver runtime, yarn_am = YARN allocation +
+                       NodeManager monitor, dynalloc, emit), yarnlogs/ (container stdout/stderr from the run),
+                       apps/ (tiny smoke app, daily_enrichment = Scenario 00), yarn.py, environment.py, cli.py,
+                       data/ (Spark archive jars, Hadoop 3.3.6 defaults)
 scenarios/NN-slug/     ticket.md, hints.md, solution.md (Evidence table checked by tests); scenario.yaml from Phase 6
 reference/jobs/        real PySpark reference jobs (ref00–ref08) + common.py
 reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
 reference/yarn-logs/   REAL container stdout/stderr for those apps (driver = container ..._000001)
 reference/yarn/        single-node HDFS+YARN config + cluster.sh
 reference/capture.sh   runs reference jobs on YARN, collects logs
-services/history-server/  run.sh + spark-defaults.conf (docker-compose.yml at repo root)
-scripts/               env.sh, hs_api.py (REST + validate), event_inventory.py, screenshot.py
+services/history-server/  run.sh + spark-defaults.conf (custom executor log URL → nm-logs; docker-compose.yml at root)
+services/nm-logs/      mock YARN NodeManager log server (stdlib) for the generated container logs, port 8042
+scripts/               env.sh, hs_api.py (REST + validate), evidence.py, event_inventory.py, screenshot.py,
+                       extract_hadoop_defaults.py
 docs/                  ROADMAP, ARCHITECTURE, DECISIONS, SCENARIOS, SESSION_LOG,
                        EVENT_LOG_FORMAT (how logs feed the UI), event-log-schema (generated)
 tests/                 unit + integration (marker `integration` starts a real History Server)
-event-logs/, build/    GENERATED, gitignored
+event-logs/, yarn-logs/, build/   GENERATED, gitignored
 ```
 
 Read `docs/EVENT_LOG_FORMAT.md` before writing any event-log code. Emit events through
 `sparksim.eventlog` (`Timeline` + `DriverLedger`): never hand-compute accumulator `Value`s or stage totals.
+Container logs are derived from the run's records (`sparksim.yarnlogs`), never written by hand.
 New apps describe a workload (`engine.runtime.AppSpec`) whose queries are PySpark-like DataFrame code over
 table schemas (`sql.dataframe`), and let `sql/` + `engine/` plan and simulate it; every throughput or overhead
 constant goes in `cost/calibration.py` with its provenance tag. Check plan/explain changes against
@@ -104,12 +108,13 @@ JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
 | Task | Command |
 |---|---|
 | Lint | `uv run ruff check .` |
-| Generate Scenario 00 (~9.4k tasks, ~10 s) | `uv run sparksim generate 00-healthy-baseline --out event-logs` |
+| Generate Scenario 00 (~9.4k tasks, ~10 s; + container logs in `yarn-logs/`) | `uv run sparksim generate 00-healthy-baseline --out event-logs` |
 | Generate the tiny synthetic app | `uv run sparksim generate tiny --out event-logs` |
 | Check the event model on a log (byte round trip) | `uv run sparksim roundtrip <event-log>...` |
 | Unit tests | `uv run pytest -m "not integration"` |
 | All tests (starts a real History Server) | `uv run pytest` |
 | History Server on a log dir | `services/history-server/run.sh [LOG_DIR] [PORT]` (default `event-logs/`, 18080) |
+| Mock NodeManager logs (executor stdout/stderr links) | `services/nm-logs/run.sh [LOG_DIR] [PORT]` (default `yarn-logs/`, 8042) |
 | Validate replay (log vs server counts) | `uv run scripts/hs_api.py validate --log-dir <dir>` |
 | Query the REST API | `uv run scripts/hs_api.py stages <app-id>` / `summary <app-id> <stage>` / `get <app-id> <path>` / `sql <app-id>` |
 | Check a solution's evidence numbers | `uv run scripts/evidence.py 00-healthy-baseline` (against a running HS) |

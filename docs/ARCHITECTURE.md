@@ -31,7 +31,7 @@ scenarios/<id>/scenario.yaml
  event-logs/application_<clusterTs>_<seq>_1[.zstd]
         │
         ├──► Spark History Server 3.5.9      http://localhost:18080   ← the UI you debug in
-        ├──► mock YARN NodeManager logs      http://localhost:8042    ← executor stdout/stderr links
+        ├──► mock YARN NodeManager logs      http://localhost:8042    ← executor stdout/stderr links (yarn-logs/)
         └──► scenario portal                 http://localhost:8000    ← tickets, hints, solutions
 ```
 
@@ -63,9 +63,39 @@ model/   cluster.py   racks, NodeManagers (+ other tenants' load), container siz
 cost/    calibration.py ([ref]/[norm] constants), model.py: one task's phases → TaskMetrics
 sched/   sim.py (event heap, signals, generator processes), scheduler.py (TaskSchedulerImpl + TaskSetManager)
 engine/  runtime.py   the driver: executors register, one AdaptiveExecution per query, its query stages → jobs,
-                      skipped stages, SQL events and driver metrics, write → new HDFS files
+                      skipped stages, SQL events and driver metrics, write → new HDFS files; executor loss
+                      (disconnect → loss reason → ExecutorLostFailure, re-run), broadcasts, MapOutputTracker epoch
+         yarn_am.py   YARN in the simulation (Phase 5): RM grants at NodeManager heartbeats (absolute asks,
+                      over-allocation), Spark's YarnAllocator loop (200 ms doubling to 3 s), container launch,
+                      NodeManager memory monitor (pmem kill, Hadoop diagnostics), completed containers → reasons
+         dynalloc.py  ExecutorAllocationManager + ExecutorMonitor (backlog ramp-up 1,2,4,8…, idle timeout)
          emit.py      heartbeat-sampled executor metrics; events via Timeline + DriverLedger
+model/   memory.py    container RSS: committed heap (G1 growth) + native footprint vs the container size
 ```
+
+## The YARN container logs (built in Phase 5)
+
+```
+AppRun records (log, yarn_log, task_records, broadcasts)
+      │
+      ▼
+yarnlogs/  executor.py  one executor's stderr: start-up, per task Got assigned / Running / broadcast fetch /
+                        codegen / Reading File path / ShuffleBlockFetcherIterator / Parquet writer + commit /
+                        spill / Finished, then "Driver commanded a shutdown" or "RECEIVED SIGNAL TERM"
+           driver.py    the AM container's stderr = the driver log: AM + SparkContext start-up, YarnAllocator,
+                        executor registrations, DAGScheduler / TaskSetManager lines, executor loss, dynamic
+                        allocation, shutdown (+ what the driver logs in reaction to executors: block updates,
+                        map-status requests)
+      │
+      ▼
+yarn-logs/<appId>/<containerId>/{stdout,stderr}  ──►  services/nm-logs (mock NodeManager, :8042)
+                                                       ◄── History Server executor links
+                                                           (spark.history.custom.executor.log.url)
+```
+
+Lines are placed on the simulated clock: a task's lines sit between its launch and finish, tasks of a
+stage that wait for the first one's broadcast fetch and code generation log after it, and a killed
+container writes nothing after its SIGTERM.
 
 ## The SQL layer (built in Phase 4)
 
@@ -117,17 +147,25 @@ what upstream wrote.
 
 - App IDs `application_<clusterTimestamp>_<seq>`, attempt ID `1`; cluster
   deploy mode (the driver runs in the ApplicationMaster container).
-- Container IDs `container_e<epoch>_<clusterTs>_<seq>_<attempt>_<n>`, plus
-  NodeManager hosts and ports in the executor attributes and log URLs.
-- Executor log links point at a mock NodeManager log server. The plan is to
-  use the History Server's `spark.history.custom.executor.log.url`. This
-  still needs checking in Phase 5.
-- Executor loss reasons in YARN's wording (container killed for exceeding
-  memory limits, exit codes 137/143, lost node), `spark.executor.memoryOverhead`
-  sizing, queue and resource limits, dynamic allocation with external shuffle
-  service.
-- Environment tab: realistic Spark, Hadoop and system properties and classpath
-  for a Hadoop 3.x YARN cluster.
+- Container IDs `container_e<epoch>_<clusterTs>_<seq>_<attempt>_<n>` (the RM
+  epoch after work-preserving restarts; HA cluster id as `CLUSTER_ID`),
+  NodeManager hosts and ports in the executor attributes and log URLs. Container
+  numbers follow the RM's grants, including the extra containers YARN's
+  absolute asks over-allocate and Spark releases unused.
+- Executor log links open generated container logs through a mock NodeManager
+  log server (`services/nm-logs`), via the History Server's
+  `spark.history.custom.executor.log.url` (verified on HS 3.5.9, driver row included).
+- Executor loss in YARN's wording: physical-memory kills from the container
+  memory model (`spark.executor.memoryOverhead` vs the JVM's native footprint;
+  exit status -104, SIGTERM 143, Hadoop's diagnostics), "Container from a bad
+  node" for other exits, ExecutorLostFailure for the running tasks, a
+  replacement container; dynamic allocation with the external shuffle service
+  (idle executors: "Executor killed by driver.").
+- Environment tab: the full Hadoop 3.3.6 configuration (~1,000 keys) with the
+  production site files, the cluster's spark-defaults, JDK 17 system properties
+  and the real Spark 3.5.9 classpath.
+- Not yet: lost shuffle files without the shuffle service (FetchFailed, stage
+  retry), node-local container requests, preemption, queue limits, app attempt 2.
 
 ## Scenario packaging
 
