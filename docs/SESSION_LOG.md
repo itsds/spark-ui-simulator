@@ -77,3 +77,39 @@ what was done, what's next, gotchas.
   - The session harness required branch `claude/beautiful-mccarthy-dp7e07` rather than `phase-2/<slug>`.
   - `pgrep -f`/`pkill -f` with a pattern also kills the calling shell (exit 144). Kill by the PID from `ps`.
 - **Still open:** the Docker Compose path is still unverified (no Docker daemon in the cloud container).
+
+## 2026-11-03 — Phase 3: cluster, cost model, scheduler → Scenario 00
+
+- **Done:**
+  - `model/`: YARN cluster (6 racks × 20 NodeManagers, other tenants' load), container sizing (overhead, 1 GiB
+    rounding), CapacityScheduler placement (one off-switch container per NM heartbeat), registration and the 80 % start
+    rule; HDFS blocks with rack-aware replicas and Parquet row groups; a port of Spark's scan planning (maxSplitBytes,
+    splitFiles, Next Fit Decreasing, block hosts, preferred locations); stage pipelines (`StageSpec`: sources →
+    operators → sink); shuffle block matrices with host-local reads and empty-block skipping; AQE coalescing.
+  - `cost/calibration.py` (`[ref]` overheads from the reference runs, `[norm]` per-stream production rates on shared
+    nodes; the tiny app's rates moved here) and `cost/model.py` (per-task phases → `TaskMetrics`).
+  - `sched/`: event kernel with generator processes; a port of `TaskSchedulerImpl` + `TaskSetManager` delay
+    scheduling (locality levels, SPARK-18886 reset rule, noPref → PROCESS_LOCAL), FIFO, revive timer.
+  - `engine/`: AQE driver loop (map-stage jobs, broadcast job on its own thread, re-created skipped stages), RDD
+    lineage/scopes, heartbeat-sampled Task Executor Metrics, emission via `Timeline` + `DriverLedger`.
+  - `eventlog/ordering.py`: Scala HashSet, JDK Properties and Scala Map iteration orders, verified on every reference
+    log (ADR-016). The environment and the tiny app now use them.
+  - Scenario 00 `clickstream-daily-enrichment`: 40 × 4 cores, 8 jobs, 15,243 tasks, 6.8 min, 641 GiB in, 405 GiB
+    shuffled; ticket, hints, solution. `scripts/evidence.py` + `tests/test_scenario00_hs.py` check the 15 evidence
+    numbers against the History Server REST API (ADR-017).
+  - Tests: 124 passed (`uv run pytest`, ~55 s), ruff clean. ADRs 013–017.
+- **Next:** Phase 4 (SQL layer). The stage pipelines in `apps/daily_enrichment.py` are the hand-written stand-in for
+  a planner: Phase 4 builds the physical plan, derives the same `StageSpec`s and lineage from it, adds SQL metric
+  accumulators per operator (`cost.model` already traces rows in/out per operator: `TaskResult.trace`), and adds
+  `spark.sql.execution.id` to job properties together with `SQLExecutionStart/End` (ADR-015).
+- **Gotchas:**
+  - A job property `spark.sql.execution.id` without its `SQLExecutionStart` makes HS 3.5.9 answer 404 on `/sql`.
+  - HS stage tables measure Duration from `firstTaskLaunchedTime`, not submission; the REST stage data has no locality
+    summary (count `taskLocality` over the task list).
+  - Next Fit Decreasing packs two small files into one split: the aggregation scans have a 2.2× max task that is
+    input-size variance, not skew. The solution teaches it; `test_healthy_quantiles` checks time per byte instead.
+  - At a scan stage's start some cores idle up to `spark.locality.wait` (3 s) while their hosts have no node-local
+    task. That's Spark's delay scheduling, not a bug.
+  - The harness required branch `claude/sharp-davinci-6fpjzj` (not `phase-3/<slug>`).
+  - JDK 17 must be installed with apt in a fresh container (`openjdk-17-jdk-headless`).
+- **Still open:** dynamic contention between concurrent tasks (ADR-014); the Docker Compose path is unverified.

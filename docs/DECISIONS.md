@@ -152,7 +152,7 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
 ## ADR-012 — The Phase 2 tiny app is a stand-in micro model
 
 - **Date:** 2026-11-03
-- **Status:** accepted (superseded in Phase 3)
+- **Status:** accepted; partly superseded by ADR-013 (its rates now live in `cost/calibration.py`)
 - **Context:** Phase 2 needs a synthetic app before the cost model and the
   scheduler exist. Non-negotiable 2 forbids hand-typed metrics.
 - **Decision:** `sparksim/apps/tiny.py` copies the structure of the real ref08
@@ -165,3 +165,87 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   into `cost/calibration.py` and replaces the greedy scheduler with the
   discrete-event one. The tiny app has no HDFS input: no reference capture uses
   `sc.textFile`, and we don't guess its lineage.
+
+## ADR-013 — Production-scale apps run on a layered engine: model → cost → scheduler → emit
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** Phase 3 needs apps with tens of executors and ~15k tasks whose
+  numbers all come from causes (non-negotiables 2 and 3). The Phase 2 tiny app
+  hard-wires one RDD job and a greedy slot loop, which doesn't scale to several
+  jobs, AQE, locality or concurrent stages.
+- **Decision:** Four layers, each testable on its own:
+  `model/` (YARN cluster and container placement, HDFS blocks and Parquet row
+  groups, Spark's file-split algorithm, operator pipelines per stage, shuffle
+  block matrices, AQE coalescing), `cost/` (`calibration.py` + a per-task phase
+  model), `sched/` (a discrete-event kernel and a port of `TaskSchedulerImpl` /
+  `TaskSetManager` delay scheduling, including the Spark 3.1+ timer-reset rule
+  and noPref tasks reported as PROCESS_LOCAL), and `engine/` (the driver: AQE
+  query stages as map-stage jobs, re-created skipped stages, RDD lineage and
+  scopes, heartbeat-sampled executor metrics, emission through `Timeline` +
+  `DriverLedger`). Where Spark has an algorithm we port it (maxSplitBytes,
+  Next Fit Decreasing packing, block hosts, preferred locations, coalescing,
+  delay scheduling) instead of approximating its output.
+- **Consequences:** Scenario 00 (15,243 tasks) simulates and writes in ~10 s.
+  numpy becomes a runtime dependency (block matrices). The tiny app stays on its
+  own loop: it is a PySpark RDD app with Python-worker costs the engine doesn't
+  model yet.
+
+## ADR-014 — Cost model v1: per-stream rates on shared nodes, durations fixed at launch
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** The reference runs give overheads and shapes (deserialization,
+  scheduler delay, GC share, result sizes) but not production throughputs: they
+  ran on one oversubscribed VM.
+- **Decision:** Throughputs are per task stream on a *shared* production node
+  (other tenants use most of the cluster), tagged `[norm]` in
+  `calibration.py`; overheads are tagged `[ref]` with the reference medians.
+  A task's duration is computed once at launch from its data, host speed,
+  locality and JVM warmth. There is no dynamic contention between concurrent
+  tasks yet.
+- **Consequences:** Healthy stages come out at max/median 1.25–1.45 with ~2 %
+  GC. Faults that work through contention (a saturated disk, a noisy neighbour)
+  must be modelled as host properties (`Host.speed`, per-host I/O rates) until a
+  contention model exists.
+
+## ADR-015 — `spark.sql.execution.id` is emitted together with the SQL events (Phase 4)
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** Real DataFrame jobs carry `spark.sql.execution.id` and
+  `spark.sql.execution.root.id` in their properties. Tested on History Server
+  3.5.9: when jobs reference an execution id with no `SQLExecutionStart`, the
+  `/api/v1/.../sql` endpoint answers 404 ("no such app").
+- **Decision:** Phase 3 jobs carry everything else a SQL job carries (the whole
+  Spark conf, `spark.rdd.scope`, `spark.job.description`, the broadcast job's
+  tags, `__fetch_continuous_blocks_in_batch_enabled`) but not the execution ids.
+  Phase 4 adds the ids and the SQL events in one step.
+
+## ADR-016 — JVM collection iteration orders are reproduced, not guessed
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** Several event-log fields come from iterating hash collections, so
+  their order looks random: `JobStart."Stage IDs"` (Scala 2.12
+  `mutable.HashSet[Int]`), `Properties` (JDK 17 `java.util.Properties`, backed
+  by a `ConcurrentHashMap`), and the `EnvironmentUpdate` maps (Scala immutable
+  `HashMap`, a hash trie).
+- **Decision:** `eventlog/ordering.py` implements the three orders from the
+  hash functions. `tests/test_ordering.py` checks them against every reference
+  log: 34 multi-stage jobs, 178 property sets, 36 environment maps. Within a
+  `ConcurrentHashMap` bin the order is insertion order, which we take from the
+  caller. `RDD Info` order after the first entry depends on identity hash codes,
+  which are random per JVM; we use a seeded shuffle there.
+
+## ADR-017 — Scenario evidence lives in `solution.md` and is checked against the REST API
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Decision:** Each `solution.md` has an Evidence table with rows
+  `| E<n> | where | what | `value` |`. `scripts/evidence.py` recomputes every
+  value from a running History Server, formatted like the UI (`UIUtils`,
+  `Utils.bytesToString`). The integration test fails when a number in the
+  solution no longer matches what the server shows. The numbers are written in
+  one place only, the solution. `uv run scripts/evidence.py <scenario>` shows
+  the new values after a model change.

@@ -10,7 +10,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 0 | Foundation and project memory | ✅ |
 | 1 | Reference capture + real History Server harness | ✅ |
 | 2 | Event-log writer (minimal synthetic app) | ✅ |
-| 3 | Cluster, cost model, scheduler → Scenario 00 at production scale | ⬜ |
+| 3 | Cluster, cost model, scheduler → Scenario 00 at production scale | ✅ |
 | 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ⬜ |
 | 5 | YARN realism: IDs, containers, executor logs, Environment tab | ⬜ |
 | 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ⬜ |
@@ -56,15 +56,23 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
 - **Done when:** the synthetic app looks like a real tiny app in every tab, and the tests pass. ✅ (screenshots checked:
   Jobs + timeline, job DAG, stage DAG/timeline/all metrics/aggregated by executor, Executors, Environment)
 
-## Phase 3 — Cluster, cost model, scheduler → Scenario 00 (healthy baseline)
+## Phase 3 — Cluster, cost model, scheduler → Scenario 00 (healthy baseline) ✅
 
-- [ ] Cluster model: YARN nodes, executors, cores, memory, overhead (static allocation first)
-- [ ] Workload model: tables (rows, width, files, partitions), stage shapes
-- [ ] Cost model v1 + `calibration.py` (constants sourced from reference runs and documented norms)
-- [ ] Discrete-event scheduler: core slots, FIFO order, locality wait, stage dependencies
-- [ ] Invariant tests: conservation, no double-booked cores, no task before parents finish, determinism
-- [ ] Scenario 00: about 40 executors × 4 cores, several jobs, ~15k tasks, healthy quantiles (max ≈ 1.5–2× median)
-- **Done when:** Scenario 00 renders in HS, the invariant tests pass, and screenshots look like a real production app.
+- [x] Cluster model: racks, NodeManagers with other tenants' load, executor/AM container sizing (overhead, rounding),
+      CapacityScheduler placement (one off-switch container per NM heartbeat), executor registration, 80 % start rule
+- [x] Workload model: HDFS blocks + rack-aware replicas, Parquet row groups, Spark's file splits (maxSplitBytes,
+      Next Fit Decreasing, block hosts, preferred locations), operator pipelines per stage, key spaces, shuffle
+      block matrices, AQE coalescing
+- [x] Cost model v1 + `calibration.py` (`[ref]` overheads from the reference runs, `[norm]` production throughputs; ADR-014)
+- [x] Discrete-event scheduler: core slots, FIFO, Spark 3.5 delay scheduling (locality levels, SPARK-18886 timer rule,
+      noPref → PROCESS_LOCAL), stage dependencies, revive timer; AQE driver loop with skipped re-created stages
+- [x] Invariant tests: conservation (block by block, rows across queries), no double-booked cores, no task before its
+      parents, stage accumulables = task totals, healthy quantiles, determinism (byte-identical log)
+- [x] Scenario 00: 40 executors × 4 cores, 8 jobs, 15,243 tasks, 641 GiB scanned, 405 GiB shuffled, max/median 1.26–1.44
+      on the big stages; ticket, hints, solution with REST-checked evidence (ADR-017)
+- **Done when:** Scenario 00 renders in HS, the invariant tests pass, and screenshots look like a real production app. ✅
+  (checked: Jobs + timeline, stages with skipped stages, job DAG with greyed skipped stages, stage DAG / summary /
+  aggregated by executor, Executors. The SQL tab arrives in Phase 4.)
 
 ## Phase 4 — SQL / DataFrame layer
 

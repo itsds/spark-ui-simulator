@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Generate production-scale Spark event logs for practising debugging in the real Spark History Server"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "numpy>=1.26,<2",  # shuffle block matrices (also pinned <2 by the PySpark reference group)
+]
 
 [project.scripts]
 sparksim = "sparksim.cli:main"

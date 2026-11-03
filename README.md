@@ -36,11 +36,11 @@ scenario.yaml  →  planner  →  cost model  →  scheduler simulation  →  Sp
 
 Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 
-## Scenarios (planned)
+## Scenarios
 
 | # | Scenario |
 |---|---|
-| 00 | Healthy baseline (learn what "normal" looks like) |
+| 00 | Healthy baseline (learn what "normal" looks like) ✅ [`scenarios/00-healthy-baseline`](scenarios/00-healthy-baseline/ticket.md) |
 | 01 | Join-key skew |
 | 02 | Too few shuffle partitions → spill |
 | 03 | YARN memoryOverhead container kills |
@@ -89,10 +89,12 @@ below. On macOS with Homebrew's `openjdk@17`, that's
 ```bash
 git clone https://github.com/itsds/spark-ui-simulator.git && cd spark-ui-simulator
 uv sync                                              # Python 3.11 + PySpark 3.5.9 (contains the History Server)
-uv run sparksim generate tiny --out event-logs       # synthetic app (Phase 2 smoke app)
+uv run sparksim generate 00-healthy-baseline         # Scenario 00: 40 executors, ~15k tasks, ~10 s to generate
 services/history-server/run.sh event-logs            # foreground; Ctrl+C to stop
-# open http://localhost:18080
+# open http://localhost:18080, then read scenarios/00-healthy-baseline/ticket.md
 ```
+
+`uv run sparksim generate tiny` writes the 8-task Phase 2 smoke app instead.
 
 To browse the nine **real** reference apps captured on YARN in Phase 1 (AQE,
 skew, spill, cache, failures and stage retries, Python UDFs, driver-bound jobs,

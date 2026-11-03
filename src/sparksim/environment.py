@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 
 from .eventlog import EnvironmentUpdate
+from .eventlog.ordering import scala_map
 from .yarn import NodeManager, YarnApp, container_work_dir
 
 # Spark 3.5 adds these to both driver and executor JVM options on Java 17 (JavaModuleOptions).
@@ -213,12 +214,13 @@ def classpath_entries(s: PySparkYarnApp) -> dict[str, str]:
 def environment_update(s: PySparkYarnApp, namenode: str,
                        java_home: str = "/usr/lib/jvm/java-17-openjdk-amd64",
                        java_version: str = "17.0.20.1") -> EnvironmentUpdate:
+    # JsonProtocol writes each section from `Seq[(String, String)].toMap`: Scala Map iteration order.
     return EnvironmentUpdate(
-        jvm_information={"Java Home": java_home, "Java Version": f"{java_version} (Ubuntu)",
-                         "Scala Version": "version 2.12.18"},
-        spark_properties=spark_properties(s),
-        hadoop_properties=hadoop_properties(s.rm_host, namenode),
-        system_properties=system_properties(s, java_home, java_version),
-        metrics_properties=dict(METRICS_PROPERTIES),
-        classpath_entries=classpath_entries(s),
+        jvm_information=scala_map({"Java Home": java_home, "Java Version": f"{java_version} (Ubuntu)",
+                                   "Scala Version": "version 2.12.18"}),
+        spark_properties=scala_map(spark_properties(s)),
+        hadoop_properties=scala_map(hadoop_properties(s.rm_host, namenode)),
+        system_properties=scala_map(system_properties(s, java_home, java_version)),
+        metrics_properties=scala_map(dict(METRICS_PROPERTIES)),
+        classpath_entries=scala_map(classpath_entries(s)),
     )

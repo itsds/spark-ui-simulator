@@ -150,6 +150,40 @@ the reference logs from task metrics alone and matches every one.
 | Stage accumulables | `StageCompleted` lists every accumulator the stage's tasks updated, with its latest `Value` and no `Update`. They are recorded on the stage's *latest* attempt (`stage.latestInfo`). |
 | JSON bytes | Compact, raw UTF-8, `\uXXXX` with upper-case hex for other control characters, `/` not escaped (Jackson defaults). `tests/test_eventlog_roundtrip.py` reproduces all 3,327 reference lines byte for byte. |
 
+### 5.2 Collection orders (verified on all 9 reference logs, `eventlog/ordering.py`)
+
+| Field | Collection Spark iterates | Order |
+|---|---|---|
+| `JobStart."Stage IDs"`, `"Stage Infos"` | `DAGScheduler.jobIdToStageIds`: Scala 2.12 `mutable.HashSet[Int]` | open addressing on `byteswap32`, table 32 → 64 at 45 % load |
+| `JobStart/StageSubmitted."Properties"` | JDK 17 `java.util.Properties` (a `ConcurrentHashMap`) | bins by `spread(String.hashCode)`; 16 bins, doubling at 75 %; insertion order inside a bin |
+| `EnvironmentUpdate` maps | `Seq[(String, String)].toMap`: Scala immutable `HashMap` | hash-trie order (5 bits per level, `improve(hashCode)`); ≤ 4 entries: insertion order |
+| `Stage Info."RDD Info"` | the stage RDD, then `getNarrowAncestors` (`HashSet[RDD]`, identity hash) | random per JVM run: seeded shuffle |
+
+### 5.3 Other driver behaviour the generator follows
+
+- **Job properties of DataFrame jobs** carry the whole Spark conf (every key of
+  the Environment tab's Spark Properties), plus `spark.rdd.scope` (absent on
+  write jobs), `spark.job.description`, `spark.sql.execution.id` /
+  `.root.id`, `__fetch_continuous_blocks_in_batch_enabled` once a
+  `ShuffledRowRDD` was created on the thread, and on broadcast jobs
+  `spark.job.interruptOnCancel` + `spark.job.tags`. A job that names an
+  execution id without its `SQLExecutionStart` makes the History Server's
+  `/sql` endpoint answer 404 (ADR-015).
+- **AQE** materializes each shuffle with its own map-stage job. The query's
+  last job re-creates the finished map stages under new ids. They appear in
+  `JobStart` but are never submitted, so the UI lists them as skipped and they
+  reuse the original stage's RDD infos.
+- **Task Executor Metrics** are the per-metric peaks of the executor's metric
+  polls during the task. With `spark.executor.metrics.pollingInterval = 0` the
+  polls happen at heartbeats (every 10 s, first one 10–20 s after start), so
+  short tasks report all zeros.
+- **Locality labels.** Tasks with no preferred location are dequeued from the
+  `noPrefs` list and reported as `PROCESS_LOCAL`. `FilePartition` drops
+  `localhost` from its block hosts, which is why the reference scans (HDFS on
+  `localhost`) show PROCESS_LOCAL. Reduce tasks only get a preferred host when
+  the shuffle has < 1000 map and < 1000 reduce partitions and one executor
+  holds ≥ 20 % of the input.
+
 ## 6. YARN-specific fields (captured on real YARN, cluster mode)
 
 - `ApplicationStart`: `App ID` = `application_…`, `App Attempt ID` = `"1"`, plus driver `Driver Logs`/`Driver Attributes` (the AM container).
