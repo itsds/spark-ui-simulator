@@ -110,3 +110,58 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   total) and `reference/yarn-logs/**` (container stdout/stderr) uncompressed,
   so sessions can grep them directly. Git compresses them in its object store.
   Generated scenario logs (`event-logs/`) are never committed.
+
+## ADR-010 — Typed event model, strict parser, byte-identical round trip
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** The History Server only shows what is in the event log, and it
+  silently ignores or mis-renders fields that are slightly wrong (string vs
+  number, a missing optional key). We need proof that our writer emits exactly
+  what Spark 3.5 emits.
+- **Decision:** One dataclass per Spark type and event (`sparksim/eventlog/`).
+  The JSON key and field order are declared on the field (`jf("Stage ID")`), and
+  a generic codec maps dataclasses to JSON and back. The parser is strict: an
+  unknown key, a missing key or a wrong scalar type raises `DecodeError`.
+  `jsonfmt.dumps` reproduces Jackson's bytes (compact, raw UTF-8, upper-case
+  `\uXXXX`). The test: parse each of the 3,327 lines in the reference logs, then
+  re-serialize it. The result must be **byte-identical**.
+- **Consequences:** A field Spark writes but we don't model fails the round trip,
+  so nothing can be dropped silently. Events no reference log contains yet
+  (`StageExecutorMetrics`, `SQLAdaptiveSQLMetricUpdates`) are marked unverified
+  until a capture includes them.
+
+## ADR-011 — The driver's bookkeeping is derived, never supplied
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** Some event fields are pure driver bookkeeping: accumulator
+  `Value` (a running total), which zero-valued accumulables are listed,
+  task-metric accumulator IDs, and the stage accumulables in `StageCompleted`.
+  If generators wrote them by hand they would drift from the task data
+  (non-negotiable 2).
+- **Decision:** `DriverLedger` derives them the way `DAGScheduler` does.
+  Generators supply only task-level facts: `TaskMetrics`, the set of "touched"
+  zero metrics, SQL metric updates, and IDs from `IdAllocator`. `Timeline`
+  builds each event at emission time, so running totals follow log order. The
+  golden test re-derives all 26,719 accumulables in the reference logs and
+  matches every one (EVENT_LOG_FORMAT.md §5.1).
+- **Consequences:** Phases 3–4 (scheduler, SQL metrics) emit events through the
+  ledger and never compute `Value` or stage totals themselves.
+
+## ADR-012 — The Phase 2 tiny app is a stand-in micro model
+
+- **Date:** 2026-11-03
+- **Status:** accepted (superseded in Phase 3)
+- **Context:** Phase 2 needs a synthetic app before the cost model and the
+  scheduler exist. Non-negotiable 2 forbids hand-typed metrics.
+- **Decision:** `sparksim/apps/tiny.py` copies the structure of the real ref08
+  job 0 (same PySpark RDD API, so RDD lineage, call sites, properties and
+  accumulable sets are grounded). Its numbers come from an explicit workload
+  (records, keys, bytes per record), a few rates of ref08's order of magnitude,
+  seeded lognormal noise and a greedy slot scheduler. Tests enforce
+  conservation, no oversubscribed core, time consistency and determinism.
+- **Consequences:** The rates are named module constants. Phase 3 moves them
+  into `cost/calibration.py` and replaces the greedy scheduler with the
+  discrete-event one. The tiny app has no HDFS input: no reference capture uses
+  `sc.textFile`, and we don't guess its lineage.

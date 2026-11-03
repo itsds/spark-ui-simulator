@@ -4,8 +4,9 @@
   uv run scripts/screenshot.py <app-id> [--url http://localhost:18080] [--out build/screenshots]
       [--stage 6] [--sql 0]
 
-Saves jobs, stages, stage detail (with Event Timeline + additional metrics
-expanded), executors, environment and SQL pages as PNGs. Uses the Playwright +
+Saves jobs, job detail (DAG), stages, stage detail (DAG, Event Timeline, all
+additional metrics, aggregated metrics by executor), executors, environment
+and SQL pages as PNGs. Uses the Playwright +
 Chromium preinstalled in the dev container (`require('playwright')` via node).
 """
 
@@ -51,6 +52,7 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=ROOT / "build" / "screenshots")
     ap.add_argument("--stage", type=int, help="stage id for the stage-detail shot (default: longest stage)")
     ap.add_argument("--sql", type=int, help="SQL execution id for the plan shot (default: first)")
+    ap.add_argument("--job", type=int, default=0, help="job id for the job-detail shot (default: 0)")
     a = ap.parse_args(argv)
 
     api = f"{a.url}/api/v1/applications/{a.app_id}"
@@ -74,9 +76,12 @@ def main(argv=None) -> int:
         {"url": f"{base}/jobs/", "path": str(out / "1-jobs.png"),
          "click": ["span.expand-application-timeline"]},
         {"url": f"{base}/stages/", "path": str(out / "2-stages.png")},
+        {"url": f"{base}/jobs/job/?id={a.job}", "path": str(out / "1b-job-detail.png"),
+         "click": ["#job-dag-viz", "span.expand-task-assignment-timeline"], "full": True},
+        # stagepage.js: #additionalMetrics toggles the metric checkboxes, #box-0 is "Select All".
         {"url": f"{base}/stages/stage/?id={a.stage}&attempt={attempt_id}", "path": str(out / "3-stage-detail.png"),
-         "click": ["span.expand-task-assignment-timeline", "span.expand-additional-metrics",
-                   "#select-all-metrics"], "full": True},
+         "click": ["#stage-dag-viz", "span.expand-task-assignment-timeline", "#additionalMetrics", "#box-0",
+                   "#aggregatedMetrics"], "full": True},
         {"url": f"{base}/executors/", "path": str(out / "4-executors.png")},
         {"url": f"{base}/environment/", "path": str(out / "5-environment.png")},
     ]

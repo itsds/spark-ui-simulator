@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = []
 
+[project.scripts]
+sparksim = "sparksim.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8",

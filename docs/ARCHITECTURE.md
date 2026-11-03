@@ -35,6 +35,20 @@ scenarios/<id>/scenario.yaml
         └──► scenario portal                 http://localhost:8000    ← tickets, hints, solutions
 ```
 
+## The eventlog layer (built in Phase 2)
+
+```
+generator (apps/, later sched/)          sparksim.eventlog
+  task-level facts only:                   Timeline       sorts by simulated time, builds events at emission
+  TaskMetrics, outcome, touched zeros,  →  DriverLedger   adds the driver's bookkeeping: running accumulator Value,
+  SQL metric updates, IDs (IdAllocator)                   task-metric IDs, StageCompleted accumulables
+                                           events/common  one dataclass per JsonProtocol type, key order = field order
+                                           jsonfmt + io   Jackson-identical bytes → application_<ts>_<seq>_<attempt>
+```
+
+Proof: every reference line round-trips byte for byte (ADR-010), and the
+ledger re-derives every real accumulable (ADR-011, EVENT_LOG_FORMAT.md §5.1).
+
 ## The realism rules ("numbers must make sense")
 
 1. **Conservation.** Rows and bytes flow through operators. The shuffle write

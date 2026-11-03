@@ -66,26 +66,50 @@ Details: [`docs/SCENARIOS.md`](docs/SCENARIOS.md).
 
 🚧 Early development. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the current phase.
 
-### Try it now: browse the real reference apps
+### Run it on your machine
 
-Phase 1 captured nine **real** Spark 3.5.9 applications on a real YARN cluster
-(cluster mode). Each one exercises a UI feature: AQE, skew, spill, cache,
-failures and stage retries, Python UDFs, driver-bound jobs, RDD API. You can
-open them in the real History Server.
+The "web app" is the **real Apache Spark History Server 3.5.9**, started from
+the Spark distribution that comes inside the project's PySpark install. You
+don't need a Spark or Hadoop install.
 
-Prerequisites: [uv](https://docs.astral.sh/uv/), **JDK 17** (Spark 3.5's
-bundled Arrow does not work on JDK 21).
+**Prerequisites:** macOS or Linux (on Windows, use WSL2 Ubuntu), `git`,
+[uv](https://docs.astral.sh/uv/getting-started/installation/), and **JDK 17**.
+Don't use JDK 21: Spark 3.5's bundled Arrow breaks on it. `scripts/env.sh` finds
+JDK 17 in the usual places.
+
+| OS | Install JDK 17 |
+|---|---|
+| macOS (Homebrew) | `brew install openjdk@17` (or Temurin 17: `brew install --cask temurin@17`) |
+| Ubuntu / Debian / WSL2 | `sudo apt-get install -y openjdk-17-jdk-headless` |
+
+If JDK 17 is somewhere else, set `JAVA_HOME` to it before running the commands
+below. On macOS with Homebrew's `openjdk@17`, that's
+`export JAVA_HOME=$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home`.
 
 ```bash
-uv sync
-services/history-server/run.sh reference/event-logs
+git clone https://github.com/itsds/spark-ui-simulator.git && cd spark-ui-simulator
+uv sync                                              # Python 3.11 + PySpark 3.5.9 (contains the History Server)
+uv run sparksim generate tiny --out event-logs       # synthetic app (Phase 2 smoke app)
+services/history-server/run.sh event-logs            # foreground; Ctrl+C to stop
 # open http://localhost:18080
 ```
 
-Or with Docker (no local Java needed):
+To browse the nine **real** reference apps captured on YARN in Phase 1 (AQE,
+skew, spill, cache, failures and stage retries, Python UDFs, driver-bound jobs,
+RDD API), point the server at that directory, optionally on another port:
 
 ```bash
-EVENT_LOG_DIR=./reference/event-logs docker compose up
+services/history-server/run.sh reference/event-logs 18081   # http://localhost:18081
+```
+
+The server rescans its directory every 5 s, so newly generated logs appear
+without a restart. Executor `stdout`/`stderr` links point at the simulated
+cluster's NodeManagers and won't open yet. Phase 5 adds a log server for them.
+
+Or with Docker (no local Java needed; not yet verified):
+
+```bash
+EVENT_LOG_DIR=./event-logs docker compose up
 ```
 
 ### Re-capture the reference logs (optional, Linux)
