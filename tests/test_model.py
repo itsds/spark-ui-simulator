@@ -92,7 +92,7 @@ def test_allocation_respects_capacity(cluster):
     assert all(e.registered_at > e.launched_at >= e.allocated_at >= 1_000_000 for e in execs)
     # the AM polls at 200 ms, doubling to the 3 s heartbeat while requests are outstanding
     calls = sorted({t for t, kind, _ in run.yarn_log if kind == "am_received"})
-    assert calls[0] == 1_000_200 and all(b - a in (200, 400, 800, 1600, 3000) for a, b in zip(calls, calls[1:]))
+    assert calls[0] == 1_000_200 and all(b - a in (200, 400, 800, 1600, 3000) for a, b in zip(calls, calls[1:], strict=False))
     # absolute asks: the RM may grant a few more containers than needed; Spark launches on none of them
     received = [p for _t, kind, p in run.yarn_log if kind == "am_received"]
     assert sum(n for n, _ in received) >= 60 and sum(k for _, k in received) == 60
