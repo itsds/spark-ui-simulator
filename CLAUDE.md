@@ -70,9 +70,10 @@ incident ticket and investigates the same way they would at work.
 ```
 src/sparksim/          Python package: eventlog/ (typed events, JsonProtocol bytes, DriverLedger, Timeline, JVM orders),
                        model/ (cluster/YARN, HDFS, file splits, workload, shuffle), cost/ (calibration.py, model.py),
-                       sched/ (event kernel, TaskScheduler), engine/ (driver/AQE runtime, lineage, emit),
+                       sched/ (event kernel, TaskScheduler), sql/ (DataFrame API + planner, AQE, explain, plan info,
+                       RDD scopes, SQL metrics), engine/ (driver runtime, emit),
                        apps/ (tiny smoke app, daily_enrichment = Scenario 00), yarn.py, environment.py, cli.py
-                       (planned: planner/, yarnlogs/)
+                       (planned: yarnlogs/)
 scenarios/NN-slug/     ticket.md, hints.md, solution.md (Evidence table checked by tests); scenario.yaml from Phase 6
 reference/jobs/        real PySpark reference jobs (ref00–ref08) + common.py
 reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
@@ -89,8 +90,10 @@ event-logs/, build/    GENERATED, gitignored
 
 Read `docs/EVENT_LOG_FORMAT.md` before writing any event-log code. Emit events through
 `sparksim.eventlog` (`Timeline` + `DriverLedger`): never hand-compute accumulator `Value`s or stage totals.
-New apps describe a workload (`engine.runtime.AppSpec`) and let `engine/` simulate it; every throughput or
-overhead constant goes in `cost/calibration.py` with its provenance tag.
+New apps describe a workload (`engine.runtime.AppSpec`) whose queries are PySpark-like DataFrame code over
+table schemas (`sql.dataframe`), and let `sql/` + `engine/` plan and simulate it; every throughput or overhead
+constant goes in `cost/calibration.py` with its provenance tag. Check plan/explain changes against
+`tests/test_sql_golden.py` (ref01 re-planned with our DSL must match the real log).
 
 ## Tooling and commands
 
@@ -101,14 +104,14 @@ JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
 | Task | Command |
 |---|---|
 | Lint | `uv run ruff check .` |
-| Generate Scenario 00 (~15k tasks, ~10 s) | `uv run sparksim generate 00-healthy-baseline --out event-logs` |
+| Generate Scenario 00 (~9.4k tasks, ~10 s) | `uv run sparksim generate 00-healthy-baseline --out event-logs` |
 | Generate the tiny synthetic app | `uv run sparksim generate tiny --out event-logs` |
 | Check the event model on a log (byte round trip) | `uv run sparksim roundtrip <event-log>...` |
 | Unit tests | `uv run pytest -m "not integration"` |
 | All tests (starts a real History Server) | `uv run pytest` |
 | History Server on a log dir | `services/history-server/run.sh [LOG_DIR] [PORT]` (default `event-logs/`, 18080) |
 | Validate replay (log vs server counts) | `uv run scripts/hs_api.py validate --log-dir <dir>` |
-| Query the REST API | `uv run scripts/hs_api.py stages <app-id>` / `summary <app-id> <stage>` / `get <app-id> <path>` |
+| Query the REST API | `uv run scripts/hs_api.py stages <app-id>` / `summary <app-id> <stage>` / `get <app-id> <path>` / `sql <app-id>` |
 | Check a solution's evidence numbers | `uv run scripts/evidence.py 00-healthy-baseline` (against a running HS) |
 | Screenshot key UI pages | `uv run scripts/screenshot.py <app-id> [--stage N]` → `build/screenshots/` |
 | Start reference YARN cluster | `reference/yarn/cluster.sh start` (needs Hadoop 3.3.x at `/opt/hadoop`) |

@@ -249,3 +249,65 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   solution no longer matches what the server shows. The numbers are written in
   one place only, the solution. `uv run scripts/evidence.py <scenario>` shows
   the new values after a model change.
+
+## ADR-018 — The SQL layer ports Spark's planner pieces and is golden-tested against a real execution
+
+- **Date:** 2026-11-03
+- **Status:** accepted; supersedes the hand-written stage pipelines of ADR-013 (`StageSpec`s are now derived)
+- **Context:** The SQL tab shows a plan graph, an explain text and per-operator metrics, and AQE rewrites the plan
+  several times during one execution. Real logs expose details that only come out right if the mechanism is the same:
+  metric accumulator ids change exactly for the nodes AQE copies, explain operator ids are per node *object*,
+  scope ids follow the order of `execute()`/`produce()` calls.
+- **Decision:** `sparksim/sql/` models Spark's physical operators (node names, simple strings, explain fields, metric
+  maps in definition order) and ports the algorithms around them: a small DataFrame API with the optimizer rules
+  that shape plans (filter pushdown, `isnotnull` inference, column pruning, CollapseProject, join strategy,
+  EnsureRequirements, partial/final aggregation, V1Writes sort), `createQueryStages` / `newQueryStage` /
+  CoalesceShufflePartitions / ApplyColumnarRulesAndInsertTransitions / CollapseCodegenStages, re-planning after
+  every completed stage (always adopted: every re-plan in ref01 was), `ExplainUtils.processPlan`,
+  `SparkPlanInfo.fromSparkPlan` with lazily allocated metric ids (pre-order), and an RDD-scope simulator. The engine
+  drives one `AdaptiveExecution` per query and runs the query stages it creates.
+- **Proof:** `tests/test_sql_golden.py` writes `ref01-daily-etl-aqe` execution 0 with our DSL (only the analyzer's
+  aggregate expression ids are pinned) and reproduces all 5 plan events byte for byte, explain text and SparkPlanInfo
+  with every accumulator id, except `[plan_id=N]` (a JVM-wide counter of every SparkPlan Catalyst instantiates; we
+  emit plausible increasing values). Scope and RDD ids of the single-threaded AQE rounds match exactly; the round
+  where the broadcast runs on its own thread matches in shape and id set (the interleaving is seeded). Metric
+  definitions are checked against all 300+ plan nodes in the 9 reference logs.
+- **Not modelled yet:** exchange reuse, subqueries / dynamic partition pruning, skew-join splits and local shuffle
+  reads in AQEShuffleRead, AQE's runtime SMJ→BHJ switch, collect/limit actions (TakeOrderedAndProject,
+  CollectLimit), Python UDF nodes. The 4 scope ids the driver opens after a broadcast stage completes, and the 2 / 4-7
+  before each execution, are taken from the reference logs, not from a mechanism.
+
+## ADR-019 — SQL metric values: Spark's reporting rules, timings nested like Spark measures them
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Decision:** `sql/metrics.py` derives each task's SQL accumulator updates from the cost model's per-task
+  result, which now keeps per-operator CPU work and memory, per-source reads and the sink's per-row work.
+  Reporting follows `SQLMetric`: sum metrics when non-zero; size/timing/nsTiming whenever the code path touched them
+  (they start at -1, so a 0 is reported); average metrics only when positive. Which operator touches what was read
+  off the reference logs (EVENT_LOG_FORMAT.md §5.4). Shuffle-read metrics go to the *upstream* Exchange node.
+  Timings nest: a WholeStageCodegen's `duration` and an aggregate's `time in aggregation build` run from the
+  pipeline's start (everything upstream in the stage), `sort time` is only the sort (35 % of the Sort's work),
+  `scan time` is the source's read + decode. Driver-side metrics are posted when Spark posts them, in the iteration
+  order of the metric `Map`s. Tests check that SQL totals equal the task metrics they shadow (rows, shuffle bytes,
+  write time, records read, written rows/files) and that timings fit inside the task's run time.
+- **Consequences:** The History Server's "total (min, med, max)" strings, the plan graph's row counts and the stage
+  pages agree with each other by construction.
+
+## ADR-020 — Row sizes and read fractions come from table schemas; Scenario 00 re-baselined
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** Phase 3 apps gave each operator an UnsafeRow size and each scan a read fraction by hand. With real
+  schemas in the plan (`ReadSchema`, `Output [n]: [...]`), hand-picked sizes would contradict what the UI shows.
+- **Decision:** Tables declare their columns with an average string length (UnsafeRow sizing: null bitset + 8 bytes
+  per field + variable data rounded to 8) and their Parquet bytes per row (read fraction = columns read / all).
+  Column pruning decides which columns a scan reads. Two model fixes surfaced by the SQL tab's row counts:
+  (1) files written right after a hash shuffle record the key they are clustered on (`HdfsFile.key_fraction`), so a
+  partial aggregation on that key meets only the keys of its files (Scenario 00's activity query: 4.06 B rows →
+  61 M, not 3.8 B); (2) a final aggregation outputs every key of its reducers (`min(groups, rows)`), not a
+  random-draw estimate. Also: an empty map task reports 0 shuffle write time (ref01 stage 5).
+- **Consequences:** Scenario 00 changed: 9,448 tasks (was 15,243; `events_enriched` is 34.6 B/row, not 82, so the
+  downstream scans have 600 tasks), 5.5 min, the customers scan reads 1.7 GiB of its 58.3 GiB (5 of 20 columns).
+  `solution.md` was rewritten from `scripts/evidence.py`; the "2x tasks from file packing" lesson no longer occurs
+  and was replaced by the SQL-tab lessons (E15–E19).

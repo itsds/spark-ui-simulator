@@ -9,9 +9,9 @@ scenarios/<id>/scenario.yaml
    the query/job shape, fault injections, seed
         │
         ▼
- planner     logical plan → physical plan (Spark 3.5 operator names, AQE)
-             → stage DAG split at Exchanges (like DAGScheduler)
-             → RDD lineage, operation scopes, call sites
+ planner     DataFrame code → physical plan (Spark 3.5 operators, AQE query stages,
+             codegen stages) → stage pipelines per query stage
+             → RDD lineage, operation scopes, call sites, SQL plan events
         │
         ▼
  cost model  per-task work from data: input bytes/rows, shuffle bytes/records,
@@ -52,7 +52,7 @@ ledger re-derives every real accumulable (ADR-011, EVENT_LOG_FORMAT.md §5.1).
 ## The simulation engine (built in Phase 3)
 
 ```
-apps/<app>.py  AppSpec: cluster, executor sizing, input datasets, queries = stage pipelines (Phase 4: from a planner)
+apps/<app>.py  AppSpec: cluster, executor sizing, input datasets, queries = PySpark-like DataFrame code (sql/)
       │
       ▼
 model/   cluster.py   racks, NodeManagers (+ other tenants' load), container sizing, YARN placement, registration
@@ -62,10 +62,29 @@ model/   cluster.py   racks, NodeManagers (+ other tenants' load), container siz
          shuffle.py   block matrices records[map, reducer], local/remote reads, AQE coalescing
 cost/    calibration.py ([ref]/[norm] constants), model.py: one task's phases → TaskMetrics
 sched/   sim.py (event heap, signals, generator processes), scheduler.py (TaskSchedulerImpl + TaskSetManager)
-engine/  runtime.py   the driver: executors register, AQE query stages → jobs, skipped stages, write → new HDFS files
-         lineage.py   RDD lineage + operation scopes per stage (stage DAG)
+engine/  runtime.py   the driver: executors register, one AdaptiveExecution per query, its query stages → jobs,
+                      skipped stages, SQL events and driver metrics, write → new HDFS files
          emit.py      heartbeat-sampled executor metrics; events via Timeline + DriverLedger
 ```
+
+## The SQL layer (built in Phase 4)
+
+```
+sql/  dataframe.py  read / where / select / join / group_by().agg() / write_parquet → logical plan;
+                    planner: filter pushdown + isnotnull inference, column pruning, BHJ vs SMJ, exchanges, sorts,
+                    partial/final aggregation, planned-write sort. Re-entrant: AQE re-plans around finished stages
+      aqe.py        AdaptiveSparkPlanExec: createQueryStages, CoalesceShufflePartitions (AQEShuffleRead),
+                    ColumnarToRow, CollapseCodegenStages, re-planning, final plan; query stage → engine StageSpec
+      nodes.py      operators: node names, simple strings, explain fields, SQL metric maps (definition order)
+      explain.py    explain("formatted") = physicalPlanDescription
+      planinfo.py   SparkPlanInfo, metric accumulator ids allocated lazily in pre-order
+      scopes.py     RDD scopes + lineage from execute()/produce() call order (stage DAG boxes)
+      metrics.py    per-task SQL metric updates from the cost model's per-operator work; driver-side updates
+```
+
+Node identity is modelled on purpose: a node keeps its metric ids and its explain operator id for as long as
+the same object stays in the plan, and rules that change a child copy the node, as Catalyst's `makeCopy` does.
+That is what makes the AQE updates match real logs (ADR-018).
 
 Data flows forward only: a write stage creates files on the simulated HDFS
 (first replica on the writer's host), and later queries plan their scans from

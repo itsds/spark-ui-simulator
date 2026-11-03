@@ -89,7 +89,7 @@ below. On macOS with Homebrew's `openjdk@17`, that's
 ```bash
 git clone https://github.com/itsds/spark-ui-simulator.git && cd spark-ui-simulator
 uv sync                                              # Python 3.11 + PySpark 3.5.9 (contains the History Server)
-uv run sparksim generate 00-healthy-baseline         # Scenario 00: 40 executors, ~15k tasks, ~10 s to generate
+uv run sparksim generate 00-healthy-baseline         # Scenario 00: 40 executors, ~9.4k tasks, 3 SQL queries, ~10 s to generate
 services/history-server/run.sh event-logs            # foreground; Ctrl+C to stop
 # open http://localhost:18080, then read scenarios/00-healthy-baseline/ticket.md
 ```

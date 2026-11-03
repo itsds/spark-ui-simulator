@@ -110,6 +110,49 @@ def _exec_layout(ctx: Ctx) -> str:
     return f"{len(execs)} x {'/'.join(map(str, sorted(cores)))} cores on {len(hosts)} hosts"
 
 
+# ---------------------------------------------------------------------------- SQL tab
+
+
+def _sql(ctx: Ctx, exec_id: int) -> dict:
+    return ctx.get(f"sql/{exec_id}", details="true", planDescription="false")
+
+
+def _metric(node: dict, name: str) -> str:
+    """A node's metric as the plan graph shows it; for totals `total (min, med, max …)` → the total."""
+    v = next(m["value"] for m in node["metrics"] if m["name"] == name)
+    return v.split("\n")[1].split(" (")[0] if "\n" in v else v
+
+
+def _rows(node: dict) -> int:
+    return int(_metric(node, "number of output rows").replace(",", ""))
+
+
+def _nodes(ctx: Ctx, exec_id: int, name: str) -> list[dict]:
+    return [n for n in _sql(ctx, exec_id)["nodes"] if n["nodeName"] == name.strip()]  # the REST API trims names
+
+
+def _sql_durations(ctx: Ctx) -> str:
+    q = sorted(ctx.get("sql", details="false"), key=lambda e: e["id"])
+    return f"{len(q)} queries: " + ", ".join(fmt_duration(e["duration"]) for e in q)
+
+
+def _bot_filter(ctx: Ctx) -> str:
+    scan = max(_nodes(ctx, 0, "Scan parquet "), key=_rows)
+    filt = max(_nodes(ctx, 0, "Filter"), key=_rows)
+    return f"{_rows(scan):,} → {_rows(filt):,}"
+
+
+def _broadcast(ctx: Ctx) -> str:
+    (b,) = _nodes(ctx, 0, "BroadcastExchange")
+    return f"{_metric(b, 'data size')}, {_rows(b):,} rows"
+
+
+def _partial_aggregation(ctx: Ctx) -> str:
+    (scan,) = _nodes(ctx, 2, "Scan parquet ")
+    partial, final = sorted(_nodes(ctx, 2, "HashAggregate"), key=lambda n: -n["nodeId"])  # leaf side first
+    return f"{_rows(scan):,} → {_rows(partial):,} → {_rows(final):,}"
+
+
 def _dur_median_max(ctx: Ctx, sid: int) -> str:
     med, mx = ctx.quantiles(sid, "duration")
     return f"{secs(med)} / {secs(mx)} ({mx / med:.2f}x)"
@@ -134,7 +177,11 @@ S00 = {
     "E12": _gc_share,
     "E13": _spill,
     "E14": _tasks_per_executor,
-    "E15": lambda c: _dur_median_max(c, 9),
+    "E15": _sql_durations,
+    "E16": _bot_filter,
+    "E17": _broadcast,
+    "E18": lambda c: f"{_rows(_nodes(c, 0, 'SortMergeJoin')[0]):,} rows",
+    "E19": _partial_aggregation,
 }
 
 

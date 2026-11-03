@@ -46,6 +46,10 @@ class HdfsFile:
     rows: int
     blocks: tuple[Block, ...]
     row_groups: tuple[RowGroup, ...] = ()
+    # Written by a task that read one hash-partition range of a shuffle on this key: the file holds every row
+    # of a `key_fraction` share of the key's values, and no other file does.
+    clustered_on: str | None = None
+    key_fraction: float = 0.0
 
     @property
     def name(self) -> str:
@@ -69,7 +73,8 @@ class Hdfs:
         second, third = self.rng.sample(self.cluster.by_rack[rack2], 2)
         return (first, second.name, third.name)[: self.replication]
 
-    def write(self, path: str, size: int, rows: int, writer: str | None, row_group_bytes: int = 0) -> HdfsFile:
+    def write(self, path: str, size: int, rows: int, writer: str | None, row_group_bytes: int = 0,
+              clustered: tuple[str, float] | None = None) -> HdfsFile:
         blocks = []
         off = 0
         while off < size:
@@ -77,7 +82,7 @@ class Hdfs:
             blocks.append(Block(off, n, self.replicas(writer)))
             off += n
         groups = self.row_groups(size, rows, row_group_bytes) if row_group_bytes else ()
-        f = HdfsFile(path, size, rows, tuple(blocks), groups)
+        f = HdfsFile(path, size, rows, tuple(blocks), groups, *(clustered or (None, 0.0)))
         self.dirs.setdefault(path.rsplit("/", 1)[0], []).append(f)
         return f
 

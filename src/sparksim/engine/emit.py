@@ -5,7 +5,11 @@
   Metrics" are the per-metric peaks over the heartbeats that happened while it
   ran, and all zero if none did (as in the reference logs).
 * Accumulables, stage accumulables and task-metric ids come from
-  `DriverLedger`, built in log order by `Timeline`.
+  `DriverLedger`, built in log order by `Timeline`; SQL metric definitions are
+  registered with it when their plan event is emitted, so TaskEnds list SQL
+  updates with names and running values like the driver does.
+* SQL events: SQLExecutionStart, SQLAdaptiveExecutionUpdate, DriverAccumUpdates
+  and SQLExecutionEnd at the simulated times the driver posts them.
 * Properties are written in `java.util.Properties` order, environment maps
   in Scala `Map` order (`eventlog.ordering`).
 """
@@ -21,6 +25,7 @@ from ..eventlog import (
     ApplicationStart,
     BlockManagerAdded,
     BlockManagerId,
+    DriverAccumUpdates,
     DriverLedger,
     ExecutorAdded,
     ExecutorInfo,
@@ -31,6 +36,9 @@ from ..eventlog import (
     JobSucceeded,
     LogStart,
     ResourceProfileAdded,
+    SQLAdaptiveExecutionUpdate,
+    SQLExecutionEnd,
+    SQLExecutionStart,
     StageCompleted,
     StageInfo,
     StageSubmitted,
@@ -190,6 +198,13 @@ def build_events(run: AppRun) -> list[Event]:
             tl.add(t, _completed(ledger, obj))
         elif kind == "job_end":
             tl.add(t, JobEnd(obj.job_id, obj.completed, JobSucceeded()))
+        elif kind in ("sql_start", "sql_update"):
+            tl.add(t, _plan_event(ledger, kind, t, *obj))
+        elif kind == "driver_accum":
+            exec_id, updates = obj
+            tl.add(t, DriverAccumUpdates(exec_id, [[i, v] for i, v in updates]))
+        elif kind == "sql_end":
+            tl.add(t, SQLExecutionEnd(obj.execution_id, obj.end, ""))
         else:
             raise ValueError(kind)
     tl.add(run.app_end, ApplicationEnd(run.app_end))
@@ -208,10 +223,19 @@ def _submitted(ledger: DriverLedger, st: StageRecord):
     return make
 
 
+def _plan_event(ledger: DriverLedger, kind: str, t: int, qrec, text: str, info, details: str):
+    def make():
+        ledger.define_plan_metrics(info)
+        if kind == "sql_start":
+            return SQLExecutionStart(qrec.execution_id, qrec.execution_id, qrec.description, details, text, info, t)
+        return SQLAdaptiveExecutionUpdate(qrec.execution_id, text, info)
+    return make
+
+
 def _task_end(ledger: DriverLedger, tk: TaskRecord):
     def make():
         m = tk.result.metrics
-        accums = ledger.task_end(tk.stage_id, tk.attempt, Success(), m, touched=tk.touched)
+        accums = ledger.task_end(tk.stage_id, tk.attempt, Success(), m, touched=tk.touched, external=tk.sql)
         return TaskEnd(tk.stage_id, tk.attempt, tk.task_type, Success(), _task_info(tk, tk.finish, accums),
                        tk.exec_metrics, m)
     return make

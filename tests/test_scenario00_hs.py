@@ -1,4 +1,4 @@
-"""Scenario 00 in the real Spark 3.5.9 History Server: replay, pages, and the solution's evidence numbers."""
+"""Scenario 00 in the real Spark 3.5.9 History Server: replay, pages, the SQL tab, and the solution's evidence."""
 
 from __future__ import annotations
 
@@ -37,10 +37,21 @@ def test_scenario00_in_history_server(tmp_path):
         mismatches = {k: (want[k], got[k]) for k in got if want[k] != got[k]}
         assert not mismatches, f"solution.md is stale (solution, server): {mismatches}"
 
+        # The SQL tab: one execution per write, linked to its jobs, every plan node's metrics filled in.
+        sql = hs.app(app_id, "sql", details="true", planDescription="false")
+        assert [(q["id"], q["status"], q["successJobIds"]) for q in sql] == [
+            (0, "COMPLETED", [0, 1, 2, 3]), (1, "COMPLETED", [4, 5]), (2, "COMPLETED", [6, 7])]
+        for q in sql:
+            for node in q["nodes"]:
+                if node["nodeName"] in ("Scan parquet", "Filter", "Exchange", "Sort", "HashAggregate",
+                                        "SortMergeJoin", "BroadcastHashJoin", "BroadcastExchange"):
+                    assert node["metrics"] and all(m["value"] for m in node["metrics"]), node["nodeName"]
+
         # The pages a learner opens render without errors.
         base = f"{url}/history/{app_id}/1"
         for page in ("jobs/", "jobs/job/?id=3", "stages/", "stages/stage/?id=2&attempt=0",
-                     "stages/stage/?id=5&attempt=0", "executors/", "environment/", "storage/"):
+                     "stages/stage/?id=5&attempt=0", "executors/", "environment/", "storage/",
+                     "SQL/", "SQL/execution/?id=0", "SQL/execution/?id=1", "SQL/execution/?id=2"):
             r = requests.get(f"{base}/{page}", timeout=120)
             assert r.status_code == 200, page
     log = (ROOT / "build" / "hs-scenario00-test.log").read_text()

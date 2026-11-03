@@ -6,7 +6,7 @@
 
 Saves jobs, job detail (DAG), stages, stage detail (DAG, Event Timeline, all
 additional metrics, aggregated metrics by executor), executors, environment
-and SQL pages as PNGs. Uses the Playwright +
+and SQL pages (list, plan graph with Details expanded, the other executions) as PNGs. Uses the Playwright +
 Chromium preinstalled in the dev container (`require('playwright')` via node).
 """
 
@@ -86,7 +86,13 @@ def main(argv=None) -> int:
         {"url": f"{base}/environment/", "path": str(out / "5-environment.png")},
     ]
     if a.sql is not None:
-        shots.append({"url": f"{base}/SQL/execution/?id={a.sql}", "path": str(out / "6-sql-plan.png"), "full": True})
+        shots.append({"url": f"{base}/SQL/", "path": str(out / "6-sql-list.png")})
+        # ExecutionPage.scala: the "Details" link under the graph calls clickPhysicalPlanDetails()
+        shots.append({"url": f"{base}/SQL/execution/?id={a.sql}", "path": str(out / "6b-sql-plan.png"),
+                      "click": ["span[onclick='clickPhysicalPlanDetails();']"], "full": True})
+        for other in [x["id"] for x in sql if x["id"] != a.sql][:2]:
+            shots.append({"url": f"{base}/SQL/execution/?id={other}", "path": str(out / f"6c-sql-plan-{other}.png"),
+                          "full": True})
 
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
         fh.write(JS)

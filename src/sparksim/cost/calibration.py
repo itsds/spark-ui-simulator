@@ -47,6 +47,30 @@ AQE_REPLAN_MS = (90, 420)
 # [ref] Broadcast job starts ~50 ms after the shuffle jobs submitted with it.
 BROADCAST_JOB_LAG_MS = (20, 80)
 
+# ============================================================================ SQL driver [ref]/[spark]
+
+# [norm] InMemoryFileIndex listing on the driver (NameNode listStatus + block locations), per file.
+# Feeds the scan's "metadata time" and the planning gap before an execution starts.
+FILE_LISTING_MS_PER_FILE = 0.06
+# [ref] SQLExecutionStart → first query-stage job: 300–500 ms in ref01 (createQueryStages, AQE update,
+# RDD building, task binary broadcast).
+SQL_START_TO_STAGES_MS = (180, 480)
+# [ref] RDDOperationScope ids the driver opens outside stage materialization (ref01/ref04/ref07): 2 before
+# the app's first SQL execution, 4-7 before every later one, 4 after a broadcast query stage completes.
+FIRST_EXECUTION_SCOPES = 2
+EXECUTION_SCOPES = (4, 7)
+SCOPES_AFTER_BROADCAST = 4
+# BroadcastExchangeExec after its collect job: build the HashedRelation, then TorrentBroadcast it.
+# [ref] ref01: 5,000 rows, "time to build" 71 ms (cold JIT), "time to broadcast" 7 ms.
+BROADCAST_BUILD_FIXED_MS = 12.0
+BROADCAST_BUILD_NS_PER_ROW = 400.0
+BROADCAST_FIXED_MS = 4.0
+BROADCAST_MBPS = 400.0
+# [spark] LongToUnsafeRowMap.estimatedSize = key array (8 B per key, dense ids) + row page (1 MiB, doubling):
+# ref01's 5,000-row relation is exactly 1,048,576 + 40,000 = 1,088,576 bytes ("data size").
+HASHED_RELATION_BYTES_PER_ROW = 8
+HASHED_RELATION_MIN_BYTES = 1024 * 1024
+
 # [spark] spark.executor.heartbeatInterval: executor metrics are polled at heartbeats
 # (spark.executor.metrics.pollingInterval=0), so a task's "Task Executor Metrics" are the peaks seen
 # by the heartbeats that happened while it ran: all zero for tasks shorter than one heartbeat gap.
