@@ -132,6 +132,24 @@ Optional events and their switches (production defaults **off**):
   must equal the sum of the task updates.
 - Accumulator IDs are unique per app and increase over its lifetime.
 
+### 5.1 The driver's accumulator bookkeeping (verified on all 9 reference logs)
+
+`sparksim.eventlog.driver.DriverLedger` implements these rules.
+`tests/test_eventlog_golden.py` re-derives all 26,719 accumulables in
+the reference logs from task metrics alone and matches every one.
+
+| Rule | Detail |
+|---|---|
+| `Value` is a running total | `Task Info.Accumulables[].Value` = the driver's accumulator after merging this task (`DAGScheduler.updateAccumulators`). Task-metric accumulators are fresh per stage attempt, so the total is per attempt. SQL metrics belong to a plan node, so their total spans every task that updates them, across stages. |
+| Number vs string | `internal.metrics.*` → JSON numbers. Every other accumulator (SQL metrics included) → strings, e.g. `"Update":"166666"`. Nameless updates inside `ExceptionFailure."Accumulator Updates"` → strings, `"Internal": false`. |
+| Zero updates are dropped… | A task lists an accumulator only if its update is non-zero (`!updates.isZero`). |
+| …unless the code path touched it | `LongAccumulator.add(0)` counts as non-zero. Every reduce task lists **all 17** shuffle-read and push-read metrics. Sort/aggregate paths list `memoryBytesSpilled`/`diskBytesSpilled` = 0. Size/timing SQL metrics start at -1, so a reported 0 (`spill size`, `fetch wait time`) is a real update. |
+| Who merges | Only `Success`, `ExceptionFailure` and `TaskKilled` merge updates. `FetchFailed` and `ExecutorLostFailure` tasks have empty `Accumulables` and no `Task Metrics`. Failed tasks report no SQL metrics, because those are registered with `countFailedValues=false`. |
+| Task-metric IDs | Each stage attempt registers 35 consecutive IDs at submission, in `TaskMetrics.nameToAccums` order (`metrics.TASK_METRIC_ACCUMS`). Offsets: 0 executorDeserializeTime … 4 resultSize, 5 jvmGCTime, 9 peakExecutionMemory, 10 updatedBlockStatuses (never written), 11–17 shuffle.read.*, 18–25 shuffle.push.read.*, 26 remoteReqsDuration, 27 remoteMergedReqsDuration, 28–30 shuffle.write.*, 31–32 input.*, 33–34 output.*. PySpark takes ID 0 at startup (PythonAccumulatorV2), so in an RDD-only app stage 0 uses 1–35 and stage 1 uses 36–70. |
+| Order | `Accumulables` lists are sorted by ID (`JsonProtocol.accumulablesToJson`). `updatedBlockStatuses` is never written. |
+| Stage accumulables | `StageCompleted` lists every accumulator the stage's tasks updated, with its latest `Value` and no `Update`. They are recorded on the stage's *latest* attempt (`stage.latestInfo`). |
+| JSON bytes | Compact, raw UTF-8, `\uXXXX` with upper-case hex for other control characters, `/` not escaped (Jackson defaults). `tests/test_eventlog_roundtrip.py` reproduces all 3,327 reference lines byte for byte. |
+
 ## 6. YARN-specific fields (captured on real YARN, cluster mode)
 
 - `ApplicationStart`: `App ID` = `application_…`, `App Attempt ID` = `"1"`, plus driver `Driver Logs`/`Driver Attributes` (the AM container).

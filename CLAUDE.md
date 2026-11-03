@@ -68,7 +68,9 @@ incident ticket and investigates the same way they would at work.
 ## Repo layout
 
 ```
-src/sparksim/          Python package (planned: model/, planner/, cost/, sched/, eventlog/, yarnlogs/)
+src/sparksim/          Python package: eventlog/ (typed events, JsonProtocol bytes, DriverLedger, Timeline),
+                       yarn.py, environment.py, apps/ (tiny smoke app), cli.py
+                       (planned: model/, planner/, cost/, sched/, yarnlogs/)
 scenarios/NN-slug/     (planned) scenario.yaml, ticket.md, hints.md, solution.md
 reference/jobs/        real PySpark reference jobs (ref00–ref08) + common.py
 reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
@@ -83,7 +85,8 @@ tests/                 unit + integration (marker `integration` starts a real Hi
 event-logs/, build/    GENERATED, gitignored
 ```
 
-Read `docs/EVENT_LOG_FORMAT.md` before writing any event-log code.
+Read `docs/EVENT_LOG_FORMAT.md` before writing any event-log code. Emit events through
+`sparksim.eventlog` (`Timeline` + `DriverLedger`): never hand-compute accumulator `Value`s or stage totals.
 
 ## Tooling and commands
 
@@ -94,6 +97,8 @@ JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
 | Task | Command |
 |---|---|
 | Lint | `uv run ruff check .` |
+| Generate the tiny synthetic app | `uv run sparksim generate tiny --out event-logs` |
+| Check the event model on a log (byte round trip) | `uv run sparksim roundtrip <event-log>...` |
 | Unit tests | `uv run pytest -m "not integration"` |
 | All tests (starts a real History Server) | `uv run pytest` |
 | History Server on a log dir | `services/history-server/run.sh [LOG_DIR] [PORT]` (default `event-logs/`, 18080) |

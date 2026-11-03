@@ -9,9 +9,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-LOG_DIR="$(realpath -m "${1:-$ROOT/event-logs}")"
+LOG_DIR="${1:-$ROOT/event-logs}"
 PORT="${2:-18080}"
 mkdir -p "$LOG_DIR"
+LOG_DIR="$(cd "$LOG_DIR" && pwd)"   # absolute path; portable (macOS realpath has no -m)
 
 source "$ROOT/scripts/env.sh"
 unset HADOOP_CONF_DIR YARN_CONF_DIR   # event logs are read from the local filesystem

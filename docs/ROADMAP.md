@@ -9,7 +9,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | 0 | Foundation and project memory | ✅ |
 | 1 | Reference capture + real History Server harness | ✅ |
-| 2 | Event-log writer (minimal synthetic app) | ⬜ |
+| 2 | Event-log writer (minimal synthetic app) | ✅ |
 | 3 | Cluster, cost model, scheduler → Scenario 00 at production scale | ⬜ |
 | 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ⬜ |
 | 5 | YARN realism: IDs, containers, executor logs, Environment tab | ⬜ |
@@ -43,13 +43,18 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
 - [x] Tests: `tests/test_reference_logs.py` (well-formed, YARN cluster mode) + integration replay test
 - **Done when:** HS shows every reference app with no replay errors, and `hs_api.py` returns their stages. ✅
 
-## Phase 2 — Event-log writer (minimal synthetic app)
+## Phase 2 — Event-log writer (minimal synthetic app) ✅
 
-- [ ] `sparksim/eventlog/`: typed builders for each event in Phase 1's catalog, serialized exactly as Spark 3.5 JsonProtocol
-- [ ] Golden test: re-emit a reference app from a model and diff it field-by-field against the real log
-- [ ] Hand-specified tiny synthetic app (1 job, 2 stages, 8 tasks, 2 executors) renders in HS
-- [ ] Integration test: generate → start HS → REST round-trip assertions
-- **Done when:** the synthetic app looks like a real tiny app in every tab, and the tests pass.
+- [x] `sparksim/eventlog/`: typed builders for each event in Phase 1's catalog, serialized exactly as Spark 3.5 JsonProtocol
+      (all 22 event types seen in the reference logs, plus `StageExecutorMetrics` and `SQLAdaptiveSQLMetricUpdates`, which
+      no reference log contains yet and so are unverified; strict parser; byte-identical round trip of all 3,327 reference lines)
+- [x] Golden test: re-emit a reference app from a model and diff it field-by-field against the real log
+      (`DriverLedger` re-derives all 26,719 accumulables in the 9 reference logs from task metrics: running `Value`s,
+      dropped-zero / touched rules, task-metric ID layout, stage accumulables; see EVENT_LOG_FORMAT.md §5.1)
+- [x] Hand-specified tiny synthetic app (1 job, 2 stages, 8 tasks, 2 executors) renders in HS: `sparksim generate tiny`
+- [x] Integration test: generate → start HS → REST round-trip assertions (`tests/test_tiny_app.py`)
+- **Done when:** the synthetic app looks like a real tiny app in every tab, and the tests pass. ✅ (screenshots checked:
+  Jobs + timeline, job DAG, stage DAG/timeline/all metrics/aggregated by executor, Executors, Environment)
 
 ## Phase 3 — Cluster, cost model, scheduler → Scenario 00 (healthy baseline)
 
