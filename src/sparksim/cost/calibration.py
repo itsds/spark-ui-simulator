@@ -1,0 +1,193 @@
+"""Every throughput, overhead and noise constant the simulation uses, with where it came from.
+
+Provenance tags:
+
+* **[ref]** measured on our real Spark 3.5.9 / YARN reference runs
+  (`reference/event-logs`, single node). We take overheads and shapes from
+  them (deserialization, scheduler delay, GC share, result sizes, timing gaps),
+  not throughputs: the reference box is one oversubscribed VM.
+* **[norm]** a production order of magnitude for Spark 3.5 on JDK 17,
+  x86 servers at 2–3 GHz, 10 GbE, HDFS on JBOD disks. These are the usual
+  figures from Spark tuning guides and vendor sizing docs, rounded. Phase 6+
+  scenarios may override a few of them per cluster (e.g. a degraded disk).
+* **[spark]** a Spark/YARN/HDFS default or source-code constant.
+
+Rates are per task thread (one core) unless noted. Times are ms, sizes bytes.
+"""
+
+from __future__ import annotations
+
+MiB = 1024 * 1024
+GiB = 1024 * MiB
+
+# ============================================================================ scheduling / driver
+
+# [ref] Launch time → finish time minus (deserialize + run + result serialization): median 11 ms,
+# p10 6 ms, p90 45 ms over 1,100 reference tasks. Production drivers with ~150 concurrent tasks sit
+# at the low end; we model the RPC + result handling as lognormal around this median.
+SCHEDULER_DELAY_MEDIAN_MS = 9.0
+SCHEDULER_DELAY_SIGMA = 0.55
+# [ref] TaskEnd → next TaskStart on the same core: 0 ms in most cases (same status-update round), ≤ 40 ms.
+RELAUNCH_GAP_MS = (0, 4)
+# [spark] spark.scheduler.revive.interval
+REVIVE_INTERVAL_MS = 1_000
+# [spark] spark.locality.wait (process/node/rack all default to it)
+LOCALITY_WAIT_MS = 3_000
+# [ref] StageSubmitted → first TaskStart for a newly submitted stage: 2–25 ms (task binary broadcast).
+STAGE_LAUNCH_DELAY_MS = (3, 22)
+# Per task launched in one offer round: TaskSetManager serializes each task (~0.2 ms each).
+LAUNCH_SPACING_MS = 0.25
+# [ref] last TaskEnd → StageCompleted 1–3 ms; StageCompleted → JobEnd 1–5 ms.
+STAGE_COMPLETE_DELAY_MS = (1, 3)
+JOB_END_DELAY_MS = (1, 5)
+# [ref] JobStart → StageSubmitted 2–25 ms.
+JOB_TO_STAGE_MS = (2, 25)
+# [ref] AQE: query-stage job end → next query-stage job start 80–500 ms (re-optimization, new stages).
+AQE_REPLAN_MS = (90, 420)
+# [ref] Broadcast job starts ~50 ms after the shuffle jobs submitted with it.
+BROADCAST_JOB_LAG_MS = (20, 80)
+
+# [spark] spark.executor.heartbeatInterval: executor metrics are polled at heartbeats
+# (spark.executor.metrics.pollingInterval=0), so a task's "Task Executor Metrics" are the peaks seen
+# by the heartbeats that happened while it ran: all zero for tasks shorter than one heartbeat gap.
+HEARTBEAT_INTERVAL_MS = 10_000
+
+# ============================================================================ YARN / executor start-up
+
+# [ref] ApplicationStart → driver BlockManagerAdded ≈ 1.0 s.
+DRIVER_BLOCK_MANAGER_MS = (900, 1_100)
+# [ref]/[norm] driver start → YarnAllocator's first container request (SparkContext + AM registration).
+AM_REQUEST_DELAY_MS = (1_300, 2_100)
+# [spark] yarn.resourcemanager.nodemanagers.heartbeat-interval-ms; one OFF_SWITCH container per node
+# heartbeat (yarn.scheduler.capacity.per-node-heartbeat.maximum-offswitch-assignments = 1).
+NM_HEARTBEAT_MS = 1_000
+# [spark] spark.yarn.scheduler.initial-allocation.interval (AM allocate() polling while requests are pending)
+AM_ALLOCATE_INTERVAL_MS = 200
+# [ref]/[norm] container launch → executor registered with the driver: NM startContainer, localization
+# of the (cached) spark.yarn.archive, JVM start, CoarseGrainedExecutorBackend registration.
+# Reference: first executor 6–7 s after app start on a cold single node; production nodes ~3–5 s.
+EXECUTOR_START_MS = (2_900, 4_800)
+# [ref] ExecutorAdded → executor BlockManagerAdded 60–200 ms.
+EXECUTOR_BLOCK_MANAGER_MS = (60, 200)
+# [spark] spark.scheduler.minRegisteredResourcesRatio on YARN (0.8) and maxRegisteredResourcesWaitingTime.
+MIN_REGISTERED_RATIO = 0.8
+MAX_REGISTERED_WAIT_MS = 30_000
+
+# [norm] Host-to-host CPU/disk speed spread inside one hardware generation (lognormal sigma).
+HOST_SPEED_SIGMA = 0.035
+# [norm] Per-task multiplicative noise on CPU work (JIT state, cache misses, co-tenant load).
+TASK_NOISE_SIGMA = 0.07
+
+# ============================================================================ task overheads
+
+# [ref] Executor Deserialize Time. First task on each core of a fresh JVM: median 690 ms (class loading,
+# first Kryo/closure deserialization). First task of a stage on an executor: task-binary broadcast fetch.
+# Later tasks: a few ms on a warm production JVM (reference: 37 ms median on the overloaded box).
+DESERIALIZE_COLD_JVM_MS = 520.0
+DESERIALIZE_NEW_STAGE_MS = 70.0
+DESERIALIZE_WARM_MS = 4.0
+DESERIALIZE_SIGMA = 0.35
+# Share of deserialize wall time that is CPU on the task thread.
+DESERIALIZE_CPU_SHARE = {"cold": 0.25, "stage": 0.55, "warm": 0.7}
+# [norm] Janino compilation of a stage's whole-stage-codegen classes, paid by the first task of the stage on
+# each executor (the CodeGenerator cache is per JVM). Shows up in run time of first-wave tasks.
+CODEGEN_COMPILE_MS = 260.0
+# [ref] Result Serialization Time: 0–4 ms.
+RESULT_SERIALIZATION_MS = (0, 3)
+# [ref] DirectTaskResult size: accumulator updates + value. ShuffleMapTask ≈ 1.7 KB + MapStatus.
+RESULT_BASE_BYTES = 1_640
+RESULT_JITTER_BYTES = 120
+
+# ============================================================================ CPU work [norm]
+
+# Vectorized Parquet read: decompression (snappy) + decoding of the selected column chunks
+# (string-heavy schemas: ~80 MB/s of compressed column data per core).
+PARQUET_DECODE_NS_PER_BYTE = 12.0
+# [spark] Parquet footer read per file opened by a scan task (FileMetaData; input bytes include it).
+PARQUET_FOOTER_READ = 48 * 1024
+# ColumnarToRow + UnsafeRow assembly for ~25 selected columns.
+SCAN_NS_PER_ROW = 120.0
+# Whole-stage-codegen operators (per input row of the operator).
+FILTER_PROJECT_NS_PER_ROW = 25.0
+BROADCAST_PROBE_NS_PER_ROW = 60.0
+HASH_AGG_NS_PER_ROW = 85.0
+SORT_NS_PER_ROW = 150.0  # UnsafeExternalSorter: prefix radix sort + record copy
+SMJ_NS_PER_ROW = 60.0
+# Shuffle write (UnsafeShuffleWriter): row copy, partition id, in-memory sort, LZ4 compression.
+SHUFFLE_SERIALIZE_NS_PER_BYTE = 11.0  # per uncompressed UnsafeRow byte ≈ 90 MB/s
+# Shuffle read: LZ4 decompression + UnsafeRow deserialization.
+SHUFFLE_DESERIALIZE_NS_PER_BYTE = 3.0  # per compressed byte read
+# Parquet write: dictionary/RLE encoding + snappy.
+PARQUET_ENCODE_NS_PER_ROW = 120.0
+PARQUET_ENCODE_NS_PER_BYTE = 4.0  # per output (compressed) byte
+
+# ============================================================================ I/O [norm]
+
+# Per task stream, on a *shared* production node: 12 JBOD disks (~1.5 GB/s) and one 10 GbE NIC serve
+# ~40 concurrent tasks of every tenant, so one stream gets far less than a disk can do alone.
+# HDFS reads: NODE_LOCAL uses short-circuit local reads; remote reads go through a DataNode; cross-rack
+# traffic also crosses the oversubscribed spine.
+HDFS_READ_MBPS = {"NODE_LOCAL": 95.0, "RACK_LOCAL": 72.0, "ANY": 55.0}
+HDFS_READ_OPEN_MS = 6.0  # per file opened (NameNode getBlockLocations + DataNode connect)
+# Shuffle write: disk throughput while flushing / merging spill files into the map output (Shuffle Write Time).
+SHUFFLE_DISK_WRITE_MBPS = 120.0
+SHUFFLE_WRITE_FIXED_MS = 5.0  # data + index file create, rename, fsync
+# Shuffle read: local blocks come from local disk/page cache; remote blocks over the network.
+SHUFFLE_LOCAL_READ_MBPS = 250.0
+SHUFFLE_REMOTE_MBPS = 90.0  # one reduce task's fetch rate (NIC shared by every task on the node)
+SHUFFLE_FETCH_OVERLAP = 0.78  # share of remote transfer hidden behind compute (spark.reducer.maxSizeInFlight)
+SHUFFLE_REQUEST_LATENCY_MS = 1.5  # per remote request round trip
+SHUFFLE_BLOCKS_PER_REQUEST = 40  # blocks batched per fetch request (≈ maxSizeInFlight / 5 / block size)
+# Parquet write to HDFS: 3-replica pipeline.
+HDFS_WRITE_MBPS = 70.0
+TASK_COMMIT_MS = 22.0  # [ref] "task commit time" ≈ 20 ms (FileOutputCommitter v1 rename)
+# [norm] Driver-side v1 job commit: one rename per task attempt directory, done serially by the driver.
+JOB_COMMIT_MS_PER_FILE = 5.5
+JOB_COMMIT_FIXED_MS = 350.0  # _SUCCESS marker + metastore partition update
+
+# ============================================================================ JVM [ref]/[norm]
+
+# [ref] JVM GC Time / Executor Run Time: median 2.8 % (p25 1.7 %, p75 4.7 %) on reference tasks > 1 s.
+GC_SHARE_MEDIAN = 0.024
+GC_SHARE_SIGMA = 0.45
+GC_COLD_EXTRA_MS = (40, 140)  # heap warm-up on a fresh JVM's first tasks
+YOUNG_GC_PAUSE_MS = 22.0  # average G1 young pause, for executor GC counts
+# [spark] Memory: reserved 300 MiB, spark.memory.fraction 0.6, spark.memory.storageFraction 0.5.
+RESERVED_MEMORY = 300 * MiB
+MEMORY_FRACTION = 0.6
+STORAGE_FRACTION = 0.5
+# [spark] spark.buffer.pageSize default: nextPowerOf2(maxExecutionMemory / cores / 16), clamped to [1 MiB, 64 MiB].
+PAGE_SIZE_MIN = 1 * MiB
+PAGE_SIZE_MAX = 64 * MiB
+# Bytes of sort-pointer array per record in UnsafeInMemorySorter (pointer + key prefix, x2 for radix).
+SORT_POINTER_BYTES = 32
+# Hash map overhead per group in BytesToBytesMap / UnsafeFixedWidthAggregationMap.
+HASH_MAP_BYTES_PER_GROUP = 48
+# [ref]/[norm] Executor heap shape for heartbeat snapshots.
+JVM_BASE_HEAP = 160 * MiB
+JVM_HEAP_PER_RUNNING_TASK = 55 * MiB  # transient young-gen allocation of a running task
+JVM_OFF_HEAP_BASE = 105 * MiB  # metaspace + code cache + threads (reference: 72–131 MiB)
+JVM_OFF_HEAP_PER_STAGE = 1_500_000  # metaspace growth per distinct stage run (generated classes)
+DIRECT_POOL_BASE = 21 * MiB  # [ref] 12–34 MiB
+DIRECT_POOL_PER_FETCH = 9 * MiB  # netty buffers per reduce task fetching
+
+# ============================================================================ data formats [norm]
+
+LZ4_SHUFFLE_RATIO = 0.42  # compressed / UnsafeRow bytes for typical mixed-type rows
+SHUFFLE_BYTES_PER_EMPTY_BLOCK = 0
+
+# ============================================================================ PySpark RDD API (Phase 2 tiny app)
+
+# Order of magnitude from ref08 job 0 (same API on the same Spark).
+PY_NS_PER_RECORD_MAP = 2_700  # Python lambda + PairwiseRDD batching, per input record
+PY_NS_PER_RECORD_REDUCE = 9_000  # Python merge of (key, count) pairs, per shuffled record
+PY_JVM_CPU_SHARE = 0.11  # JVM task-thread CPU / run time: the work runs in the Python worker process
+PY_WORKER_MS = {"cold": 260, "warm": 140}  # per-task Python worker hand-off (fork on first use, then reuse)
+PY_DESERIALIZE_MS = {"cold_jvm": 480, "cold_stage": 210, "warm": 9}  # first task per core / new stage / later
+PY_SCHEDULER_OVERHEAD_MS = (18, 45)  # launch RPC + status update, uniform range
+PY_SHUFFLE_WRITE_FIXED_MS = 32  # open, fsync, index file commit
+PY_SHUFFLE_WRITE_BPS = 150e6
+PY_NETWORK_BPS = 90e6  # one remote fetch stream
+PY_REMOTE_FETCH_LATENCY_MS = 4
+PY_HOST_SPEED_SIGMA = 0.05
+PY_TASK_NOISE_SIGMA = 0.08

@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ..cost import calibration as cal
 from ..environment import PySparkYarnApp, environment_update
 from ..eventlog import (
     SHUFFLE_READ_ACCUMS,
@@ -65,6 +66,7 @@ from ..eventlog import (
     rdd_scope,
     write_event_log,
 )
+from ..eventlog.ordering import java_properties
 from ..eventlog.timeline import Timeline
 from ..yarn import GiB, NodeManager, YarnApp, container_attributes, container_log_urls, unified_memory_max
 
@@ -92,19 +94,19 @@ class TinySpec:
     started_at: str = "2026-11-02T06:15:03.412+00:00"
 
 
-# Rates (order of magnitude from ref08 job 0, same API): Phase 3 moves these into cost/calibration.py.
-PY_NS_PER_RECORD_MAP = 2_700  # Python lambda + PairwiseRDD batching, per input record
-PY_NS_PER_RECORD_REDUCE = 9_000  # Python merge of (key, count) pairs, per shuffled record
-JVM_CPU_SHARE = 0.11  # JVM task-thread CPU / run time: the work runs in the Python worker process
-PY_WORKER_MS = {"cold": 260, "warm": 140}  # per-task Python worker hand-off (fork on first use, then reuse)
-DESERIALIZE_MS = {"cold_jvm": 480, "cold_stage": 210, "warm": 9}  # first task per core / new stage / later
-SCHEDULER_OVERHEAD_MS = (18, 45)  # launch RPC + status update, uniform range
-SHUFFLE_WRITE_FIXED_MS = 32  # open, fsync, index file commit
-SHUFFLE_WRITE_BPS = 150e6
-NETWORK_BPS = 90e6  # one remote fetch stream
-REMOTE_FETCH_LATENCY_MS = 4
-HOST_SPEED_SIGMA = 0.05
-TASK_NOISE_SIGMA = 0.08
+# Rates: order of magnitude from ref08 job 0 (same API); they live in cost/calibration.py (PY_* constants).
+PY_NS_PER_RECORD_MAP = cal.PY_NS_PER_RECORD_MAP
+PY_NS_PER_RECORD_REDUCE = cal.PY_NS_PER_RECORD_REDUCE
+JVM_CPU_SHARE = cal.PY_JVM_CPU_SHARE
+PY_WORKER_MS = cal.PY_WORKER_MS
+DESERIALIZE_MS = cal.PY_DESERIALIZE_MS
+SCHEDULER_OVERHEAD_MS = cal.PY_SCHEDULER_OVERHEAD_MS
+SHUFFLE_WRITE_FIXED_MS = cal.PY_SHUFFLE_WRITE_FIXED_MS
+SHUFFLE_WRITE_BPS = cal.PY_SHUFFLE_WRITE_BPS
+NETWORK_BPS = cal.PY_NETWORK_BPS
+REMOTE_FETCH_LATENCY_MS = cal.PY_REMOTE_FETCH_LATENCY_MS
+HOST_SPEED_SIGMA = cal.PY_HOST_SPEED_SIGMA
+TASK_NOISE_SIGMA = cal.PY_TASK_NOISE_SIGMA
 
 CLUSTER_TS = 1792541274210  # ResourceManager start (2026-10-21)
 APP_SEQ = 4217
@@ -256,15 +258,13 @@ def build_events(spec: TinySpec | None = None):
     def stage_info(sid, name, rdds, parents, details, submitted=None, completed=None, accums=None):
         return StageInfo(sid, 0, name, n, rdds, parents, details, submitted, completed, None, accums or [])
 
-    props = {
+    props = java_properties({
         "spark.rdd.scope": rdd_scope(3, "collect"),
         "spark.job.description": "count events per key",
         "callSite.short": f"count at {callsite}",
         "spark.rdd.scope.noOverride": "true",
-    }
-    stage_props = {"spark.rdd.scope": props["spark.rdd.scope"], "resource.executor.cores": str(spec.executor_cores),
-                   "spark.job.description": props["spark.job.description"], "callSite.short": props["callSite.short"],
-                   "spark.rdd.scope.noOverride": "true"}
+    })
+    stage_props = java_properties({**props, "resource.executor.cores": str(spec.executor_cores)})
     names = (f"reduceByKey at {callsite}", f"count at {callsite}")
 
     ledger = DriverLedger()

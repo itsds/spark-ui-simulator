@@ -49,6 +49,29 @@ generator (apps/, later sched/)          sparksim.eventlog
 Proof: every reference line round-trips byte for byte (ADR-010), and the
 ledger re-derives every real accumulable (ADR-011, EVENT_LOG_FORMAT.md §5.1).
 
+## The simulation engine (built in Phase 3)
+
+```
+apps/<app>.py  AppSpec: cluster, executor sizing, input datasets, queries = stage pipelines (Phase 4: from a planner)
+      │
+      ▼
+model/   cluster.py   racks, NodeManagers (+ other tenants' load), container sizing, YARN placement, registration
+         hdfs.py      files, 128 MiB blocks, rack-aware replicas, Parquet row groups
+         files.py     Spark's scan planning: maxSplitBytes, splitFiles, Next Fit Decreasing, preferred locations
+         workload.py  StageSpec = sources → operators (rows, bytes, CPU, memory) → sink; KeySpace
+         shuffle.py   block matrices records[map, reducer], local/remote reads, AQE coalescing
+cost/    calibration.py ([ref]/[norm] constants), model.py: one task's phases → TaskMetrics
+sched/   sim.py (event heap, signals, generator processes), scheduler.py (TaskSchedulerImpl + TaskSetManager)
+engine/  runtime.py   the driver: executors register, AQE query stages → jobs, skipped stages, write → new HDFS files
+         lineage.py   RDD lineage + operation scopes per stage (stage DAG)
+         emit.py      heartbeat-sampled executor metrics; events via Timeline + DriverLedger
+```
+
+Data flows forward only: a write stage creates files on the simulated HDFS
+(first replica on the writer's host), and later queries plan their scans from
+those files, so task counts, input sizes and locality downstream follow from
+what upstream wrote.
+
 ## The realism rules ("numbers must make sense")
 
 1. **Conservation.** Rows and bytes flow through operators. The shuffle write

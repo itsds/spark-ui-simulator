@@ -260,6 +260,9 @@ wheels = [
 name = "sparksim"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "numpy" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -275,6 +278,7 @@ reference = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "numpy", specifier = ">=1.26,<2" }]
 
 [package.metadata.requires-dev]
 dev = [
