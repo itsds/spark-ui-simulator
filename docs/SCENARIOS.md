@@ -7,7 +7,7 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 
 | # | Scenario | Injected cause | Ticket (symptom) | Evidence in Spark UI | Fix |
 |---|---|---|---|---|---|
-| 00 ✅ | Healthy baseline | none | (onboarding: record the baseline) | Learn what normal looks like: task max ≈ 1.5–2× median, low GC, no spill, even executors (`scenarios/00-healthy-baseline`) | — |
+| 00 ✅ | Healthy baseline | none | (onboarding: record the baseline) | Learn what normal looks like: task max ≈ 1.5–2× median, low GC, no spill, even executors; SQL tab: BHJ + SMJ plan, row counts per operator, pre-clustered partial aggregation (`scenarios/00-healthy-baseline`) | — |
 | 01 | Join-key skew | hot key (e.g. `customer_id = -1` guest checkouts) in fact table; AQE skew join off | "Nightly enrichment took 3h12m, usually 40m, no code change" | Stage detail: max shuffle read ≫ median; Event Timeline one long bar; 399/400 tasks done; SQL: SortMergeJoin; Environment: `spark.sql.adaptive.skewJoin.enabled=false` | AQE skew join, salting, isolate hot key, broadcast small side |
 | 02 | Shuffle partitions too few → spill | 200 shuffle partitions on ~2 TB shuffle | "Job slow, disk-usage alerts on workers" | Every task spills (memory & disk); ~10 GB/partition; Environment: `spark.sql.shuffle.partitions=200`, AQE off | Raise partitions / AQE coalesce with advisory size |
 | 03 | YARN memoryOverhead kills | off-heap usage (Arrow/netty/Python) > `memoryOverhead` | "Job failed after 4 attempts" | Failed tasks `ExecutorLostFailure`; Executors tab dead executors; stderr: "Container killed by YARN for exceeding physical memory limits", exit 137 | Raise `spark.executor.memoryOverhead`, fewer cores/executor, smaller partitions |

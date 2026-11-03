@@ -46,6 +46,12 @@ class PartitionedFile:
             return sum(g.length for g in self._groups())
         return self.length
 
+    def batches(self, batch_rows: int = 4096) -> int:
+        """Columnar batches the vectorized reader returns (`columnarReaderBatchSize`; never across row groups)."""
+        if self.file.row_groups:
+            return sum(-(-g.rows // batch_rows) for g in self._groups())
+        return -(-self.rows // batch_rows)
+
 
 @dataclass(frozen=True)
 class FilePartition:
@@ -63,6 +69,9 @@ class FilePartition:
     @property
     def data_bytes(self) -> int:
         return sum(f.data_bytes for f in self.files)
+
+    def batches(self, batch_rows: int = 4096) -> int:
+        return sum(f.batches(batch_rows) for f in self.files)
 
     def preferred_locations(self) -> list[str]:
         """Top 3 hosts by bytes of this partition they hold ("localhost" is ignored)."""

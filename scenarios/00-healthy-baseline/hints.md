@@ -41,9 +41,19 @@ Compare the number of tasks of the stage that reads a shuffle with
 DAG: is there an `AQEShuffleRead` box?
 </details>
 
-<details><summary>Hint 6: the 2x tasks</summary>
+<details><summary>Hint 6: the SQL tab</summary>
 
-Open the aggregation scan stage, sort the task table by Duration, and compare
-the slowest tasks' *Input Size / Records* with the median in Summary Metrics.
-Then look at `spark.sql.files.maxPartitionBytes` on the Environment tab.
+Open **SQL / DataFrame** and click a query. Each box is a physical operator
+with its metrics; the blue `WholeStageCodegen (n)` boxes group operators that
+run as one generated function. Follow `number of output rows` from the scans
+down through `Filter`, `BroadcastHashJoin` and `SortMergeJoin`. *Details* under
+the graph has the plan as text, including `PushedFilters` and `ReadSchema`.
+</details>
+
+<details><summary>Hint 7: the small activity shuffle</summary>
+
+In query 2, compare `number of output rows` of the `HashAggregate` before the
+`Exchange` (partial) with the one after it (final). Then look at how query 0
+produced `events_enriched`: what was its data hash-partitioned on just before
+the write?
 </details>

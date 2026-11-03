@@ -1,7 +1,7 @@
 """`sparksim` command line.
 
   sparksim generate tiny [--out event-logs] [--seed N]                  the Phase 2 smoke app (8 tasks)
-  sparksim generate 00-healthy-baseline [--out event-logs] [--seed N]   Scenario 00 (~15k tasks, 40 executors)
+  sparksim generate 00-healthy-baseline [--out event-logs] [--seed N]   Scenario 00 (~9.4k tasks, 3 SQL queries)
   sparksim roundtrip <event-log>...                                     parse + re-serialize, report byte diffs
 """
 

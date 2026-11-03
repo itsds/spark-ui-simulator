@@ -184,6 +184,20 @@ the reference logs from task metrics alone and matches every one.
   the shuffle has < 1000 map and < 1000 reduce partitions and one executor
   holds ≥ 20 % of the input.
 
+### 5.4 SQL executions: plans, AQE updates, metric ids, scopes (verified on ref01, `sparksim/sql`)
+
+| Topic | What Spark 3.5.9 does |
+|---|---|
+| Execution lifecycle | `SQLExecutionStart` (description = job description, details = long call site, the *initial* AQE plan) → per AQE round an `SQLAdaptiveExecutionUpdate` posted **before** that round's stages materialize (only rounds that create stages, plus the final plan with `isFinalPlan=true`) → `DriverAccumUpdates` → `SQLExecutionEnd` (`errorMessage: ""`). Jobs carry `spark.sql.execution.id` and `.root.id`. |
+| Metric ids | SQL metrics are `lazy val`s: a node's ids are allocated when `SparkPlanInfo.fromSparkPlan` first reads them, pre-order. Nodes reused from the previous plan keep their ids. AQE's first round only copies the ancestors of the new stages; every later re-plan rebuilds every node outside a stage (the write command too: new metric ids each time). Stage-internal task-metric ids (35 per submitted stage) interleave between plan events. |
+| Metric order | Definition order = allocation order; the JSON lists `plan.metrics` in Scala `Map` order (≤ 4 entries: insertion order, else hash trie). `DriverAccumUpdates` lists are in the order of the `Map` being posted (e.g. scan `driverMetrics`, BroadcastExchange `metrics.values`, write `driverSideMetrics`). |
+| Explain text | `ExplainUtils.processPlan`: operator ids post-order per node *object* (the initial plan reuses ids of shared nodes, e.g. scans inside stages), `* ` prefix inside a codegen stage, `[codegen id : n]` in the details, `Statistics(sizeInBytes=…, rowCount=…)` on materialized stages (shuffle: the Exchange's `data size` and records written; broadcast: the relation's size). `[plan_id=N]` comes from a JVM-wide counter. |
+| HS listener | `SQLAppStatusListener` tracks only accumulators declared by a plan event **before** the job starts; metrics accumulate across updates (`exec.metrics ++=`), the graph is replaced. Tasks that don't report a metric count as 0 in its per-stage array, so min = 0 whenever some tasks skipped it (empty splits). |
+| Task reporting | sum metrics when non-zero; size/timing/nsTiming when touched (start at -1, so 0 is reported: Sort `spill size`, `fetch wait time`); average only when > 0. Scan: rows, scan time (always). ColumnarToRow: rows, batches. Filter/BHJ: rows. SMJ: rows, spill size. Sort: sort time, peak memory, spill size (always). HashAggregate: rows, peak memory, build time, avg hash probes (×10). WholeStageCodegen: duration (always). Exchange map side: data size, bytes/records written, write time (tasks with rows). Shuffle read: reported on the **upstream** Exchange node by tasks that fetched blocks. Write command: task commit time. |
+| Driver metrics | scan: files, metadata time, file size, [partitions read, pruning time] when its RDD is built; Exchange `number of partitions` with its shuffle dependency; AQEShuffleRead: partitions, coalesced partitions, one `partition data size` per spec; BroadcastExchange: after its job; write command: after the job commit. |
+| RDD scopes | One scope per `executeQuery` (`execute`, `executeColumnar`, `executeBroadcast`, `executeWrite`) and per `CodegenSupport.produce`; RDDs take the open scope. AQE reduce stages read a shuffle through a **new** `Exchange` scope (or `AQEShuffleRead`), not the map side's. A BroadcastHashJoin opens InputAdapter + BroadcastExchange scopes twice (prepareBroadcast, needCopyResult). Broadcast children run on their own thread, so scope and RDD ids interleave with the shuffle stages of the same round. |
+| REST | YARN apps need the attempt in the path (`/applications/<id>/1/sql`); node names are trimmed (`Scan parquet`), WholeStageCodegen clusters are listed as nodes. |
+
 ## 6. YARN-specific fields (captured on real YARN, cluster mode)
 
 - `ApplicationStart`: `App ID` = `application_…`, `App Attempt ID` = `"1"`, plus driver `Driver Logs`/`Driver Attributes` (the AM container).

@@ -1,7 +1,10 @@
 """What a stage computes: its input, the operators it runs, and where its output goes.
 
 A stage is a pipeline of physical operators between two shuffle boundaries,
-as Spark's DAGScheduler cuts it:
+as Spark's DAGScheduler cuts it. Apps no longer write these by hand: `sql.aqe`
+derives one `StageSpec` per AQE query stage from the physical plan, and each
+operator, source and sink carries its plan node (`node`) so tasks can report
+the node's SQL metrics.
 
     source(s) ──► [side operators] ──► [join] ──► operators ──► sink
 
@@ -66,6 +69,7 @@ class Op:
     out_row_bytes: int | None = None  # UnsafeRow bytes per output row (None: unchanged)
     groups: KeySpace | None = None  # aggregations: the grouping keys
     buffer_bytes: int = 0  # aggregation buffer bytes per group
+    node: object = field(default=None, compare=False)  # the physical plan node (SQL metrics)
 
 
 def Filter(selectivity: float, ns: float = cal.FILTER_PROJECT_NS_PER_ROW) -> Op:  # noqa: N802
@@ -114,12 +118,15 @@ class Dataset:
 @dataclass(frozen=True)
 class ScanSource:
     dataset: Dataset
+    node: object = field(default=None, compare=False)  # FileSourceScan
 
 
 @dataclass(frozen=True)
 class ShuffleSource:
     exchange: str  # name of the Exchange whose output this stage reads
     row_bytes: int  # UnsafeRow bytes per shuffled row
+    node: object = field(default=None, compare=False)  # the upstream ShuffleExchange (read metrics)
+    read: object = field(default=None, compare=False)  # AQEShuffleRead over it, if any
 
 
 Source = ScanSource | ShuffleSource
@@ -138,6 +145,7 @@ class ShuffleSink:
     key: KeySpace
     num_partitions: int
     unique_keys: bool = False
+    node: object = field(default=None, compare=False)  # ShuffleExchange
 
 
 @dataclass(frozen=True)
@@ -149,11 +157,13 @@ class WriteSink:
     file_prefix: str = "part"
     # Compressed row-group size: parquet.block.size (128 MiB of buffered rows) after encoding + snappy.
     row_group_bytes: int = 48 * 1024 * 1024
+    node: object = field(default=None, compare=False)  # DataWritingCommand
 
 
 @dataclass(frozen=True)
 class BroadcastSink:
     name: str
+    node: object = field(default=None, compare=False)  # BroadcastExchange
 
 
 @dataclass(frozen=True)
@@ -187,23 +197,3 @@ class StageSpec:
     def shuffle_inputs(self) -> list[str]:
         return [s.exchange for s in self.sources if isinstance(s, ShuffleSource)]
 
-
-@dataclass(frozen=True)
-class Query:
-    """One DataFrame action (a SQL execution): its stages, last one is the result stage."""
-
-    description: str
-    stages: tuple[StageSpec, ...]
-    action: str = "parquet"  # call site: "<action> at NativeMethodAccessorImpl.java:0"
-    planning_ms: tuple[int, int] = (350, 900)  # analysis + optimization + file listing on the driver
-    think_ms: tuple[int, int] = (150, 1_200)  # Python driver code before the action
-
-    def stage(self, name: str) -> StageSpec:
-        for s in self.stages:
-            if s.name == name:
-                return s
-        raise KeyError(name)
-
-    @property
-    def result(self) -> StageSpec:
-        return self.stages[-1]

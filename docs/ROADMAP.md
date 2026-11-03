@@ -11,7 +11,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 1 | Reference capture + real History Server harness | ✅ |
 | 2 | Event-log writer (minimal synthetic app) | ✅ |
 | 3 | Cluster, cost model, scheduler → Scenario 00 at production scale | ✅ |
-| 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ⬜ |
+| 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ✅ |
 | 5 | YARN realism: IDs, containers, executor logs, Environment tab | ⬜ |
 | 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ⬜ |
 | 7 | Scenario portal + one-command startup | ⬜ |
@@ -74,16 +74,28 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
   (checked: Jobs + timeline, stages with skipped stages, job DAG with greyed skipped stages, stage DAG / summary /
   aggregated by executor, Executors. The SQL tab arrives in Phase 4.)
 
-## Phase 4 — SQL / DataFrame layer
+## Phase 4 — SQL / DataFrame layer ✅
 
-- [ ] Physical plan builder with Spark 3.5 operators: FileScan parquet (PartitionFilters, PushedFilters), Filter, Project,
-      HashAggregate (partial/final), Exchange, Sort, SortMergeJoin, BroadcastExchange/BroadcastHashJoin,
-      WholeStageCodegen, AdaptiveSparkPlan, AQEShuffleRead, write commands
-- [ ] SQL metrics as accumulators updated by tasks, plus driver accumulator updates
-- [ ] AQE replanning events (`SparkListenerSQLAdaptiveExecutionUpdate`)
-- [ ] `physicalPlanDescription` text in Spark's format
-- [ ] RDD operation scopes so stage DAGs show the codegen clusters
-- **Done when:** Scenario 00's SQL tab shows plan graphs with coherent metrics that link to its jobs and stages.
+- [x] Physical plan builder with Spark 3.5 operators: FileScan parquet (PartitionFilters, PushedFilters, DataFilters,
+      ReadSchema), Filter, Project, HashAggregate (partial/final, and the 4-aggregate plan for one distinct), Exchange,
+      Sort, SortMergeJoin, BroadcastExchange/BroadcastHashJoin, WholeStageCodegen, ColumnarToRow, InputAdapter,
+      AdaptiveSparkPlan, Shuffle/BroadcastQueryStage, AQEShuffleRead, WriteFiles, Execute InsertIntoHadoopFsRelationCommand.
+      Apps write PySpark-like DataFrame code (`sql/dataframe.py`); the planner infers `isnotnull` filters, prunes
+      columns, picks the join strategy and inserts exchanges/sorts; `StageSpec`s are derived from the query stages
+- [x] SQL metrics as accumulators updated by tasks (Spark's reporting rules, nested timings from the cost model's
+      per-operator work), plus driver accumulator updates (scan files, AQEShuffleRead specs, broadcast, write command)
+- [x] AQE replanning events (`SparkListenerSQLAdaptiveExecutionUpdate`): createQueryStages, CoalesceShufflePartitions,
+      columnar transitions, CollapseCodegenStages, re-planning with Spark's node identity (metric ids, operator ids)
+- [x] `physicalPlanDescription` in Spark's formatted explain, incl. `== Current/Final Plan ==` / `== Initial Plan ==`
+      and query-stage `Statistics(...)`
+- [x] RDD operation scopes from the execute()/produce() calls of each stage, so stage DAGs show the codegen clusters
+- [x] Golden test: `ref01-daily-etl-aqe` execution 0 re-planned with our DSL reproduces all 5 plan events (explain
+      text + SparkPlanInfo with every accumulator id) and the RDD scope ids; every operator's metric definitions are
+      checked against all 300+ plan nodes in the reference logs (ADR-018)
+- [x] Scenario 00 rewritten as 3 DataFrame queries over real table schemas (re-baselined: 9,448 tasks, 5.5 min;
+      ADR-020), SQL evidence rows E15–E19 checked against the REST API
+- **Done when:** Scenario 00's SQL tab shows plan graphs with coherent metrics that link to its jobs and stages. ✅
+  (checked in HS 3.5.9: SQL list, all three plan graphs with Details, job ↔ query links; screenshots reviewed)
 
 ## Phase 5 — YARN realism
 

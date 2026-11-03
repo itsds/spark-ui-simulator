@@ -113,3 +113,42 @@ what was done, what's next, gotchas.
   - The harness required branch `claude/sharp-davinci-6fpjzj` (not `phase-3/<slug>`).
   - JDK 17 must be installed with apt in a fresh container (`openjdk-17-jdk-headless`).
 - **Still open:** dynamic contention between concurrent tasks (ADR-014); the Docker Compose path is unverified.
+
+## 2026-11-03 — Phase 4: SQL / DataFrame layer
+
+- **Done:**
+  - `sparksim/sql/`: a PySpark-like DataFrame API (`read`, `where`, `select`, `join`, `group_by().agg()`,
+    `write_parquet`) and a physical planner (filter pushdown with `isnotnull` inference, column pruning,
+    CollapseProject, BHJ vs SMJ, EnsureRequirements exchanges and sorts, partial/final and one-distinct aggregation,
+    planned-write sort); Spark 3.5 operators with their node names, strings and metric maps; AQE
+    (`createQueryStages`, CoalesceShufflePartitions → AQEShuffleRead, ColumnarToRow, CollapseCodegenStages,
+    re-planning with Spark's node identity, final plan); formatted explain; SparkPlanInfo with lazily allocated
+    metric ids; an RDD-scope simulator; per-task and driver-side SQL metrics.
+  - Engine: one `AdaptiveExecution` per query drives the jobs; `StageSpec`s and lineage come from the query stages
+    (`engine/lineage.py` and `workload.Query` removed). Events: SQLExecutionStart / AQE updates / DriverAccumUpdates /
+    SQLExecutionEnd; jobs carry `spark.sql.execution.id`; TaskEnds list SQL accumulables via `DriverLedger`.
+  - Golden test (`tests/test_sql_golden.py`, model in `tests/sql_ref01_model.py`): ref01 execution 0 re-planned with
+    our DSL matches all 5 plan events (explain + SparkPlanInfo + every accumulator id; `plan_id` normalized) and the
+    RDD scope/RDD ids; metric definitions match all 300+ reference plan nodes (ADR-018).
+  - Scenario 00 rewritten as 3 DataFrame queries over table schemas; re-baselined (9,448 tasks, 5.5 min); evidence
+    E15–E19 from the SQL tab; ticket/hints/solution updated (ADR-020). Model fixes found via the SQL tab: clustered
+    files after a shuffle (partial aggregation), final aggregation = all keys of its reducers, 0 write time for empty
+    map tasks.
+  - `scripts/screenshot.py` also shoots the SQL list, the plan with Details expanded and the other executions.
+  - Tests: 145 passed (`uv run pytest`, ~55 s), ruff clean. ADRs 018–020.
+- **Next:** Phase 5 (YARN realism): mock NodeManager log server and per-container stdout/stderr, executor removal
+  with YARN wording, Environment tab polish, dynamic allocation. Consider the schema-inference jobs PySpark runs at
+  `spark.read.parquet` (ref01 jobs 0–2: 1 task, ParallelCollectionRDD, no execution id) for Jobs-tab realism.
+- **Gotchas:**
+  - The SQL REST endpoint needs the attempt id for YARN apps: `/applications/<id>/1/sql`; node names come back trimmed
+    (`Scan parquet`, not `Scan parquet `).
+  - Metric ids are allocated when the plan event is built, so record plan events in simulation order relative to
+    stage submissions (each takes 35 task-metric ids).
+  - The HS counts tasks that didn't report a SQL metric as 0, so `min` is 0 when some tasks had empty splits.
+  - A plan event must precede the job whose tasks update its metrics, or the HS ignores the updates.
+  - Spark source for checking: `https://raw.githubusercontent.com/apache/spark/v3.5.9/...` is reachable from the
+    cloud container (GitHub archive downloads are not).
+  - The harness required branch `claude/optimistic-dirac-8ewgqh` (not `phase-4/<slug>`).
+- **Still open:** exchange reuse, subqueries/DPP, skew-join splits and local reads in AQEShuffleRead, AQE's runtime
+  SMJ→BHJ switch, collect/limit actions, Python UDF nodes; MapStatus size quantization (AQE sees exact sizes);
+  dynamic contention (ADR-014); the Docker Compose path is unverified.

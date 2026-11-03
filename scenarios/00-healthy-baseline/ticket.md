@@ -27,8 +27,11 @@ Write down:
 4. The join-and-write stage: how much it shuffled in and how much it wrote.
 5. What AQE changed at runtime.
 6. GC time, spill, and how evenly work was spread over executors.
+7. The SQL / DataFrame tab: the join strategy for each join, and how many rows
+   go into and come out of the filter and the joins.
 
-Something to think about: in the two aggregation scans the slowest task takes
-about twice as long as the median. Is that a problem?
+Something to think about: `customer_daily_activity` groups 4 billion events by
+`customer_id`, which has 61 million values, yet its shuffle is tiny. Why does
+the partial aggregation before the shuffle work so well here?
 
 History Server: `http://localhost:18080` (`services/history-server/run.sh`).
