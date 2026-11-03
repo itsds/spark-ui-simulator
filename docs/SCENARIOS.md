@@ -26,3 +26,9 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 | ★ | Capstone(s) | 2–3 faults combined + red herrings | realistic multi-cause incidents | — | — |
 
 Later: Structured Streaming (ADR-005), dynamic-allocation thrash, broadcast timeout / driver OOM, "AQE working as intended" (to recognize success).
+
+Also later: **driver failure → YARN app attempt 2.** In cluster mode a failed driver is retried by
+YARN (`yarn.resourcemanager.am.max-attempts`, default 2), so the History Server lists two attempts
+and the second may "succeed" or fail differently. Seen for real while capturing `ref04` (a driver
+`AttributeError` produced `container_…_02_000001`). Evidence: attempt selector on the app page,
+attempt 1 shows partial jobs, AM stdout shows the Python traceback.

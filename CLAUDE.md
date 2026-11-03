@@ -65,18 +65,46 @@ incident ticket and investigates the same way they would at work.
    check a real event log in `reference/` or the Spark 3.5 source
    (`JsonProtocol.scala`, `AppStatusListener.scala`, `SQLAppStatusListener.scala`).
 
-## Repo layout (planned — created as phases land)
+## Repo layout
 
 ```
-src/sparksim/      Python package: model/, planner/, cost/, sched/, eventlog/, yarnlogs/
-scenarios/NN-slug/ scenario.yaml, ticket.md, hints.md, solution.md
-reference/         real event logs captured from real Spark runs (format truth + calibration)
-services/          history-server/, nm-logs/ (mock YARN NodeManager logs), portal/
-tests/             unit (invariants), integration (History Server REST round-trip)
-event-logs/        GENERATED, gitignored
+src/sparksim/          Python package (planned: model/, planner/, cost/, sched/, eventlog/, yarnlogs/)
+scenarios/NN-slug/     (planned) scenario.yaml, ticket.md, hints.md, solution.md
+reference/jobs/        real PySpark reference jobs (ref00–ref08) + common.py
+reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
+reference/yarn-logs/   REAL container stdout/stderr for those apps (driver = container ..._000001)
+reference/yarn/        single-node HDFS+YARN config + cluster.sh
+reference/capture.sh   runs reference jobs on YARN, collects logs
+services/history-server/  run.sh + spark-defaults.conf (docker-compose.yml at repo root)
+scripts/               env.sh, hs_api.py (REST + validate), event_inventory.py, screenshot.py
+docs/                  ROADMAP, ARCHITECTURE, DECISIONS, SCENARIOS, SESSION_LOG,
+                       EVENT_LOG_FORMAT (how logs feed the UI), event-log-schema (generated)
+tests/                 unit + integration (marker `integration` starts a real History Server)
+event-logs/, build/    GENERATED, gitignored
 ```
+
+Read `docs/EVENT_LOG_FORMAT.md` before writing any event-log code.
 
 ## Tooling and commands
 
-To be filled in by Phase 1. Intended: Python 3.11 via `uv`, `pytest`, `ruff`,
-Docker Compose for History Server + log server + portal.
+Python 3.11 via `uv` (`uv sync` installs dev + PySpark 3.5.9). **JDK 17** is
+required: JDK 21 breaks Arrow in Spark 3.5 (ADR-007). `scripts/env.sh` picks
+JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
+
+| Task | Command |
+|---|---|
+| Lint | `uv run ruff check .` |
+| Unit tests | `uv run pytest -m "not integration"` |
+| All tests (starts a real History Server) | `uv run pytest` |
+| History Server on a log dir | `services/history-server/run.sh [LOG_DIR] [PORT]` (default `event-logs/`, 18080) |
+| Validate replay (log vs server counts) | `uv run scripts/hs_api.py validate --log-dir <dir>` |
+| Query the REST API | `uv run scripts/hs_api.py stages <app-id>` / `summary <app-id> <stage>` / `get <app-id> <path>` |
+| Screenshot key UI pages | `uv run scripts/screenshot.py <app-id> [--stage N]` → `build/screenshots/` |
+| Start reference YARN cluster | `reference/yarn/cluster.sh start` (needs Hadoop 3.3.x at `/opt/hadoop`) |
+| Re-capture reference logs | `reference/capture.sh [ref0N_name ...]` (YARN cluster mode) |
+| Regenerate event schema doc | `uv run scripts/event_inventory.py` |
+
+Environment notes (cloud dev container): no Docker daemon. JDK 17 comes
+from apt (`openjdk-17-jdk-headless`). Hadoop comes from
+`downloads.apache.org` (`dlcdn.apache.org` is blocked). The sandbox sets
+`JAVA_TOOL_OPTIONS` (proxy); scripts unset it for local-only JVMs.

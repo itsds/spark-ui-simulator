@@ -66,7 +66,37 @@ Details: [`docs/SCENARIOS.md`](docs/SCENARIOS.md).
 
 🚧 Early development. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the current phase.
 
-Quickstart (planned for Phase 7):
+### Try it now: browse the real reference apps
+
+Phase 1 captured nine **real** Spark 3.5.9 applications on a real YARN cluster
+(cluster mode). Each one exercises a UI feature: AQE, skew, spill, cache,
+failures and stage retries, Python UDFs, driver-bound jobs, RDD API. You can
+open them in the real History Server.
+
+Prerequisites: [uv](https://docs.astral.sh/uv/), **JDK 17** (Spark 3.5's
+bundled Arrow does not work on JDK 21).
+
+```bash
+uv sync
+services/history-server/run.sh reference/event-logs
+# open http://localhost:18080
+```
+
+Or with Docker (no local Java needed):
+
+```bash
+EVENT_LOG_DIR=./reference/event-logs docker compose up
+```
+
+### Re-capture the reference logs (optional, Linux)
+
+```bash
+reference/yarn/cluster.sh start      # single-node HDFS + YARN (needs Hadoop 3.3.x in /opt/hadoop)
+reference/capture.sh                 # runs reference/jobs/*.py with --master yarn --deploy-mode cluster
+uv run scripts/event_inventory.py    # regenerates docs/event-log-schema.md
+```
+
+Planned one-command quickstart (Phase 7):
 
 ```bash
 docker compose up

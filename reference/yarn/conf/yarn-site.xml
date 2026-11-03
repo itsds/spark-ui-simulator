@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<configuration>
+  <property><name>yarn.resourcemanager.hostname</name><value>localhost</value></property>
+  <!-- One NodeManager offering 12 GB / 8 vcores. -->
+  <property><name>yarn.nodemanager.resource.memory-mb</name><value>12288</value></property>
+  <property><name>yarn.nodemanager.resource.cpu-vcores</name><value>8</value></property>
+  <property><name>yarn.scheduler.minimum-allocation-mb</name><value>512</value></property>
+  <property><name>yarn.scheduler.maximum-allocation-mb</name><value>8192</value></property>
+  <!-- Common production setting: virtual-memory check off, physical-memory check ON
+       (so memoryOverhead breaches really get "Container killed by YARN"). -->
+  <property><name>yarn.nodemanager.vmem-check-enabled</name><value>false</value></property>
+  <property><name>yarn.nodemanager.pmem-check-enabled</name><value>true</value></property>
+  <property><name>yarn.nodemanager.local-dirs</name><value>@BUILD@/nm-local</value></property>
+  <property><name>yarn.nodemanager.log-dirs</name><value>@BUILD@/nm-logs</value></property>
+  <!-- Keep container logs on the NodeManager after the app finishes (real stdout/stderr references). -->
+  <property><name>yarn.log-aggregation-enable</name><value>false</value></property>
+  <property><name>yarn.nodemanager.log.retain-seconds</name><value>604800</value></property>
+  <property><name>yarn.nodemanager.delete.debug-delay-sec</name><value>3600</value></property>
+  <property><name>yarn.nodemanager.env-whitelist</name>
+    <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_HOME,PATH,LANG,TZ</value></property>
+</configuration>
