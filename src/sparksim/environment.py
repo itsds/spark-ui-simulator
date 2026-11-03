@@ -61,7 +61,7 @@ class PySparkYarnApp:
     driver_memory: str = "2g"
     executor_memory: str = "4g"
     executor_cores: int = 2
-    executor_instances: int = 2
+    executor_instances: int | None = 2  # --num-executors (None with dynamic allocation)
     nm_local_dir: str = "/data/1/yarn/nm"
     nm_log_dir: str = "/data/1/yarn/container-logs"
     event_log_dir: str = "hdfs:///spark-history"
@@ -91,14 +91,13 @@ def spark_properties(s: PySparkYarnApp) -> dict[str, str]:
         "spark.yarn.appMasterEnv.PYSPARK_PYTHON": s.python,
         "spark.executorEnv.PYSPARK_PYTHON": s.python,
         "spark.executorEnv.PYTHONPATH": "{{PWD}}/pyspark.zip<CPS>{{PWD}}/py4j-0.10.9.7-src.zip",
-        "spark.driver.host": s.am_node.ip,
+        "spark.driver.host": s.am_node.host,  # Utils.localCanonicalHostName(): the FQDN on a DNS-backed cluster
         "spark.driver.port": str(s.driver_port),
         "spark.driver.memory": s.driver_memory,
         "spark.driver.extraJavaOptions": JAVA17_MODULE_OPTIONS,
         "spark.executor.id": "driver",
         "spark.executor.memory": s.executor_memory,
         "spark.executor.cores": str(s.executor_cores),
-        "spark.executor.instances": str(s.executor_instances),
         "spark.executor.extraJavaOptions": JAVA17_MODULE_OPTIONS,
         "spark.eventLog.enabled": "true",
         "spark.eventLog.dir": s.event_log_dir,
@@ -112,6 +111,8 @@ def spark_properties(s: PySparkYarnApp) -> dict[str, str]:
         "spark.org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter.param.PROXY_URI_BASES":
             f"http://{s.rm_host}:8088/proxy/{a.app_id}",
     }
+    if s.executor_instances is not None:
+        props["spark.executor.instances"] = str(s.executor_instances)
     props.update(s.extra_conf)
     return props
 

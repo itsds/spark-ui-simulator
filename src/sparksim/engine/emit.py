@@ -25,11 +25,13 @@ from ..eventlog import (
     ApplicationStart,
     BlockManagerAdded,
     BlockManagerId,
+    BlockManagerRemoved,
     DriverAccumUpdates,
     DriverLedger,
     ExecutorAdded,
     ExecutorInfo,
     ExecutorMetrics,
+    ExecutorRemoved,
     ExecutorResourceRequest,
     JobEnd,
     JobStart,
@@ -76,7 +78,8 @@ def sample_executor_metrics(run: AppRun) -> None:
         active: list[TaskRecord] = []
         gc_finished = 0.0
         stages_seen: set[int] = set()
-        while t < run.app_end:
+        end = run.app_end if ex.exit_at is None else ex.exit_at
+        while t < end:
             while i < len(tasks) and tasks[i].launch <= t:
                 active.append(tasks[i])
                 stages_seen.add(tasks[i].stage_id)
@@ -140,12 +143,12 @@ def build_events(run: AppRun) -> list[Event]:
     sample_executor_metrics(run)
     spec = run.spec
     yapp = run.yapp
-    am = run.placement.am_host
+    am = run.am_host
     rng = substream(spec.seed, "emit")
     t0 = run.t0
     sizing = spec.sizing
 
-    driver_bm = BlockManagerId("driver", am.ip, rng.randint(33000, 46000))
+    driver_bm = BlockManagerId("driver", am.name, rng.randint(33000, 46000))  # spark.driver.host: canonical FQDN
     driver_mem = unified_memory_max(sizing.driver_heap_bytes)
     t_bm = t0 + rng.randint(*cal.DRIVER_BLOCK_MANAGER_MS)
     preamble: list[Event] = [
@@ -165,7 +168,7 @@ def build_events(run: AppRun) -> list[Event]:
             app_name=spec.app_name, app_id=yapp.app_id, timestamp=t0, user=spec.user,
             app_attempt_id=str(yapp.attempt),
             driver_logs=container_log_urls(am.nm, yapp.am_container_id, spec.user),
-            driver_attributes=container_attributes(am.nm, yapp.am_container_id, spec.user),
+            driver_attributes=container_attributes(am.nm, yapp.am_container_id, spec.user, spec.cluster.rm_cluster_id),
         ),
     ]
 
@@ -176,13 +179,20 @@ def build_events(run: AppRun) -> list[Event]:
             ex = obj
             info = ExecutorInfo(host=ex.host.name, total_cores=ex.cores,
                                 log_urls=container_log_urls(ex.host.nm, ex.container_id, spec.user),
-                                attributes=container_attributes(ex.host.nm, ex.container_id, spec.user),
+                                attributes=container_attributes(ex.host.nm, ex.container_id, spec.user,
+                                                                spec.cluster.rm_cluster_id),
                                 resources={}, resource_profile_id=0, registration_time=ex.registered_at)
             tl.add(t, ExecutorAdded(ex.registered_at, ex.id, info))
         elif kind == "block_manager_added":
             ex = obj
             bm = BlockManagerId(ex.id, ex.host.name, ex.block_manager_port)
             tl.add(t, BlockManagerAdded(bm, ex.max_memory, ex.block_manager_at, ex.max_memory, 0))
+        elif kind == "block_manager_removed":
+            ex = obj
+            tl.add(t, BlockManagerRemoved(BlockManagerId(ex.id, ex.host.name, ex.block_manager_port), t))
+        elif kind == "executor_removed":
+            ex, reason = obj
+            tl.add(t, ExecutorRemoved(t, ex.id, reason))
         elif kind == "job_start":
             job = obj
             infos = [stage_info(run.stages[s]) for s in job.stage_ids]
@@ -212,8 +222,9 @@ def build_events(run: AppRun) -> list[Event]:
 
 
 def _task_info(tk: TaskRecord, finish: int = 0, accums=None) -> TaskInfo:
-    return TaskInfo(tk.task_id, tk.index, tk.attempt, tk.index, tk.launch, tk.executor.id, tk.executor.host.name,
-                    tk.locality, finish_time=finish, accumulables=accums or [])
+    return TaskInfo(tk.task_id, tk.index, tk.task_attempt, tk.index, tk.launch, tk.executor.id,
+                    tk.executor.host.name, tk.locality, finish_time=finish, failed=bool(finish) and not tk.ok,
+                    accumulables=accums or [])
 
 
 def _submitted(ledger: DriverLedger, st: StageRecord):
@@ -233,6 +244,13 @@ def _plan_event(ledger: DriverLedger, kind: str, t: int, qrec, text: str, info, 
 
 
 def _task_end(ledger: DriverLedger, tk: TaskRecord):
+    if not tk.ok:  # ExecutorLostFailure: no metrics, no accumulables, unset executor metric peaks
+        def make_failed():
+            ledger.task_end(tk.stage_id, tk.attempt, tk.failure, None)
+            return TaskEnd(tk.stage_id, tk.attempt, tk.task_type, tk.failure, _task_info(tk, tk.finish),
+                           ExecutorMetrics(jvm_heap_memory=-1), None)
+        return make_failed
+
     def make():
         m = tk.result.metrics
         accums = ledger.task_end(tk.stage_id, tk.attempt, Success(), m, touched=tk.touched, external=tk.sql)

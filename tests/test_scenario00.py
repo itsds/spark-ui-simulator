@@ -57,6 +57,15 @@ def test_shape(app):
     assert {type(t.reason).__name__ for t in ends} == {"Success"}
 
 
+def test_containers_fit_their_memory(app):
+    """Healthy: the default overhead (10 %) holds the JVM's native footprint; YARN kills nothing."""
+    run, ev = app
+    assert not [e for e in ev if type(e).__name__ in ("ExecutorRemoved", "BlockManagerRemoved")]
+    for ex in run.executors:
+        limit = ex.container_mb * 1024 * 1024
+        assert 0.85 * limit < ex.extra["peak_rss"] < limit, ex.id  # busy executors commit their heap
+
+
 def test_every_event_roundtrips(app):
     _, ev = app
     for e in ev:
