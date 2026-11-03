@@ -343,7 +343,7 @@ class AggExpr:
 
     @property
     def result_attr(self) -> Attr:
-        return Attr(str(self.func), self.func.dtype, self.result_id, True)
+        return Attr(str(self.func), self.func.dtype, self.result_id, self.func.name != "count")
 
 
 # --------------------------------------------------------------------------- types and sizes

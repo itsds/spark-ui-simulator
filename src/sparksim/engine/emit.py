@@ -51,7 +51,7 @@ from ..eventlog import (
     TaskStart,
 )
 from ..eventlog.events import Event
-from ..eventlog.ordering import java_properties
+from ..eventlog.ordering import java_properties, java_properties_order
 from ..eventlog.timeline import Timeline
 from ..rng import substream
 from ..yarn import container_attributes, container_log_urls, unified_memory_max
@@ -155,15 +155,11 @@ def build_events(run: AppRun) -> list[Event]:
         LogStart(),
         ResourceProfileAdded(
             resource_profile_id=0,
-            executor_resources={
-                "cores": ExecutorResourceRequest("cores", sizing.cores),
-                "memory": ExecutorResourceRequest("memory", sizing.memory_mb),
-                "offHeap": ExecutorResourceRequest("offHeap", 0),
-            },
+            executor_resources=_executor_resources(run),
             task_resources={"cpus": TaskResourceRequest("cpus", 1.0)},
         ),
         BlockManagerAdded(driver_bm, driver_mem, t_bm, driver_mem, 0),
-        environment_update(run.env_app, namenode=spec.cluster.namenode),
+        environment_update(run.env_app, cluster=spec.cluster),
         ApplicationStart(
             app_name=spec.app_name, app_id=yapp.app_id, timestamp=t0, user=spec.user,
             app_attempt_id=str(yapp.attempt),
@@ -219,6 +215,16 @@ def build_events(run: AppRun) -> list[Event]:
             raise ValueError(kind)
     tl.add(run.app_end, ApplicationEnd(run.app_end))
     return tl.events(preamble)
+
+
+def _executor_resources(run: AppRun) -> dict[str, ExecutorResourceRequest]:
+    """The default ResourceProfile's executor requests; an explicit spark.executor.memoryOverhead is one of
+    them. ExecutorResourceRequests keeps them in a ConcurrentHashMap: JsonProtocol writes them in its order."""
+    sz = run.spec.sizing
+    req = {"cores": sz.cores, "memory": sz.memory_mb, "offHeap": 0}
+    if "spark.executor.memoryOverhead" in run.conf:
+        req["memoryOverhead"] = sz.executor_overhead_mb
+    return {k: ExecutorResourceRequest(k, req[k]) for k in java_properties_order(list(req))}
 
 
 def _task_info(tk: TaskRecord, finish: int = 0, accums=None) -> TaskInfo:

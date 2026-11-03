@@ -53,10 +53,10 @@ def _launch_context(run: AppRun) -> str:
     nn = f"hdfs://{s.cluster.namenode}:8020"
     staging = f"{nn}/user/{s.user}/.sparkStaging/{app}"
     opts = run.base_props.get("spark.executor.extraJavaOptions", "").split()
-    cmd = ["{{JAVA_HOME}}/bin/java", "-server", f"-Xmx{s.sizing.memory_mb}m", *[f"'{o}'" for o in opts],
-           "-Djava.io.tmpdir={{PWD}}/tmp", f"'-Dspark.driver.port={run.env_app.driver_port}'", "'-Dspark.ui.port=0'"]
-    if run.ess_enabled:
-        cmd.append(f"'-Dspark.shuffle.service.port={ESS_PORT}'")
+    lib = run.base_props.get("spark.executor.extraLibraryPath")
+    cmd = [f'LD_LIBRARY_PATH=\\"{lib}:$LD_LIBRARY_PATH\\"'] if lib else []  # ExecutorRunnable.prepareCommand
+    cmd += ["{{JAVA_HOME}}/bin/java", "-server", f"-Xmx{s.sizing.memory_mb}m", *[f"'{o}'" for o in opts],
+            "-Djava.io.tmpdir={{PWD}}/tmp", f"'-Dspark.driver.port={run.env_app.driver_port}'", "'-Dspark.ui.port=0'"]
     cmd += ["-Dspark.yarn.app.container.log.dir=<LOG_DIR>", "-XX:OnOutOfMemoryError='kill %p'",
             "org.apache.spark.executor.YarnCoarseGrainedExecutorBackend", "--driver-url",
             f"spark://CoarseGrainedScheduler@{run.am_host.name}:{run.env_app.driver_port}", "--executor-id",
@@ -82,11 +82,9 @@ def _launch_context(run: AppRun) -> str:
             "PRIVATE", ts + 60),
     ]
     env = [
+        # with-Hadoop Spark build: spark.yarn.populateHadoopClasspath is false (as in the reference AM logs)
         "    CLASSPATH -> {{PWD}}<CPS>{{PWD}}/__spark_conf__<CPS>{{PWD}}/__spark_libs__/*<CPS>"
-        "{{PWD}}/__spark_conf__/__hadoop_conf__<CPS>$HADOOP_CONF_DIR<CPS>$HADOOP_COMMON_HOME/share/hadoop/common/*"
-        "<CPS>$HADOOP_COMMON_HOME/share/hadoop/common/lib/*<CPS>$HADOOP_HDFS_HOME/share/hadoop/hdfs/*<CPS>"
-        "$HADOOP_HDFS_HOME/share/hadoop/hdfs/lib/*<CPS>$HADOOP_YARN_HOME/share/hadoop/yarn/*<CPS>"
-        "$HADOOP_YARN_HOME/share/hadoop/yarn/lib/*",
+        "{{PWD}}/__spark_conf__/__hadoop_conf__",
         f"    SPARK_YARN_STAGING_DIR -> {staging}",
         f"    SPARK_USER -> {s.user}",
         "    PYTHONPATH -> {{PWD}}/pyspark.zip<CPS>{{PWD}}/py4j-0.10.9.7-src.zip",

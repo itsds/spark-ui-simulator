@@ -29,8 +29,8 @@ from urllib.parse import parse_qs, urlparse
 CONTAINER = re.compile(r"^container_(?:e\d+_)?(\d+)_(\d+)_\d+_\d+$")
 STYLE = ("body{font:13px/1.4 Verdana,Arial,sans-serif;margin:0;color:#222}"
          "#hd{background:#1d3e5c;color:#fff;padding:8px 14px}#hd h1{font-size:18px;margin:0}"
-         "#nav{float:left;width:150px;padding:10px 14px;font-size:12px}#nav a{color:#1d3e5c}"
-         "#main{margin-left:180px;padding:10px 14px}p{margin:4px 0}"
+         "#nav{float:left;width:220px;padding:10px 14px;font-size:12px;word-break:break-all}#nav a{color:#1d3e5c}"
+         "#main{margin-left:260px;padding:10px 14px}p{margin:4px 0}"
          "pre{background:#f7f7f7;border:1px solid #ddd;padding:8px;white-space:pre-wrap;word-break:break-all}"
          "table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:3px 8px;text-align:left}")
 

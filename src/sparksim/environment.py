@@ -1,19 +1,28 @@
 """Environment tab content (`SparkListenerEnvironmentUpdate`) for a PySpark app in YARN cluster mode.
 
-The keys mirror what real Spark 3.5.9 drivers logged on our YARN cluster
-(reference/event-logs, EnvironmentUpdate). Values are rebuilt for the
-simulated cluster. This is the Phase 2 version: a realistic Spark property set,
-a short curated Hadoop property set and the real Spark 3.5.9 jar list. Phase 5
-replaces the Hadoop part with a full cluster configuration.
+The keys mirror what real Spark 3.5.9 drivers logged on our YARN cluster (reference/event-logs,
+EnvironmentUpdate); values are rebuilt for the simulated production cluster:
+
+* **Spark Properties**: what the driver's SparkConf holds: the cluster's `spark-defaults.conf`
+  (`CLUSTER_SPARK_DEFAULTS`), what spark-submit and the YARN Client set, and the job's `--conf`s.
+* **Hadoop Properties**: the full Hadoop `Configuration` the driver runs with, ~1,000 keys: Hadoop
+  3.3.6's core/hdfs/yarn/mapred defaults as a real driver logged them (`data/hadoop-3.3.6-defaults.json`,
+  built by `scripts/extract_hadoop_defaults.py`) plus the cluster's site files (`hadoop_site`):
+  HA ResourceManagers, NodeManager resources and dirs, the Spark shuffle service, log aggregation.
+* **System Properties** of the AM's JVM (JDK 17 on Ubuntu, as in the reference logs) and the
+  **Classpath** of the real Spark 3.5.9 YARN archive.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from functools import cache
 from importlib import resources
 
 from .eventlog import EnvironmentUpdate
 from .eventlog.ordering import scala_map
+from .model.cluster import ClusterSpec
 from .yarn import NodeManager, YarnApp, container_work_dir
 
 # Spark 3.5 adds these to both driver and executor JVM options on Java 17 (JavaModuleOptions).
@@ -40,6 +49,23 @@ METRICS_PROPERTIES = {
 }
 
 
+# The cluster's spark-defaults.conf (/etc/spark/conf): what every job on it inherits.
+NATIVE_LIB = "/opt/hadoop/lib/native"
+CLUSTER_SPARK_DEFAULTS = {
+    "spark.shuffle.service.enabled": "true",  # YarnShuffleService runs in every NodeManager (aux service)
+    "spark.yarn.historyServer.address": "shs1.hadoop.prod.internal:18080",
+    "spark.driver.extraLibraryPath": NATIVE_LIB,
+    "spark.executor.extraLibraryPath": NATIVE_LIB,
+    "spark.yarn.am.extraLibraryPath": NATIVE_LIB,
+}
+
+
+@cache
+def hadoop_defaults() -> dict[str, str]:
+    text = resources.files("sparksim.data").joinpath("hadoop-3.3.6-defaults.json").read_text()
+    return json.loads(text)
+
+
 def spark_archive_jars() -> list[str]:
     text = resources.files("sparksim.data").joinpath("spark-3.5.9-yarn-archive-jars.txt").read_text()
     return [ln for ln in text.splitlines() if ln and not ln.startswith("#")]
@@ -63,11 +89,13 @@ class PySparkYarnApp:
     executor_cores: int = 2
     executor_instances: int | None = 2  # --num-executors (None with dynamic allocation)
     nm_local_dir: str = "/data/1/yarn/nm"
+    nm_local_dirs: str = "/data/1/yarn/nm,/data/2/yarn/nm,/data/3/yarn/nm"
     nm_log_dir: str = "/data/1/yarn/container-logs"
     event_log_dir: str = "hdfs:///spark-history"
     yarn_archive: str = "hdfs:///apps/spark/spark-3.5.9-libs.zip"
     python: str = "/usr/bin/python3"
     extra_conf: dict[str, str] = field(default_factory=dict)  # spark-submit --conf
+    rm_standby_hosts: tuple[str, ...] = ()  # ResourceManager HA: the AM filter accepts every RM's proxy
 
     @property
     def am_work_dir(self) -> str:
@@ -76,7 +104,8 @@ class PySparkYarnApp:
 
 def spark_properties(s: PySparkYarnApp) -> dict[str, str]:
     a = s.app
-    props = {
+    props = dict(CLUSTER_SPARK_DEFAULTS)
+    props |= {
         "spark.app.name": s.app_name,
         "spark.app.id": a.app_id,
         "spark.app.attempt.id": str(a.attempt),
@@ -107,9 +136,10 @@ def spark_properties(s: PySparkYarnApp) -> dict[str, str]:
         "spark.ui.port": "0",
         "spark.ui.showConsoleProgress": "false",
         "spark.ui.filters": "org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter",
-        "spark.org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter.param.PROXY_HOSTS": s.rm_host,
+        "spark.org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter.param.PROXY_HOSTS":
+            ",".join((s.rm_host, *s.rm_standby_hosts)),
         "spark.org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter.param.PROXY_URI_BASES":
-            f"http://{s.rm_host}:8088/proxy/{a.app_id}",
+            ",".join(f"http://{h}:8088/proxy/{a.app_id}" for h in (s.rm_host, *s.rm_standby_hosts)),
     }
     if s.executor_instances is not None:
         props["spark.executor.instances"] = str(s.executor_instances)
@@ -117,43 +147,82 @@ def spark_properties(s: PySparkYarnApp) -> dict[str, str]:
     return props
 
 
-# A short, realistic slice of a Hadoop 3.3 YARN cluster's configuration (Phase 5 brings the full set).
-def hadoop_properties(rm_host: str, namenode: str) -> dict[str, str]:
-    return {
-        "fs.defaultFS": f"hdfs://{namenode}:8020",
-        "dfs.replication": "3",
-        "dfs.blocksize": "134217728",
-        "dfs.client.read.shortcircuit": "true",
-        "hadoop.security.authentication": "simple",
-        "hadoop.tmp.dir": "/tmp/hadoop-${user.name}",
+def hadoop_site(c: ClusterSpec, nm_local_dirs: str, nm_log_dirs: str) -> dict[str, str]:
+    """The production cluster's core-, hdfs-, yarn- and mapred-site.xml (what a client sees of them)."""
+    nn = c.namenode
+    rms = (c.rm_host, *c.rm_standby_hosts)
+    zk = ",".join(f"zk{i}.{c.domain}:2181" for i in (1, 2, 3))
+    site = {
+        # core-site
+        "fs.defaultFS": f"hdfs://{nn}:8020",
+        "fs.trash.interval": "1440",
         "io.file.buffer.size": "131072",
         "io.compression.codecs": "org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.GzipCodec,"
                                  "org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.SnappyCodec,"
-                                 "org.apache.hadoop.io.compress.Lz4Codec",
-        "mapreduce.framework.name": "yarn",
-        "mapreduce.fileoutputcommitter.algorithm.version": "1",
-        "yarn.resourcemanager.hostname": rm_host,
-        "yarn.resourcemanager.address": f"{rm_host}:8032",
-        "yarn.resourcemanager.scheduler.address": f"{rm_host}:8030",
-        "yarn.resourcemanager.webapp.address": f"{rm_host}:8088",
+                                 "org.apache.hadoop.io.compress.Lz4Codec,org.apache.hadoop.io.compress.ZStandardCodec",
+        "net.topology.script.file.name": "/etc/hadoop/conf/topology.py",  # rack awareness
+        "hadoop.security.authentication": "simple",
+        "ha.zookeeper.quorum": zk,
+        # hdfs-site
+        "dfs.replication": "3",
+        "dfs.blocksize": "134217728",
+        "dfs.namenode.http-address": f"{nn}:9870",
+        "dfs.namenode.name.dir": "file:///data/1/dfs/nn,file:///data/2/dfs/nn",
+        "dfs.datanode.data.dir": ",".join(f"file:///data/{i}/dfs/dn" for i in range(1, 13)),
+        "dfs.client.read.shortcircuit": "true",
+        "dfs.domain.socket.path": "/var/run/hdfs-sockets/dn",
+        "dfs.permissions.superusergroup": "hadoop",
+        # yarn-site
         "yarn.resourcemanager.scheduler.class":
             "org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler",
-        "yarn.scheduler.minimum-allocation-mb": "1024",
-        "yarn.scheduler.maximum-allocation-mb": "65536",
+        "yarn.resourcemanager.recovery.enabled": "true",
+        "yarn.resourcemanager.store.class": "org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore",
+        "yarn.resourcemanager.zk-address": zk,
+        "yarn.scheduler.minimum-allocation-mb": str(c.min_allocation_mb),
+        "yarn.scheduler.maximum-allocation-mb": str(c.max_allocation_mb),
         "yarn.scheduler.maximum-allocation-vcores": "16",
-        "yarn.nodemanager.resource.memory-mb": "114688",
-        "yarn.nodemanager.resource.cpu-vcores": "30",
+        "yarn.nodemanager.resource.memory-mb": str(c.nm_memory_mb),
+        "yarn.nodemanager.resource.cpu-vcores": str(c.nm_vcores),
+        "yarn.nodemanager.address": "${yarn.nodemanager.hostname}:45454",
+        "yarn.nodemanager.local-dirs": nm_local_dirs,
+        "yarn.nodemanager.log-dirs": nm_log_dirs,
         "yarn.nodemanager.vmem-check-enabled": "false",
         "yarn.nodemanager.pmem-check-enabled": "true",
-        "yarn.nodemanager.local-dirs": "/data/1/yarn/nm,/data/2/yarn/nm,/data/3/yarn/nm",
-        "yarn.nodemanager.log-dirs": "/data/1/yarn/container-logs",
+        "yarn.nodemanager.recovery.enabled": "true",
+        "yarn.nodemanager.recovery.dir": "/var/lib/hadoop-yarn/yarn-nm-recovery",
         "yarn.nodemanager.aux-services": "mapreduce_shuffle,spark_shuffle",
+        "yarn.nodemanager.aux-services.mapreduce_shuffle.class": "org.apache.hadoop.mapred.ShuffleHandler",
         "yarn.nodemanager.aux-services.spark_shuffle.class": "org.apache.spark.network.yarn.YarnShuffleService",
         "yarn.log-aggregation-enable": "true",
-        "yarn.log.server.url": f"http://{rm_host}:19888/jobhistory/logs",
+        "yarn.log-aggregation.retain-seconds": "604800",
+        "yarn.nodemanager.remote-app-log-dir": "/app-logs",
+        "yarn.log.server.url": f"http://jhs1.{c.domain}:19888/jobhistory/logs",
         "yarn.timeline-service.enabled": "false",
-        "hadoop.service.shutdown.timeout": "30s",
+        # mapred-site
+        "mapreduce.framework.name": "yarn",
+        "mapreduce.jobhistory.address": f"jhs1.{c.domain}:10020",
+        "mapreduce.jobhistory.webapp.address": f"jhs1.{c.domain}:19888",
+        "mapreduce.fileoutputcommitter.algorithm.version": "1",
     }
+    if c.rm_standby_hosts:
+        ids = [f"rm{i}" for i in range(1, len(rms) + 1)]
+        site |= {
+            "yarn.resourcemanager.ha.enabled": "true",
+            "yarn.resourcemanager.ha.automatic-failover.enabled": "true",
+            "yarn.resourcemanager.ha.rm-ids": ",".join(ids),
+            "yarn.resourcemanager.cluster-id": c.rm_cluster_id,
+        }
+        for rid, host in zip(ids, rms, strict=True):
+            site[f"yarn.resourcemanager.hostname.{rid}"] = host
+            site[f"yarn.resourcemanager.webapp.address.{rid}"] = f"{host}:8088"
+    else:
+        site["yarn.resourcemanager.hostname"] = c.rm_host
+    return site
+
+
+def hadoop_properties(c: ClusterSpec, nm_local_dirs: str = "/data/1/yarn/nm,/data/2/yarn/nm,/data/3/yarn/nm",
+                      nm_log_dirs: str = "/data/1/yarn/container-logs") -> dict[str, str]:
+    return {**hadoop_defaults(), **hadoop_site(c, nm_local_dirs, nm_log_dirs)}
 
 
 def system_properties(s: PySparkYarnApp, java_home: str, java_version: str) -> dict[str, str]:
@@ -200,7 +269,29 @@ def system_properties(s: PySparkYarnApp, java_home: str, java_version: str) -> d
         ),
         "java.home": java_home,
         "java.version": java_version,
+        # JDK 17.0.20.1 (Ubuntu) constants, as the reference AMs logged them
+        "java.library.path": f"{NATIVE_LIB}::/usr/java/packages/lib:/usr/lib/x86_64-linux-gnu/jni:"
+                             "/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/jni:/lib:/usr/lib",
+        "java.specification.maintenance.version": "1",
+        "java.specification.name": "Java Platform API Specification",
+        "java.vendor.url": "https://ubuntu.com/",
+        "java.vendor.url.bug": "https://bugs.launchpad.net/ubuntu/+source/openjdk-17",
+        "java.version.date": "2026-08-18",
+        "java.vm.compressedOopsMode": _oops_mode(s.driver_memory),
+        "java.vm.specification.vendor": "Oracle Corporation",
+        "java.vm.specification.version": "17",
+        "jdk.debug": "release",
+        "jetty.git.hash": "8f1440587e9e4ae7db3d74cf205643f3d707148d",
+        "sun.io.unicode.encoding": "UnicodeLittle",
+        "sun.jnu.encoding": "UTF-8",
     }
+
+
+def _oops_mode(heap: str) -> str:
+    """HotSpot's compressed-oops mode for -Xmx<heap>: a heap that ends below 4 GiB is "32-bit" (the
+    1.5-2 GiB reference drivers), below 32 GiB "Zero based"."""
+    gib = float(heap[:-1]) / (1024 if heap[-1].lower() == "m" else 1) if heap[-1].lower() in "gm" else 1.0
+    return "32-bit" if gib <= 3 else "Zero based" if gib < 31 else "Non-zero based"
 
 
 def classpath_entries(s: PySparkYarnApp) -> dict[str, str]:
@@ -212,15 +303,18 @@ def classpath_entries(s: PySparkYarnApp) -> dict[str, str]:
     return entries
 
 
-def environment_update(s: PySparkYarnApp, namenode: str,
+def environment_update(s: PySparkYarnApp, namenode: str | None = None, cluster: ClusterSpec | None = None,
                        java_home: str = "/usr/lib/jvm/java-17-openjdk-amd64",
                        java_version: str = "17.0.20.1") -> EnvironmentUpdate:
+    if cluster is None:
+        cluster = ClusterSpec(cluster_timestamp=s.app.cluster_timestamp, rm_host=s.rm_host,
+                              **({"namenode": namenode} if namenode else {}))
     # JsonProtocol writes each section from `Seq[(String, String)].toMap`: Scala Map iteration order.
     return EnvironmentUpdate(
         jvm_information=scala_map({"Java Home": java_home, "Java Version": f"{java_version} (Ubuntu)",
                                    "Scala Version": "version 2.12.18"}),
         spark_properties=scala_map(spark_properties(s)),
-        hadoop_properties=scala_map(hadoop_properties(s.rm_host, namenode)),
+        hadoop_properties=scala_map(hadoop_properties(cluster, s.nm_local_dirs, s.nm_log_dir)),
         system_properties=scala_map(system_properties(s, java_home, java_version)),
         metrics_properties=scala_map(dict(METRICS_PROPERTIES)),
         classpath_entries=scala_map(classpath_entries(s)),

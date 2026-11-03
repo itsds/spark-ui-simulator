@@ -39,7 +39,7 @@ from datetime import UTC, datetime
 
 from ..cost import calibration as cal
 from ..cost.model import StageContext, TaskEnv, TaskPlan, TaskResult, simulate_task
-from ..environment import PySparkYarnApp, spark_properties
+from ..environment import CLUSTER_SPARK_DEFAULTS, PySparkYarnApp, spark_properties
 from ..eventlog import (
     SHUFFLE_READ_ACCUMS,
     ExecutorLostFailure,
@@ -228,7 +228,7 @@ class AppRun:
         self.submit_time = self.t0 - self.rng.randint(*spec.submit_to_start_ms)
 
         # YARN: the AM container (driver), then Spark's YarnAllocator asks the RM for executor containers.
-        conf = dict(spec.conf)
+        conf = {**CLUSTER_SPARK_DEFAULTS, **dict(spec.conf)}  # the cluster's spark-defaults.conf, then --conf
         yarn_rng = substream(seed, "yarn-allocation")
         min_mb = spec.cluster.min_allocation_mb
         exec_mb = spec.sizing.container_mb(min_mb)
@@ -270,7 +270,7 @@ class AppRun:
             executor_memory=f"{spec.sizing.memory_mb // 1024}g",
             driver_memory=f"{spec.sizing.driver_memory_mb // 1024}g",
             executor_cores=spec.sizing.cores, executor_instances=spec.sizing.instances or None,
-            extra_conf=dict(spec.conf),
+            extra_conf=dict(spec.conf), rm_standby_hosts=spec.cluster.rm_standby_hosts,
         )
         # SQL jobs carry the whole Spark conf in their properties (SQLExecution.withSQLConfPropagated).
         self.base_props = spark_properties(self.env_app)

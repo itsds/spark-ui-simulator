@@ -216,3 +216,13 @@ def test_container_logs_are_deterministic(da_app):
 
     run, _ev = da_app
     assert am_stderr(run) == am_stderr(run)
+
+
+def test_explicit_overhead_is_part_of_the_default_resource_profile(pmem_app):
+    from sparksim.eventlog import ResourceProfileAdded
+
+    _run, ev = pmem_app
+    rp = of(ev, ResourceProfileAdded)[0]
+    # ConcurrentHashMap order of the request names, as JsonProtocol writes them
+    assert list(rp.executor_resources) == ["memoryOverhead", "cores", "memory", "offHeap"]
+    assert rp.executor_resources["memoryOverhead"].amount == 384
