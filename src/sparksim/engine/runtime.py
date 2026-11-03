@@ -56,7 +56,7 @@ from ..model.cluster import (
     Host,
     build_cluster,
 )
-from ..model.files import plan_scan
+from ..model.files import max_split_bytes, plan_scan
 from ..model.hdfs import Hdfs
 from ..model.shuffle import ShuffleExchange, coalesce_partitions, key_shares, row_shares
 from ..model.workload import ScanSource, ShuffleSink, ShuffleSource, StageSpec, WriteSink
@@ -121,6 +121,22 @@ class AppSpec:
 
 
 @dataclass
+class Broadcast:
+    """A TorrentBroadcast the driver created: task binaries, the Parquet reader's Hadoop conf, relations."""
+
+    id: int
+    kind: str  # task_binary | hadoop_conf | relation
+    created: int
+    piece_bytes: int  # serialized (compressed) size, split in spark.broadcast.blockSize (4 MiB) pieces
+    value_bytes: int  # deserialized size in the MemoryStore
+    callsite: str
+
+    @property
+    def pieces(self) -> int:
+        return max(1, -(-self.piece_bytes // (4 * MiB)))
+
+
+@dataclass
 class TaskRecord:
     stage_id: int
     attempt: int
@@ -172,6 +188,9 @@ class StageRecord:
     top_scope: tuple[int, str] | None = None
     done: Signal | None = None
     plan_root: object = None  # the stage's physical plan (SQL metrics)
+    task_binary_bc: int | None = None
+    scan_bcs: list[int] = field(default_factory=list)  # Hadoop conf broadcasts of its scans
+    epoch: int = 0  # MapOutputTracker epoch its tasks carry
 
 
 @dataclass
@@ -229,8 +248,12 @@ class AppRun:
         self.executors: list[Executor] = []  # every executor that registered, in registration order
         self.executor_by_id: dict[str, Executor] = {}
         self.yarn_log: list[tuple[int, str, object]] = []  # YARN/AM/driver happenings for the container logs
+        self.conf = conf
         self.java_home = "/usr/lib/jvm/java-17-openjdk-amd64"
         self.nm_log_dir = "/data/1/yarn/container-logs"
+        self.nm_local_dirs = "/data/1/yarn/nm,/data/2/yarn/nm,/data/3/yarn/nm"
+        self.driver_bm_port = substream(seed, "driver-ports").randint(33000, 46000)
+        self.rm_ip = "10.31.0.5"
         self.executor_java_opts = ""
         self.stopping = False
         self.scheduling_started: int | None = None
@@ -289,6 +312,13 @@ class AppRun:
         self.stage_rng: dict[int, random.Random] = {}
         self.stage_nprng: dict[int, object] = {}
         self.fetch_batch_prop = False  # __fetch_continuous_blocks_in_batch_enabled sticks once set
+        self.bc_ids = IdAllocator(0)
+        self.broadcasts: dict[int, Broadcast] = {}
+        self.scan_bc: dict[int, int] = {}  # id(FileSourceScan) -> its Hadoop conf broadcast
+        self.relation_bc: dict[str, int] = {}  # broadcast exchange name -> relation broadcast
+        self.bc_rng = substream(seed, "broadcasts")
+        self.epoch = 0  # MapOutputTrackerMaster epoch: +1 per finished map stage and per lost executor
+        self.scan_split_bytes: dict[str, tuple[int, int]] = {}  # path -> (maxSplitBytes, openCost)
         self.app_end: int | None = None
 
     # ------------------------------------------------------------------ helpers
@@ -298,6 +328,11 @@ class AppRun:
 
     def _jitter(self, lo_hi: tuple[int, int]) -> int:
         return self.rng.randint(*lo_hi)
+
+    def _new_broadcast(self, kind: str, piece: int, values: int, callsite: str) -> int:
+        b = Broadcast(self.bc_ids.next(), kind, self.sim.now, piece, values, callsite)
+        self.broadcasts[b.id] = b
+        return b.id
 
     def conf_bytes(self, key: str, default: int) -> int:
         v = dict(self.spec.conf).get(key)
@@ -421,6 +456,7 @@ class AppRun:
         """RemoveExecutor(reason) reaches the driver: fail the running tasks, post ExecutorRemoved."""
         if self.stopping or ex.id not in self.sched.executors:
             return
+        self.epoch += 1  # DAGScheduler.handleExecutorLost
         if not self.ess_enabled and any(e.map_executor and ex.id in e.map_executor
                                         for e in self.exchanges.values()):
             raise NotImplementedError(
@@ -450,6 +486,18 @@ class AppRun:
             ex.killed_by_driver = True
             self.sched.disable_executor(eid)
             self.allocator.kill_executor(ex)
+
+    @property
+    def event_log_path(self) -> str:
+        """Where SingleEventLogFileWriter writes (Hadoop Path prints hdfs:///x as hdfs:/x)."""
+        d = self.base_props.get("spark.eventLog.dir", "hdfs:///spark-history").replace(":///", ":/")
+        return f"{d.rstrip('/')}/{self.yapp.event_log_name}"
+
+    def job_tracker_id(self, stage: StageRecord) -> str:
+        """FileFormatWriter's jobTrackerID: yyyyMMddHHmmss of the write job + abs(Random.nextLong)."""
+        job = next(j for j in self.jobs if j.final_stage == stage.stage_id)
+        stamp = datetime.fromtimestamp(job.submitted / 1000, UTC).strftime("%Y%m%d%H%M%S")
+        return f"{stamp}{substream(self.spec.seed, f'jobtracker/{stage.stage_id}').getrandbits(63)}"
 
     def executor_command(self, ex: Executor) -> str:
         """The container launch command (ExecutorRunnable.prepareCommand), as the NM process tree shows it."""
@@ -552,7 +600,13 @@ class AppRun:
     def _stage_driver_metrics(self, qrec: QueryRecord, plan) -> None:
         """What the driver posts while it builds a stage's RDDs: scan files, AQEShuffleRead specs, partitions."""
         root = plan.children[0] if isinstance(plan, (sqln.ShuffleExchange, sqln.BroadcastExchange)) else plan
+        site = (callsites.BROADCAST_SHORT if isinstance(plan, sqln.BroadcastExchange)
+                else callsites.py4j_callsite(self.spec.queries[qrec.execution_id].action)[0])
         for scan in sqlm.scans_in(root):
+            if id(scan) not in self.scan_bc:  # ParquetFileFormat.buildReaderWithPartitionValues
+                r = self.bc_rng
+                self.scan_bc[id(scan)] = self._new_broadcast("hadoop_conf", 40_300 + r.randint(0, 900),
+                                                             474_000 + r.randint(0, 4_000), site)
             path = scan.relation.root_paths[0]
             files = self.hdfs.listdir(path)
             listing = max(1, int(len(files) * cal.FILE_LISTING_MS_PER_FILE * self.rng.uniform(0.7, 1.3)))
@@ -604,6 +658,12 @@ class AppRun:
         def submit_stage():
             stage.submitted = self.sim.now
             stage.accum_base = self.accum_ids.take(35).start
+            stage.epoch = self.epoch
+            nodes = sum(1 for _ in plan_root.walk()) if plan_root is not None else 4
+            piece = 3_600 + nodes * 2_900 + (90_000 if isinstance(spec.sink, WriteSink) else 0)
+            piece = int(piece * self.bc_rng.uniform(0.93, 1.07))
+            stage.task_binary_bc = self._new_broadcast("task_binary", piece, int(piece * self.bc_rng.uniform(2.3, 3.4)),
+                                                       "broadcast at DAGScheduler.scala:1611")
             self._record("stage_submitted", stage)
             ts = TaskSet(stage.stage_id, 0, job_id, [p.preferred for p in stage.plans],
                          on_launch=lambda a, st=stage: self._on_launch(st, a),
@@ -631,6 +691,7 @@ class AppRun:
                     ex = self.exchanges[spec.sink.exchange]
                     size = sum(t.result.sink_rows * t.result.sink_row_bytes for t in stage.tasks if t.ok)
                     self.stage_stats[spec.sink.exchange] = (size, int(ex.records.sum()))
+                    self.epoch += 1  # DAGScheduler: mapOutputTracker.incrementEpoch() after a map stage
                 materialized.fire()
 
         self.sim.after(self._jitter(cal.JOB_TO_STAGE_MS), submit_stage)
@@ -654,6 +715,8 @@ class AppRun:
         def done():
             self._record("driver_accum", (qrec.execution_id, sqlm.broadcast_driver_updates(
                 spec.sink.node, data_size, rows, collect, build, bcast)))
+            self.relation_bc[spec.sink.name] = self._new_broadcast(
+                "relation", int(data_size * 0.38), data_size + 512, callsites.BROADCAST_SHORT)
             materialized.fire()
 
         self.sim.after(build + bcast, done)
@@ -687,6 +750,8 @@ class AppRun:
         task_type = "ShuffleMapTask" if isinstance(spec.sink, ShuffleSink) else "ResultTask"
         rec = StageRecord(sid, 0, short, details, len(plans), rdds, parent_ids, task_type, qi, spec,
                           plans=plans, top_scope=lineage.top_scope)
+        rec.scan_bcs = [self.scan_bc[id(s.node)] for s in spec.sources
+                        if isinstance(s, ScanSource) and id(s.node) in self.scan_bc]
         rec.plan_root = plan_root
         out_ex = None
         if isinstance(spec.sink, ShuffleSink):
@@ -709,10 +774,11 @@ class AppRun:
     def _scan_partitions(self, scan: ScanSource):
         path = scan.dataset.path
         if path not in self.scan_parts:
-            self.scan_parts[path] = plan_scan(
-                self.hdfs.listdir(path), self.default_parallelism,
-                max_partition_bytes=self.conf_bytes("spark.sql.files.maxPartitionBytes", 128 * MiB),
-                open_cost=self.conf_bytes("spark.sql.files.openCostInBytes", 4 * MiB))
+            mpb = self.conf_bytes("spark.sql.files.maxPartitionBytes", 128 * MiB)
+            oc = self.conf_bytes("spark.sql.files.openCostInBytes", 4 * MiB)
+            files = self.hdfs.listdir(path)
+            self.scan_parts[path] = plan_scan(files, self.default_parallelism, max_partition_bytes=mpb, open_cost=oc)
+            self.scan_split_bytes[path] = (max_split_bytes(files, mpb, oc, self.default_parallelism), oc)
         return self.scan_parts[path]
 
     def _reduce_preferred(self, exs: list[ShuffleExchange], a: int, b: int) -> tuple[str, ...]:

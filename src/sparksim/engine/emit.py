@@ -148,7 +148,7 @@ def build_events(run: AppRun) -> list[Event]:
     t0 = run.t0
     sizing = spec.sizing
 
-    driver_bm = BlockManagerId("driver", am.name, rng.randint(33000, 46000))  # spark.driver.host: canonical FQDN
+    driver_bm = BlockManagerId("driver", am.name, run.driver_bm_port)  # spark.driver.host: canonical FQDN
     driver_mem = unified_memory_max(sizing.driver_heap_bytes)
     t_bm = t0 + rng.randint(*cal.DRIVER_BLOCK_MANAGER_MS)
     preamble: list[Event] = [

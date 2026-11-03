@@ -21,10 +21,15 @@ def _free_port() -> int:
 
 
 @contextlib.contextmanager
-def run_history_server(log_dir: Path, expected_apps: int, log_name: str = "hs-test.log", timeout: float = 120):
-    """Start the real Spark 3.5.9 History Server on `log_dir`; yield its base URL once it lists every app."""
+def run_history_server(log_dir: Path, expected_apps: int, log_name: str = "hs-test.log", timeout: float = 120,
+                       extra_opts: str = ""):
+    """Start the real Spark 3.5.9 History Server on `log_dir`; yield its base URL once it lists every app.
+
+    `extra_opts`: more `-Dspark.history.*` settings (SPARK_HISTORY_OPTS)."""
     port = _free_port()
     env = {k: v for k, v in os.environ.items() if k != "JAVA_TOOL_OPTIONS"}
+    if extra_opts:
+        env["SPARK_HISTORY_OPTS"] = extra_opts
     (ROOT / "build").mkdir(exist_ok=True)
     with open(ROOT / "build" / log_name, "w") as log:
         proc = subprocess.Popen(
@@ -52,6 +57,29 @@ def run_history_server(log_dir: Path, expected_apps: int, log_name: str = "hs-te
                 proc.wait(timeout=20)
             except subprocess.TimeoutExpired:
                 proc.kill()
+
+
+@contextlib.contextmanager
+def run_nm_logs(log_dir: Path):
+    """Start the mock NodeManager log server (services/nm-logs) on `log_dir`; yield its base URL."""
+    import sys
+
+    port = _free_port()
+    proc = subprocess.Popen([sys.executable, str(ROOT / "services" / "nm-logs" / "server.py"), "--dir", str(log_dir),
+                             "--port", str(port), "--host", "127.0.0.1"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    url = f"http://localhost:{port}"
+    try:
+        for _ in range(50):
+            try:
+                requests.get(url, timeout=2)
+                break
+            except requests.ConnectionError:
+                time.sleep(0.1)
+        yield url
+    finally:
+        proc.terminate()
+        proc.wait(timeout=10)
 
 
 @pytest.fixture(scope="session")

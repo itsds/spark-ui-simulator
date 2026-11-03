@@ -164,3 +164,55 @@ def test_idle_executors_are_released(da_app):
     added = of(ev, ExecutorAdded)
     assert max(a.timestamp for a in added) > min(r.timestamp for r in removed)
     assert len({a.executor_info.attributes["CONTAINER_ID"] for a in added}) == len(added)
+
+
+# --------------------------------------------------------------------------- container logs of these runs
+
+
+def test_killed_executor_logs(pmem_app):
+    from sparksim.yarnlogs import am_stderr, executor_stderr
+
+    run, ev = pmem_app
+    echo: list = []
+    killed = [ex for ex in run.executors if ex.exit_status == -104]
+    ex = killed[0]
+    text = executor_stderr(run, ex, echo)
+    tail = text.rstrip().splitlines()[-3:]
+    assert tail[0].endswith("ERROR CoarseGrainedExecutorBackend: RECEIVED SIGNAL TERM")
+    assert tail[-1].endswith("INFO ShutdownHookManager: Shutdown hook called")
+    lost = {e.task_info.task_id for e in of(ev, TaskEnd)
+            if isinstance(e.reason, ExecutorLostFailure) and e.task_info.executor_id == ex.id}
+    finished = {int(x) for x in re.findall(r"Finished task \S+ in stage \S+ \(TID (\d+)\)", text)}
+    started = {int(x) for x in re.findall(r"Running task \S+ in stage \S+ \(TID (\d+)\)", text)}
+    assert lost and lost <= started and not lost & finished
+    driver = am_stderr(run, echo)
+    reason = ex.removed_reason
+    assert f"WARN YarnAllocator: {reason}" in driver
+    assert (f"INFO YarnAllocator: Completed container {ex.container_id} on host: {ex.host.name} (state: COMPLETE, "
+            "exit status: -104)") in driver
+    assert f"ERROR YarnClusterScheduler: Lost executor {ex.id} on {ex.host.name}: {reason}" in driver
+    assert re.search(rf"WARN TaskSetManager: Lost task \S+ in stage \S+ \(TID \d+\) \({re.escape(ex.host.name)} "
+                     rf"executor {ex.id}\): ExecutorLostFailure \(executor {ex.id} exited caused by one of the "
+                     rf"running tasks\) Reason: {re.escape(reason)}", driver)
+
+
+def test_dynamic_allocation_logs(da_app):
+    from sparksim.yarnlogs import am_stderr, executor_stderr
+
+    run, _ev = da_app
+    driver = am_stderr(run)
+    assert "INFO ExecutorAllocationManager: Requesting 1 new executor because tasks are backlogged (new desired " \
+           "total will be 1 for resource profile id: 0)" in driver
+    assert re.search(r"INFO ExecutorAllocationManager: Executors [\d,]+ removed due to idle timeout\.", driver)
+    released = [ex for ex in run.executors if ex.killed_by_driver]
+    assert released
+    ex = released[0]
+    assert f"INFO YarnClusterScheduler: Executor {ex.id} on {ex.host.name} killed by driver." in driver
+    assert "ERROR CoarseGrainedExecutorBackend: RECEIVED SIGNAL TERM" in executor_stderr(run, ex)
+
+
+def test_container_logs_are_deterministic(da_app):
+    from sparksim.yarnlogs import am_stderr
+
+    run, _ev = da_app
+    assert am_stderr(run) == am_stderr(run)

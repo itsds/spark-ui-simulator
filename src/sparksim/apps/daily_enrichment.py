@@ -44,6 +44,7 @@ from ..model.cluster import ClusterSpec, ExecutorSizing
 from ..model.workload import KeySpace, WriteSink
 from ..sql.dataframe import Column, SparkSession, SqlQuery, Table, agg
 from ..sql.expr import Func, Not
+from ..yarnlogs import write_container_logs
 
 MiB = 1024 * 1024
 NN = "hdfs://nn1.hadoop.prod.internal:8020"
@@ -181,6 +182,9 @@ def build(seed: int | None = None):
     return run, build_events(run)
 
 
-def generate(out_dir: str | Path, seed: int | None = None) -> Path:
+def generate(out_dir: str | Path, seed: int | None = None, logs_dir: str | Path | None = None) -> Path:
+    """Write the event log (and, with `logs_dir`, every container's stdout/stderr for the NodeManager mock)."""
     run, events = build(seed)
+    if logs_dir is not None:
+        write_container_logs(run, logs_dir)
     return write_event_log(Path(out_dir) / run.yapp.event_log_name, events)
