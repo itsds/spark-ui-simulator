@@ -11,23 +11,23 @@ job pages you. Every number below is what the History Server shows, and
 |---|---|---|---|
 | E1 | Jobs tab, header | Total Uptime | `5.5 min` |
 | E2 | Jobs tab / Stages tab | Jobs, completed and skipped stages | `8 jobs, 8 completed + 4 skipped stages` |
-| E3 | Stages tab | Tasks over all completed stages | `9,448` |
+| E3 | Stages tab | Tasks over all completed stages | `9,447` |
 | E4 | Executors tab | Executors | `40 x 4 cores on 40 hosts` |
 | E5 | Stages tab, stage 2 (events scan) | Tasks, duration | `5,200 tasks, 3.7 min` |
-| E6 | Stage 2, Summary Metrics, Duration | Median / max | `7.0 s / 10.3 s (1.47x)` |
-| E7 | Stage 2 header | Input, shuffle write | `517.7 GiB in, 296.5 GiB shuffle write` |
+| E6 | Stage 2, Summary Metrics, Duration | Median / max | `7.0 s / 10.2 s (1.46x)` |
+| E7 | Stage 2 header | Input, shuffle write | `517.7 GiB in, 296.6 GiB shuffle write` |
 | E8 | Stage 2 header, Locality Level Summary | Tasks per locality level | `NODE_LOCAL 3,684, RACK_LOCAL 1,516` |
 | E9 | Stages tab, stage 5 (join + write) | Shuffle read, output | `303.2 GiB read, 130.7 GiB written by 2,400 tasks` |
-| E10 | Stage 5, Summary Metrics, Duration | Median / max | `2.8 s / 3.8 s (1.36x)` |
+| E10 | Stage 5, Summary Metrics, Duration | Median / max | `2.8 s / 3.7 s (1.32x)` |
 | E11 | Stages tab, stage 8 (daily_funnel final) | Tasks reading 2,400 shuffle partitions | `166 tasks` |
-| E12 | Executors tab, Task Time (GC Time) | GC share per executor, min – max | `1.8 % – 2.2 %` |
+| E12 | Executors tab, Task Time (GC Time) | GC share per executor, min – max | `1.8 % – 2.1 %` |
 | E13 | Stage pages | Spill (memory + disk), all stages | `0 B` |
-| E14 | Executors tab, Complete Tasks | Tasks per executor, min – max | `218 – 253` |
+| E14 | Executors tab, Complete Tasks | Tasks per executor, min – max | `224 – 261` |
 | E15 | SQL / DataFrame tab | Queries and their durations | `3 queries: 4.7 min, 13 s, 21 s` |
 | E16 | SQL query 0, events `Scan parquet` → `Filter` | number of output rows | `4,426,997,388 → 4,117,107,532` |
 | E17 | SQL query 0, `BroadcastExchange` | data size, rows | `4.4 MiB, 46,261 rows` |
-| E18 | SQL query 0, `SortMergeJoin` | number of output rows | `4,055,350,909 rows` |
-| E19 | SQL query 2, `Scan parquet` → `HashAggregate` (partial) → `HashAggregate` (final) | number of output rows | `4,055,350,909 → 61,000,003 → 60,961,863` |
+| E18 | SQL query 0, `SortMergeJoin` | number of output rows | `4,055,350,906 rows` |
+| E19 | SQL query 2, `Scan parquet` → `HashAggregate` (partial) → `HashAggregate` (final) | number of output rows | `4,055,350,906 → 61,000,003 → 60,962,709` |
 
 ## Click path and what each number means
 
@@ -48,9 +48,9 @@ registered within ~2.5 s, and the first job started once the driver had them.
 **Stage 2, the events scan (the biggest stage).** 5,200 tasks, 3.7 min (E5).
 Spark cut 4,300 Parquet files at `spark.sql.files.maxPartitionBytes = 256m` and
 packed the small tails together, so most tasks read one 256 MiB split. Task
-times are tight: median 7.0 s, max 10.3 s, **1.47x** (E6). That's the shape of
+times are tight: median 7.0 s, max 10.2 s, **1.46x** (E6). That's the shape of
 a healthy stage: max within ~1.5–2x the median, no long tail. The stage reads
-517.7 GiB of the selected columns and shuffles 296.5 GiB to the join (E7).
+517.7 GiB of the selected columns and shuffles 296.6 GiB to the join (E7).
 **Locality:** 3,684 tasks NODE_LOCAL and 1,516 RACK_LOCAL (E8). Each HDFS
 block has 3 replicas, but our executors run on only 40 of 120 nodes, so for
 some splits no replica host has an executor. After `spark.locality.wait`
@@ -63,7 +63,7 @@ the neighbouring split. Also normal.
 **Stage 5, join + write.** Reads both shuffles (303.2 GiB, E9) into 2,400
 tasks (`spark.sql.shuffle.partitions = 2400`), sorts both sides, sort-merge
 joins on `customer_id`, sorts by `dt` for the partitioned write, and writes
-130.7 GiB of Parquet. Median 2.8 s, max 3.8 s (**1.36x**, E10): partition sizes
+130.7 GiB of Parquet. Median 2.8 s, max 3.7 s (**1.32x**, E10): partition sizes
 are even because `customer_id` has ~200 M distinct values and no hot key. The
 Locality column says PROCESS_LOCAL for every task. A reduce task has no
 preferred host when its input is spread over thousands of map outputs, and
@@ -76,11 +76,11 @@ The activity aggregation got the same treatment. The join stage has no
 `AQEShuffleRead`, because its ~130 MiB partitions were already above the
 coalescing target.
 
-**JVM and memory.** GC is **1.8–2.2 %** of task time on every executor (E12),
+**JVM and memory.** GC is **1.8–2.1 %** of task time on every executor (E12),
 far below the 10 % at which the Executors tab turns the cell red. **No spill**
 anywhere (E13): the largest per-task sort buffer (~500 MiB `peak memory` of the
 write's `Sort` in the SQL plan) fits in the ~2.4 GiB of execution memory each
-task can use. Work is evenly spread: **218–253 tasks** per executor (E14).
+task can use. Work is evenly spread: **224–261 tasks** per executor (E14).
 
 **SQL / DataFrame tab.** One row per DataFrame action: **3 queries**, 4.7 min,
 13 s and 21 s (E15). Click query 0 to see its plan as Spark ran it (AQE's final
@@ -119,6 +119,16 @@ a shuffle on the key you later group by is pre-clustered. Losing that layout,
 for example by repartitioning before the write, would make this shuffle ~60x
 bigger.
 
+**Executor logs.** On the Executors tab each row has `stdout` / `stderr` links (YARN container logs,
+served here by the NodeManager mock on port 8042). A healthy executor's stderr reads like this: start-up
+(registration with the driver, `MemoryStore started with capacity 9.4 GiB`), then per task
+`Running task … (TID n)`, the broadcasts it fetched, `Reading File path: …` lines for each file split a scan
+read, `Getting N … non-empty blocks including … local and … remote blocks` for each shuffle it read,
+`Saved output of task …` for writes, and `Finished task … bytes result sent to driver`; at the end
+`Driver commanded a shutdown`. No WARN or ERROR lines, no `spilling sort data`, no `RECEIVED SIGNAL TERM`.
+The driver's row links to the ApplicationMaster container (the driver runs inside it in cluster mode): its
+stderr has every `Starting task` / `Finished task … (k/n)` line and the YarnAllocator's container requests.
+
 ## The baseline to remember
 
 | | Healthy value |
@@ -128,6 +138,7 @@ bigger.
 | Join + write | 2,400 tasks, max/median ≈ 1.4, no spill |
 | SQL plan | BroadcastHashJoin (page catalog) + SortMergeJoin (customers), ~4.1 B rows in and out |
 | Locality | ~70 % NODE_LOCAL, rest RACK_LOCAL on scans; PROCESS_LOCAL on reduce stages |
+| Logs | executor stderr: only INFO lines; containers end with `Driver commanded a shutdown`, none removed |
 | GC | ~2 % of task time |
 | Spill | none |
 | Executors | 40 x 4 cores, even task counts |

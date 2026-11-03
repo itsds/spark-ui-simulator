@@ -44,6 +44,7 @@ from ..model.cluster import ClusterSpec, ExecutorSizing
 from ..model.workload import KeySpace, WriteSink
 from ..sql.dataframe import Column, SparkSession, SqlQuery, Table, agg
 from ..sql.expr import Func, Not
+from ..yarnlogs import write_container_logs
 
 MiB = 1024 * 1024
 NN = "hdfs://nn1.hadoop.prod.internal:8020"
@@ -150,7 +151,9 @@ SPEC = AppSpec(
     script="daily_enrichment.py",
     started_at="2026-11-03T02:10:07.318+00:00",
     app_seq=48213,
-    cluster=ClusterSpec(cluster_timestamp=1791902144377),  # RM restarted 2026-10-13
+    # RM HA pair; the active RM (rm1) started 2026-10-13, epoch 23 after that many work-preserving restarts.
+    cluster=ClusterSpec(cluster_timestamp=1791902144377, rm_standby_hosts=("rm2.hadoop.prod.internal",),
+                        rm_cluster_id="yarn-prod", rm_epoch=23),
     sizing=ExecutorSizing(instances=40, cores=4, memory_mb=16 * 1024, driver_memory_mb=8 * 1024, driver_cores=2),
     inputs=(
         InputDataset(f"{EVENTS.root}/dt={DT}", files=4_300, mean_file_bytes=285 * MiB, file_size_sigma=0.22,
@@ -179,6 +182,9 @@ def build(seed: int | None = None):
     return run, build_events(run)
 
 
-def generate(out_dir: str | Path, seed: int | None = None) -> Path:
+def generate(out_dir: str | Path, seed: int | None = None, logs_dir: str | Path | None = None) -> Path:
+    """Write the event log (and, with `logs_dir`, every container's stdout/stderr for the NodeManager mock)."""
     run, events = build(seed)
+    if logs_dir is not None:
+        write_container_logs(run, logs_dir)
     return write_event_log(Path(out_dir) / run.yapp.event_log_name, events)

@@ -2,8 +2,14 @@
 
 `AppRun` wires the pieces together and plays the driver:
 
-* YARN places the AM and the executor containers; executors register over a
-  few seconds and scheduling starts once 80 % have (minRegisteredResourcesRatio).
+* YARN places the AM; Spark's YarnAllocator asks the ResourceManager for executor
+  containers (`engine.yarn_am`), executors register over a few seconds and
+  scheduling starts once 80 % of the initial target have (minRegisteredResourcesRatio).
+  NodeManagers watch each container's physical memory and kill it when it exceeds
+  the container size; the driver then fails the executor's running tasks
+  (ExecutorLostFailure), re-runs them elsewhere and YARN starts a replacement.
+  With `spark.dynamicAllocation.enabled` the executor count follows the task
+  backlog and idle executors are released (`engine.dynalloc`).
 * Each query is a DataFrame action planned by `sql.dataframe` and run by
   `sql.aqe.AdaptiveExecution` the way Spark 3.5 runs it with AQE on (the
   default): every shuffle exchange is materialized by its own map-stage job;
@@ -33,9 +39,10 @@ from datetime import UTC, datetime
 
 from ..cost import calibration as cal
 from ..cost.model import StageContext, TaskEnv, TaskPlan, TaskResult, simulate_task
-from ..environment import PySparkYarnApp, spark_properties
+from ..environment import CLUSTER_SPARK_DEFAULTS, PySparkYarnApp, spark_properties
 from ..eventlog import (
     SHUFFLE_READ_ACCUMS,
+    ExecutorLostFailure,
     ExecutorMetrics,
     IdAllocator,
     RDDInfo,
@@ -46,11 +53,10 @@ from ..model.cluster import (
     ClusterSpec,
     Executor,
     ExecutorSizing,
+    Host,
     build_cluster,
-    place_application,
-    scheduling_start,
 )
-from ..model.files import plan_scan
+from ..model.files import max_split_bytes, plan_scan
 from ..model.hdfs import Hdfs
 from ..model.shuffle import ShuffleExchange, coalesce_partitions, key_shares, row_shares
 from ..model.workload import ScanSource, ShuffleSink, ShuffleSource, StageSpec, WriteSink
@@ -67,6 +73,8 @@ from ..sql.planinfo import plan_info
 from ..sql.scopes import ScopeSimulator
 from ..yarn import YarnApp
 from . import callsites
+from .dynalloc import DynAllocConf, ExecutorAllocationManager
+from .yarn_am import ResourceManager, YarnAllocator, container_memory, pmem_diagnostics
 
 MiB = 1024 * 1024
 
@@ -113,6 +121,22 @@ class AppSpec:
 
 
 @dataclass
+class Broadcast:
+    """A TorrentBroadcast the driver created: task binaries, the Parquet reader's Hadoop conf, relations."""
+
+    id: int
+    kind: str  # task_binary | hadoop_conf | relation
+    created: int
+    piece_bytes: int  # serialized (compressed) size, split in spark.broadcast.blockSize (4 MiB) pieces
+    value_bytes: int  # deserialized size in the MemoryStore
+    callsite: str
+
+    @property
+    def pieces(self) -> int:
+        return max(1, -(-self.piece_bytes // (4 * MiB)))
+
+
+@dataclass
 class TaskRecord:
     stage_id: int
     attempt: int
@@ -127,10 +151,16 @@ class TaskRecord:
     touched: frozenset
     exec_metrics: ExecutorMetrics = field(default_factory=ExecutorMetrics)
     sql: list[tuple[int, int]] = field(default_factory=list)  # SQL metric (accumulator id, update)
+    task_attempt: int = 0  # TaskInfo.Attempt (retries of the same index)
+    failure: ExecutorLostFailure | None = None  # set when its executor was lost while it ran
 
     @property
     def duration(self) -> int:
         return self.finish - self.launch
+
+    @property
+    def ok(self) -> bool:
+        return self.failure is None
 
 
 @dataclass
@@ -158,6 +188,9 @@ class StageRecord:
     top_scope: tuple[int, str] | None = None
     done: Signal | None = None
     plan_root: object = None  # the stage's physical plan (SQL metrics)
+    task_binary_bc: int | None = None
+    scan_bcs: list[int] = field(default_factory=list)  # Hadoop conf broadcasts of its scans
+    epoch: int = 0  # MapOutputTracker epoch its tasks carry
 
 
 @dataclass
@@ -190,30 +223,64 @@ class AppRun:
         seed = spec.seed
         self.rng = substream(seed, "driver")
         self.cluster: Cluster = build_cluster(spec.cluster, seed)
-        self.yapp = YarnApp(spec.cluster.cluster_timestamp, spec.app_seq)
+        self.yapp = YarnApp(spec.cluster.cluster_timestamp, spec.app_seq, epoch=spec.cluster.rm_epoch)
         self.t0 = iso_ms(spec.started_at)
         self.submit_time = self.t0 - self.rng.randint(*spec.submit_to_start_ms)
-        self.placement = place_application(self.cluster, spec.sizing, self.yapp, self.t0, seed)
-        self.executors = self.placement.executors
+
+        # YARN: the AM container (driver), then Spark's YarnAllocator asks the RM for executor containers.
+        conf = {**CLUSTER_SPARK_DEFAULTS, **dict(spec.conf)}  # the cluster's spark-defaults.conf, then --conf
+        yarn_rng = substream(seed, "yarn-allocation")
+        min_mb = spec.cluster.min_allocation_mb
+        exec_mb = spec.sizing.container_mb(min_mb)
+        if exec_mb > spec.cluster.max_allocation_mb:
+            raise ValueError(f"executor container {exec_mb} MB exceeds yarn.scheduler.maximum-allocation-mb")
+        am_mb = spec.sizing.am_container_mb(min_mb)
+        self.am_host: Host = yarn_rng.choice([h for h in self.cluster.hosts if self.cluster.free_mb[h.name] >= am_mb])
+        self.am_request_time = self.t0 + yarn_rng.randint(*cal.AM_REQUEST_DELAY_MS)
+        self.rm = ResourceManager(self.cluster, yarn_rng, exec_mb)
+        self.rm.free[self.am_host.name] -= am_mb
+        self.dynalloc_conf = (DynAllocConf.from_conf(conf)
+                              if conf.get("spark.dynamicAllocation.enabled", "false") == "true" else None)
+        self.ess_enabled = conf.get("spark.shuffle.service.enabled", "false") == "true"
+        initial = self.dynalloc_conf.initial_executors if self.dynalloc_conf else spec.sizing.instances
+        self.allocator = YarnAllocator(self, self.rm, self.yapp, spec.sizing, yarn_rng, target=initial)
+        self.min_registered = math.ceil(initial * cal.MIN_REGISTERED_RATIO)
+        self.executors: list[Executor] = []  # every executor that registered, in registration order
+        self.executor_by_id: dict[str, Executor] = {}
+        self.yarn_log: list[tuple[int, str, object]] = []  # YARN/AM/driver happenings for the container logs
+        self.conf = conf
+        self.java_home = "/usr/lib/jvm/java-17-openjdk-amd64"
+        self.nm_log_dir = "/data/1/yarn/container-logs"
+        self.nm_local_dirs = "/data/1/yarn/nm,/data/2/yarn/nm,/data/3/yarn/nm"
+        self.driver_bm_port = substream(seed, "driver-ports").randint(33000, 46000)
+        self.rm_ip = "10.31.0.5"
+        self.executor_java_opts = ""
+        self.stopping = False
+        self.scheduling_started: int | None = None
         self.hdfs = Hdfs(self.cluster, substream(seed, "hdfs"))
         for d in spec.inputs:
             self.hdfs.create_dataset(d.path, d.files, d.mean_file_bytes, d.file_size_sigma, d.bytes_per_row,
                                      _upstream_file_namer(substream(seed, f"names/{d.path}")),
                                      row_group_bytes=d.row_group_bytes)
-        am = self.placement.am_host
+        am = self.am_host
         self.env_app = PySparkYarnApp(
             app=self.yapp, app_name=spec.app_name, user=spec.user, script=spec.script, am_node=am.nm,
             rm_host=spec.cluster.rm_host, submit_time=self.submit_time, start_time=self.t0,
             driver_port=self.rng.randint(33000, 46000),
             executor_memory=f"{spec.sizing.memory_mb // 1024}g",
             driver_memory=f"{spec.sizing.driver_memory_mb // 1024}g",
-            executor_cores=spec.sizing.cores, executor_instances=spec.sizing.instances,
-            extra_conf=dict(spec.conf),
+            executor_cores=spec.sizing.cores, executor_instances=spec.sizing.instances or None,
+            extra_conf=dict(spec.conf), rm_standby_hosts=spec.cluster.rm_standby_hosts,
         )
         # SQL jobs carry the whole Spark conf in their properties (SQLExecution.withSQLConfPropagated).
         self.base_props = spark_properties(self.env_app)
         self.sim = Sim(self.t0)
+        self.ready = self.sim.signal()  # enough executors registered to start scheduling
+        if self.min_registered == 0:
+            self.ready.fire()
         self.sched = TaskScheduler(self.sim, substream(seed, "scheduler"), self.cluster.rack_of)
+        self.dynalloc = (ExecutorAllocationManager(self, self.dynalloc_conf, spec.sizing.cores)
+                         if self.dynalloc_conf else None)
 
         # DAGScheduler / SparkContext counters
         self.job_ids = IdAllocator(0)
@@ -238,11 +305,20 @@ class AppRun:
         self.exchanges: dict[str, ShuffleExchange] = {}
         self.map_stage_of: dict[str, StageRecord] = {}  # exchange -> the stage that wrote it
         self.log: list[tuple[int, str, object]] = []  # (time, kind, payload) in simulation order
-        self.exec_launched: dict[str, int] = {e.id: 0 for e in self.executors}
+        self.exec_launched: dict[str, int] = {}
+        self.exec_stages: dict[str, set[int]] = {}  # stages that ran tasks on each executor
+        self.task_records: dict[int, TaskRecord] = {}
         self.compile_end: dict[tuple[int, int, str], int] = {}
         self.stage_rng: dict[int, random.Random] = {}
         self.stage_nprng: dict[int, object] = {}
         self.fetch_batch_prop = False  # __fetch_continuous_blocks_in_batch_enabled sticks once set
+        self.bc_ids = IdAllocator(0)
+        self.broadcasts: dict[int, Broadcast] = {}
+        self.scan_bc: dict[int, int] = {}  # id(FileSourceScan) -> its Hadoop conf broadcast
+        self.relation_bc: dict[str, int] = {}  # broadcast exchange name -> relation broadcast
+        self.bc_rng = substream(seed, "broadcasts")
+        self.epoch = 0  # MapOutputTrackerMaster epoch: +1 per finished map stage and per lost executor
+        self.scan_split_bytes: dict[str, tuple[int, int]] = {}  # path -> (maxSplitBytes, openCost)
         self.app_end: int | None = None
 
     # ------------------------------------------------------------------ helpers
@@ -252,6 +328,11 @@ class AppRun:
 
     def _jitter(self, lo_hi: tuple[int, int]) -> int:
         return self.rng.randint(*lo_hi)
+
+    def _new_broadcast(self, kind: str, piece: int, values: int, callsite: str) -> int:
+        b = Broadcast(self.bc_ids.next(), kind, self.sim.now, piece, values, callsite)
+        self.broadcasts[b.id] = b
+        return b.id
 
     def conf_bytes(self, key: str, default: int) -> int:
         v = dict(self.spec.conf).get(key)
@@ -267,26 +348,168 @@ class AppRun:
     # ------------------------------------------------------------------ main
 
     def run(self) -> AppRun:
-        for ex in self.executors:
-            self.sim.at(ex.registered_at, self._executor_added, ex)
+        self.allocator.start(self.am_request_time)
+        if self.dynalloc is not None:
+            self.dynalloc.start()
         self.sim.spawn(self._driver())
         self.sim.run()
         assert self.app_end is not None, "driver program did not finish"
         return self
 
-    def _executor_added(self, ex: Executor) -> None:
-        self._record("executor_added", ex)
-        self._record("block_manager_added", ex, t=ex.block_manager_at)
-        self.sched.add_executor(ex)
-
     def _driver(self):
-        ready = scheduling_start(self.placement, self.spec.sizing.instances, self.t0 + 1_500)
-        yield max(0, ready - self.sim.now)
+        driver_ready = self.t0 + 1_500
+        yield max(0, driver_ready - self.sim.now)
+        if not self.ready.fired:  # YarnClusterSchedulerBackend: 80 % registered, or 30 s
+            timeout = self.sim.signal()
+            self.sim.at(driver_ready + cal.MAX_REGISTERED_WAIT_MS, timeout.fire)
+            yield any_of(self.sim, [self.ready, timeout])
+        self.scheduling_started = self.sim.now
         self.sched.start()
         for qi, q in enumerate(self.spec.queries):
             yield from self._run_query(qi, q)
         yield self._jitter(self.spec.stop_ms)
+        self.stopping = True
+        self.allocator.stop()
         self.app_end = self.sim.now
+
+    # ------------------------------------------------------------------ executors (YARN containers)
+
+    def _container_launched(self, ex: Executor) -> None:
+        """YarnAllocator launched `ex`: it registers after JVM start-up; its NodeManager watches its memory."""
+        self.sim.at(ex.registered_at, self._executor_added, ex)
+        rng = substream(self.spec.seed, f"nm-monitor/{ex.container_id}")
+        phase = rng.randrange(cal.NM_MONITOR_INTERVAL_MS)
+        mem = container_memory(ex, self.spec.sizing, rng)
+        self.sim.at(ex.launched_at + phase, self._nm_check, ex, mem)
+
+    def _executor_added(self, ex: Executor) -> None:
+        if ex.exit_at is not None or self.stopping:
+            return
+        self.executors.append(ex)
+        self.executor_by_id[ex.id] = ex
+        self.exec_launched.setdefault(ex.id, 0)
+        self.exec_stages.setdefault(ex.id, set())
+        self._record("executor_added", ex)
+        self._record("block_manager_added", ex, t=ex.block_manager_at)
+        self.sched.add_executor(ex)
+        if self.dynalloc is not None:
+            self.dynalloc.executor_added(ex)
+        if len(self.executors) >= self.min_registered and not self.ready.fired:
+            self.ready.fire()
+
+    def _nm_check(self, ex: Executor, mem) -> None:
+        """ContainersMonitorImpl: the container's process-tree RSS against its size, every 3 s."""
+        if self.stopping or ex.nm_kill_at is not None:
+            return
+        now = self.sim.now
+        exec_mem, fetching, running = 0.0, 0, 0
+        for a in self.sched.running.get(ex.id, {}).values():
+            rec = self.task_records[a.task_id]
+            frac = (now - rec.launch) / max(1, rec.finish - rec.launch)
+            exec_mem += rec.result.exec_memory * min(1.0, frac / 0.7)
+            fetching += rec.result.fetching
+            running += 1
+        rss = mem.check(now, running, exec_mem, fetching, len(self.exec_stages.get(ex.id, ())))
+        ex.extra["peak_rss"] = max(ex.extra.get("peak_rss", 0), rss)
+        if rss > mem.limit:
+            t_exit = now + self.rng.randint(*cal.JVM_SIGTERM_EXIT_MS)
+            ex.nm_kill_at, ex.exit_status = now, -104
+            ex.diagnostics = pmem_diagnostics(ex, rss, mem.limit, now, t_exit, self.java_home,
+                                              self.executor_command(ex))
+            self.yarn_log.append((now, "nm_kill_pmem", (ex, rss, mem.limit)))
+            self.sim.at(t_exit, self._jvm_exit, ex)
+            return
+        self.sim.after(cal.NM_MONITOR_INTERVAL_MS, self._nm_check, ex, mem)
+
+    def _nm_stop_container(self, ex: Executor) -> None:
+        """The RM told the NodeManager to stop a container the AM released (SIGTERM)."""
+        if self.stopping or ex.nm_kill_at is not None:
+            return
+        now = self.sim.now
+        t_exit = now + self.rng.randint(*cal.JVM_SIGTERM_EXIT_MS)
+        ex.nm_kill_at, ex.exit_status = now, 143
+        ex.diagnostics = (f"[{_nm(now)}]Container killed by the ApplicationMaster.\n"
+                          f"[{_nm(t_exit)}]Container killed on request. Exit code is 143\n"
+                          f"[{_nm(t_exit)}]Container exited with a non-zero exit code 143. \n")
+        self.yarn_log.append((now, "nm_stop", ex))
+        self.sim.at(t_exit, self._jvm_exit, ex)
+
+    def _jvm_exit(self, ex: Executor) -> None:
+        if self.stopping:
+            return
+        ex.exit_at = self.sim.now
+        self.rm.container_exited(ex, ex.exit_at)
+        if ex.id in self.sched.executors:  # the driver notices the dropped RPC connection
+            self.sim.after(self.rng.randint(2, 15), self._driver_disconnected, ex)
+
+    def _driver_disconnected(self, ex: Executor) -> None:
+        """DriverEndpoint.onDisconnected → disableExecutor → executorLost(LossReasonPending): the block
+        manager is removed now; the tasks wait for the loss reason the AM will give."""
+        if self.stopping:
+            return
+        self.sched.disable_executor(ex.id)
+        self.allocator.pending_loss.add(ex.id)
+        self.yarn_log.append((self.sim.now, "driver_disconnected", ex))
+        self._record("block_manager_removed", ex)
+
+    def _executor_loss_reason(self, ex: Executor, reason: str, by_app: bool, released: bool) -> None:
+        """RemoveExecutor(reason) reaches the driver: fail the running tasks, post ExecutorRemoved."""
+        if self.stopping or ex.id not in self.sched.executors:
+            return
+        self.epoch += 1  # DAGScheduler.handleExecutorLost
+        if not self.ess_enabled and any(e.map_executor and ex.id in e.map_executor
+                                        for e in self.exchanges.values()):
+            raise NotImplementedError(
+                f"executor {ex.id} lost its shuffle files: without spark.shuffle.service.enabled this needs "
+                "FetchFailed / stage retry handling, which is not modelled yet")
+        ex.removed_reason = "Executor killed by driver." if released else reason
+        ex.exit_caused_by_app = by_app
+        self._loss_reason = (ex, reason, by_app)
+        lost = self.sched.remove_executor(ex.id, counts_as_failure=by_app and not released)
+        self.yarn_log.append((self.sim.now, "executor_lost", (ex, reason, by_app, released, lost)))
+        ex.removed_at = self.sim.now + self.rng.randint(1, 4)
+        self._record("executor_removed", (ex, ex.removed_reason), t=ex.removed_at)
+        if not released:  # the AM also sent RemoveExecutor itself: the second one finds no executor
+            self._record("executor_removed", (ex, ex.removed_reason), t=ex.removed_at + 1)
+        if self.dynalloc is not None:
+            self.dynalloc.executor_removed(ex)
+
+    def _dynalloc_target(self, target: int, old: int, backlogged: bool, delta: int = 0) -> None:
+        self.yarn_log.append((self.sim.now, "da_target", (target, old, backlogged, delta)))
+        self.allocator.set_target(target)
+
+    def _dynalloc_kill(self, ids: list[str]) -> None:
+        """client.killExecutors(ids, countFailures = false): no more tasks, the AM releases the containers."""
+        self.yarn_log.append((self.sim.now, "da_kill", ids))
+        for eid in ids:
+            ex = self.sched.executors[eid]
+            ex.killed_by_driver = True
+            self.sched.disable_executor(eid)
+            self.allocator.kill_executor(ex)
+
+    @property
+    def event_log_path(self) -> str:
+        """Where SingleEventLogFileWriter writes (Hadoop Path prints hdfs:///x as hdfs:/x)."""
+        d = self.base_props.get("spark.eventLog.dir", "hdfs:///spark-history").replace(":///", ":/")
+        return f"{d.rstrip('/')}/{self.yapp.event_log_name}"
+
+    def job_tracker_id(self, stage: StageRecord) -> str:
+        """FileFormatWriter's jobTrackerID: yyyyMMddHHmmss of the write job + abs(Random.nextLong)."""
+        job = next(j for j in self.jobs if j.final_stage == stage.stage_id)
+        stamp = datetime.fromtimestamp(job.submitted / 1000, UTC).strftime("%Y%m%d%H%M%S")
+        return f"{stamp}{substream(self.spec.seed, f'jobtracker/{stage.stage_id}').getrandbits(63)}"
+
+    def executor_command(self, ex: Executor) -> str:
+        """The container launch command (ExecutorRunnable.prepareCommand), as the NM process tree shows it."""
+        sz = self.spec.sizing
+        log_dir = f"{self.nm_log_dir}/{self.yapp.app_id}/{ex.container_id}"
+        return (f"{self.java_home}/bin/java -server -Xmx{sz.memory_mb}m "
+                f"{self.executor_java_opts}-Djava.io.tmpdir={{{{PWD}}}}/tmp "
+                f"-Dspark.driver.port={self.env_app.driver_port} -Dspark.yarn.app.container.log.dir={log_dir} "
+                "-XX:OnOutOfMemoryError=kill %p org.apache.spark.executor.YarnCoarseGrainedExecutorBackend "
+                f"--driver-url spark://CoarseGrainedScheduler@{self.am_host.name}:{self.env_app.driver_port} "
+                f"--executor-id {ex.id} --hostname {ex.host.name} --cores {ex.cores} --app-id {self.yapp.app_id} "
+                f"--resourceProfileId 0 1>{log_dir}/stdout 2>{log_dir}/stderr")
 
     # ------------------------------------------------------------------ queries (AQE)
 
@@ -343,7 +566,7 @@ class AppRun:
         final = self._submit_job(qi, q, aqe, None, lineage, qrec)
         yield final
         stage = self.stages[self.jobs[-1].final_stage]
-        files = [t.result.output_file for t in stage.tasks if t.result.output_file]
+        files = [t.result.output_file for t in stage.tasks if t.ok and t.result.output_file]
         commit = int(cal.JOB_COMMIT_FIXED_MS + len(files) * cal.JOB_COMMIT_MS_PER_FILE * self.rng.uniform(0.85, 1.2))
         yield commit
         cmd = aqe.root.current
@@ -377,7 +600,13 @@ class AppRun:
     def _stage_driver_metrics(self, qrec: QueryRecord, plan) -> None:
         """What the driver posts while it builds a stage's RDDs: scan files, AQEShuffleRead specs, partitions."""
         root = plan.children[0] if isinstance(plan, (sqln.ShuffleExchange, sqln.BroadcastExchange)) else plan
+        site = (callsites.BROADCAST_SHORT if isinstance(plan, sqln.BroadcastExchange)
+                else callsites.py4j_callsite(self.spec.queries[qrec.execution_id].action)[0])
         for scan in sqlm.scans_in(root):
+            if id(scan) not in self.scan_bc:  # ParquetFileFormat.buildReaderWithPartitionValues
+                r = self.bc_rng
+                self.scan_bc[id(scan)] = self._new_broadcast("hadoop_conf", 40_300 + r.randint(0, 900),
+                                                             474_000 + r.randint(0, 4_000), site)
             path = scan.relation.root_paths[0]
             files = self.hdfs.listdir(path)
             listing = max(1, int(len(files) * cal.FILE_LISTING_MS_PER_FILE * self.rng.uniform(0.7, 1.3)))
@@ -429,13 +658,22 @@ class AppRun:
         def submit_stage():
             stage.submitted = self.sim.now
             stage.accum_base = self.accum_ids.take(35).start
+            stage.epoch = self.epoch
+            nodes = sum(1 for _ in plan_root.walk()) if plan_root is not None else 4
+            piece = 3_600 + nodes * 2_900 + (90_000 if isinstance(spec.sink, WriteSink) else 0)
+            piece = int(piece * self.bc_rng.uniform(0.93, 1.07))
+            stage.task_binary_bc = self._new_broadcast("task_binary", piece, int(piece * self.bc_rng.uniform(2.3, 3.4)),
+                                                       "broadcast at DAGScheduler.scala:1611")
             self._record("stage_submitted", stage)
             ts = TaskSet(stage.stage_id, 0, job_id, [p.preferred for p in stage.plans],
                          on_launch=lambda a, st=stage: self._on_launch(st, a),
-                         on_finish=lambda a, st=stage: self._on_finish(st, a))
+                         on_finish=lambda a, st=stage: self._on_finish(st, a),
+                         on_fail=lambda a, st=stage: self._on_fail(st, a))
             ts.done = self.sim.signal()
             ts.done.wait(lambda: self.sim.after(self._jitter(cal.STAGE_COMPLETE_DELAY_MS), stage_completed))
             self.sched.submit(ts)
+            if self.dynalloc is not None:
+                self.dynalloc.stage_submitted()
 
         def stage_completed():
             stage.completed = self.sim.now
@@ -451,8 +689,9 @@ class AppRun:
             else:
                 if qstage is not None:
                     ex = self.exchanges[spec.sink.exchange]
-                    size = sum(t.result.sink_rows * t.result.sink_row_bytes for t in stage.tasks)
+                    size = sum(t.result.sink_rows * t.result.sink_row_bytes for t in stage.tasks if t.ok)
                     self.stage_stats[spec.sink.exchange] = (size, int(ex.records.sum()))
+                    self.epoch += 1  # DAGScheduler: mapOutputTracker.incrementEpoch() after a map stage
                 materialized.fire()
 
         self.sim.after(self._jitter(cal.JOB_TO_STAGE_MS), submit_stage)
@@ -460,8 +699,9 @@ class AppRun:
 
     def _broadcast_built(self, qrec, stage: StageRecord, job: JobRecord, spec: StageSpec, materialized: Signal):
         """BroadcastExchangeExec.relationFuture after the collect job: build the HashedRelation, broadcast it."""
-        rows = sum(t.result.result_rows for t in stage.tasks)
-        row_bytes = stage.tasks[0].result.sink_row_bytes if stage.tasks else 16
+        done = [t for t in stage.tasks if t.ok]
+        rows = sum(t.result.result_rows for t in done)
+        row_bytes = done[0].result.sink_row_bytes if done else 16
         build = int(cal.BROADCAST_BUILD_FIXED_MS + rows * cal.BROADCAST_BUILD_NS_PER_ROW / 1e6)
         page_need = rows * (row_bytes + 8)  # UnsafeRow + its 8-byte length/next-pointer word
         page = cal.HASHED_RELATION_MIN_BYTES
@@ -475,6 +715,8 @@ class AppRun:
         def done():
             self._record("driver_accum", (qrec.execution_id, sqlm.broadcast_driver_updates(
                 spec.sink.node, data_size, rows, collect, build, bcast)))
+            self.relation_bc[spec.sink.name] = self._new_broadcast(
+                "relation", int(data_size * 0.38), data_size + 512, callsites.BROADCAST_SHORT)
             materialized.fire()
 
         self.sim.after(build + bcast, done)
@@ -508,6 +750,8 @@ class AppRun:
         task_type = "ShuffleMapTask" if isinstance(spec.sink, ShuffleSink) else "ResultTask"
         rec = StageRecord(sid, 0, short, details, len(plans), rdds, parent_ids, task_type, qi, spec,
                           plans=plans, top_scope=lineage.top_scope)
+        rec.scan_bcs = [self.scan_bc[id(s.node)] for s in spec.sources
+                        if isinstance(s, ScanSource) and id(s.node) in self.scan_bc]
         rec.plan_root = plan_root
         out_ex = None
         if isinstance(spec.sink, ShuffleSink):
@@ -530,10 +774,11 @@ class AppRun:
     def _scan_partitions(self, scan: ScanSource):
         path = scan.dataset.path
         if path not in self.scan_parts:
-            self.scan_parts[path] = plan_scan(
-                self.hdfs.listdir(path), self.default_parallelism,
-                max_partition_bytes=self.conf_bytes("spark.sql.files.maxPartitionBytes", 128 * MiB),
-                open_cost=self.conf_bytes("spark.sql.files.openCostInBytes", 4 * MiB))
+            mpb = self.conf_bytes("spark.sql.files.maxPartitionBytes", 128 * MiB)
+            oc = self.conf_bytes("spark.sql.files.openCostInBytes", 4 * MiB)
+            files = self.hdfs.listdir(path)
+            self.scan_parts[path] = plan_scan(files, self.default_parallelism, max_partition_bytes=mpb, open_cost=oc)
+            self.scan_split_bytes[path] = (max_split_bytes(files, mpb, oc, self.default_parallelism), oc)
         return self.scan_parts[path]
 
     def _reduce_preferred(self, exs: list[ShuffleExchange], a: int, b: int) -> tuple[str, ...]:
@@ -552,7 +797,7 @@ class AppRun:
                 by_exec[ex.map_executor[m]] = by_exec.get(ex.map_executor[m], 0.0) + v
             for eid, v in by_exec.items():
                 if v / total >= 0.2:
-                    h = self.sched.executors[eid].host.name
+                    h = self.executor_by_id[eid].host.name
                     if h not in out:
                         out.append(h)
         return tuple(out)
@@ -601,16 +846,32 @@ class AppRun:
             self.compile_end[key] = a.launch_time + res.deserialize_ms + int(cal.CODEGEN_COMPILE_MS)
         touched = SHUFFLE_READ_ACCUMS if st.spec.shuffle_inputs else frozenset()
         rec = TaskRecord(st.stage_id, st.attempt, a.index, a.task_id, ex, LOCALITY_NAMES[a.locality],
-                         a.launch_time, a.launch_time + res.duration_ms, st.task_type, res, touched)
+                         a.launch_time, a.launch_time + res.duration_ms, st.task_type, res, touched,
+                         task_attempt=a.attempt)
         rec.sql = sqlm.task_updates(st.plan_root, res)
         st.tasks.append(rec)
         st.by_index[a.index] = rec
+        self.task_records[a.task_id] = rec
+        self.exec_stages[ex.id].add(st.stage_id)
         self._record("task_start", rec, t=a.launch_time)
+        if self.dynalloc is not None:
+            self.dynalloc.task_started(ex.id)
         return res.duration_ms
 
+    def _on_fail(self, st: StageRecord, a: Launch) -> None:
+        """The task's executor was lost (TaskSetManager.executorLost → handleFailedTask)."""
+        rec = self.task_records[a.task_id]
+        ex, reason, by_app = self._loss_reason
+        rec.finish = self.sim.now
+        rec.failure = ExecutorLostFailure(ex.id, by_app, reason)
+        rec.sql = []
+        self._record("task_end", rec)
+
     def _on_finish(self, st: StageRecord, a: Launch) -> None:
-        rec = st.by_index[a.index]
+        rec = self.task_records[a.task_id]
         assert rec.finish == a.finish_time
+        if self.dynalloc is not None:
+            self.dynalloc.task_ended(a.executor.id)
         ex = a.executor
         if st.exchange is not None:
             self.exchanges[st.exchange].commit(a.index, ex.id, ex.host.name)
@@ -639,6 +900,12 @@ class AppRun:
 
 def _scans(plan) -> list:
     return [n for n in plan.walk() if isinstance(n, sqln.FileSourceScan)]
+
+
+def _nm(ms: int) -> str:
+    from .yarn_am import nm_date
+
+    return nm_date(ms)
 
 
 def _upstream_file_namer(rng: random.Random):

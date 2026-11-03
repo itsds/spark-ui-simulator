@@ -1,7 +1,8 @@
 """`sparksim` command line.
 
   sparksim generate tiny [--out event-logs] [--seed N]                  the Phase 2 smoke app (8 tasks)
-  sparksim generate 00-healthy-baseline [--out event-logs] [--seed N]   Scenario 00 (~9.4k tasks, 3 SQL queries)
+  sparksim generate 00-healthy-baseline [--out event-logs] [--logs-out yarn-logs] [--seed N]
+                                       Scenario 00 (~9.4k tasks, 3 SQL queries) + its YARN container logs
   sparksim roundtrip <event-log>...                                     parse + re-serialize, report byte diffs
 """
 
@@ -24,7 +25,10 @@ def _generate(a) -> int:
     else:
         from .apps import daily_enrichment
 
-        path = daily_enrichment.generate(a.out, a.seed)
+        logs = Path(a.logs_out) if a.logs_out else None
+        path = daily_enrichment.generate(a.out, a.seed, logs)
+        if logs is not None:
+            print(f"wrote container logs under {logs}")
     print(f"wrote {path}")
     return 0
 
@@ -48,6 +52,8 @@ def main(argv=None) -> int:
     g.add_argument("app", choices=APPS)
     g.add_argument("--out", default="event-logs", type=Path)
     g.add_argument("--seed", default=None, type=int, help="override the scenario's seed")
+    g.add_argument("--logs-out", default="yarn-logs",
+                   help="YARN container logs (stdout/stderr) served by services/nm-logs; '' to skip")
     g.set_defaults(fn=_generate)
     r = sub.add_parser("roundtrip", help="check that the event model reproduces a log byte for byte")
     r.add_argument("logs", nargs="+", type=Path)

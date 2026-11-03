@@ -195,6 +195,33 @@ JVM_OFF_HEAP_PER_STAGE = 1_500_000  # metaspace growth per distinct stage run (g
 DIRECT_POOL_BASE = 21 * MiB  # [ref] 12–34 MiB
 DIRECT_POOL_PER_FETCH = 9 * MiB  # netty buffers per reduce task fetching
 
+# ============================================================================ container physical memory [norm]/[spark]
+# What the NodeManager's ContainersMonitor measures (process-tree RSS) against the container size
+# (spark.executor.memory + memoryOverhead, rounded up to yarn.scheduler.minimum-allocation-mb).
+
+# [spark] yarn.nodemanager.container-monitor.interval-ms
+NM_MONITOR_INTERVAL_MS = 3_000
+# [spark] JVM ergonomics: without -Xms (Spark sets only -Xmx) the initial heap is 1/64 of the host's RAM.
+JVM_INITIAL_HEAP_FRACTION_OF_RAM = 1 / 64
+# [norm] G1 grows the committed heap under allocation pressure (GCTimeRatio) and almost never gives it
+# back while tasks run: committed = Xms + (Xmx - Xms) * (1 - exp(-busy core-seconds / tau)), and never
+# below 1.25x the live heap. A busy executor commits its whole -Xmx within a few minutes.
+G1_HEAP_GROWTH_CORE_S = 240.0
+G1_HEAP_GROWTH_SIGMA = 0.35  # lognormal spread of tau between executor JVMs (allocation patterns differ)
+G1_COMMIT_HEADROOM = 1.25
+# [norm] Native memory outside the heap: G1 remembered sets, card table and mark bitmaps (~4-5 % of the
+# committed heap), thread stacks actually touched, glibc malloc arenas used by task threads (compression
+# codecs, JNI) per core. Metaspace + code cache and netty direct buffers are the JVM_OFF_HEAP_* and
+# DIRECT_POOL_* figures above. Together ≈ 6-8 % of the heap: why Spark's default overhead is 10 %.
+G1_NATIVE_FRACTION = 0.045
+NATIVE_FOOTPRINT_SIGMA = 0.06
+THREAD_STACKS_RSS = 48 * MiB
+MALLOC_ARENA_RSS_PER_CORE = 40 * MiB
+# [spark] yarn.nodemanager.sleep-delay-before-sigkill.ms (SIGTERM → SIGKILL); a JVM running shutdown hooks
+# exits after ~100-250 ms, so the container exits with 143 (SIGTERM).
+NM_SIGKILL_DELAY_MS = 250
+JVM_SIGTERM_EXIT_MS = (90, 240)
+
 # ============================================================================ data formats [norm]
 
 LZ4_SHUFFLE_RATIO = 0.42  # compressed / UnsafeRow bytes for typical mixed-type rows

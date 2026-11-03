@@ -190,7 +190,8 @@ class LAggregate(LNode):
         return (self.child,)
 
     def output(self):
-        return list(self.keys) + [Attr(a.name, a.func.dtype, a.alias_id) for a in self.aggs]
+        # Count is never null (Count.nullable = false); sum/min/max/avg are
+        return list(self.keys) + [Attr(a.name, a.func.dtype, a.alias_id, a.func.name != "count") for a in self.aggs]
 
 
 @dataclass(eq=False)

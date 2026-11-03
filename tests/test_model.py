@@ -7,7 +7,8 @@ import random
 import numpy as np
 import pytest
 
-from sparksim.model.cluster import ClusterSpec, ExecutorSizing, build_cluster, place_application, scheduling_start
+from sparksim.engine.yarn_am import ResourceManager, YarnAllocator
+from sparksim.model.cluster import ClusterSpec, ExecutorSizing, build_cluster
 from sparksim.model.files import (
     FilePartition,
     PartitionedFile,
@@ -19,6 +20,8 @@ from sparksim.model.files import (
 from sparksim.model.hdfs import Block, Hdfs, HdfsFile
 from sparksim.model.shuffle import ShuffleExchange, coalesce_partitions, key_shares, row_shares
 from sparksim.model.workload import KeySpace, expected_distinct
+from sparksim.rng import substream
+from sparksim.sched.sim import Sim
 from sparksim.yarn import YarnApp
 
 MiB = 1024 * 1024
@@ -48,31 +51,60 @@ def test_cluster_layout(cluster):
     assert all(0.85 < h.speed < 1.15 for h in cluster.hosts)
 
 
-def test_placement_respects_capacity(cluster):
+class _AllocRun:
+    """Just enough of AppRun for the YARN allocator: a clock, the log, launch callbacks."""
+
+    def __init__(self, cluster, start: int):
+        self.cluster = cluster
+        self.sim = Sim(start)
+        self.yarn_log = []
+        self.launched = []
+
+    def _container_launched(self, ex):
+        self.launched.append(ex)
+
+
+def _allocate(cluster, sizing, app, request_time, seed, until):
+    run = _AllocRun(cluster, request_time)
+    rng = substream(seed, "yarn-allocation")
+    rm = ResourceManager(cluster, rng, sizing.container_mb(cluster.spec.min_allocation_mb))
+    alloc = YarnAllocator(run, rm, app, sizing, rng, target=sizing.instances)
+    alloc.start(request_time)
+    run.sim.run(until=until)
+    alloc.stop()
+    return run, alloc, rm
+
+
+def test_allocation_respects_capacity(cluster):
     sizing = ExecutorSizing(instances=60, cores=4, memory_mb=16 * 1024)
-    p = place_application(cluster, sizing, YarnApp(SPEC.cluster_timestamp, 7), driver_start=1_000_000, seed=3)
-    assert len(p.executors) == 60
+    run, alloc, rm = _allocate(cluster, sizing, YarnApp(SPEC.cluster_timestamp, 7), 1_000_000, 3, 1_060_000)
+    execs = run.launched
+    assert len(execs) == 60 and len(alloc.running) == 60
     used: dict[str, int] = {}
-    for e in p.executors:
+    for e in execs:
         used[e.host.name] = used.get(e.host.name, 0) + sizing.container_mb(SPEC.min_allocation_mb)
-    used[p.am_host.name] = used.get(p.am_host.name, 0) + sizing.am_container_mb(SPEC.min_allocation_mb)
     for h, mb in used.items():
         assert mb <= cluster.free_mb[h], h
-    # executor ids follow container order; registration happens after allocation
-    by_id = sorted(p.executors, key=lambda e: int(e.id))
-    assert [e.container_n for e in by_id] == list(range(2, 62))
-    assert all(e.registered_at > e.allocated_at >= p.request_time for e in p.executors)
-    assert [e.registered_at for e in p.executors] == sorted(e.registered_at for e in p.executors)
-    start = scheduling_start(p, 60, driver_ready=1_001_500)
-    assert sum(e.registered_at <= start for e in p.executors) >= 48  # minRegisteredResourcesRatio 0.8
+    # executor ids follow launch order; container numbers grow with grants (released extras leave gaps)
+    assert [e.id for e in execs] == [str(i) for i in range(1, 61)]
+    ns = [e.container_n for e in execs]
+    assert ns == sorted(ns) and ns[0] == 2 and len(set(ns)) == 60
+    assert all(e.registered_at > e.launched_at >= e.allocated_at >= 1_000_000 for e in execs)
+    # the AM polls at 200 ms, doubling to the 3 s heartbeat while requests are outstanding
+    calls = sorted({t for t, kind, _ in run.yarn_log if kind == "am_received"})
+    gaps = [b - a for a, b in zip(calls, calls[1:], strict=False)]
+    assert calls[0] == 1_000_200 and all(g in (200, 400, 800, 1600, 3000) for g in gaps)
+    # absolute asks: the RM may grant a few more containers than needed; Spark launches on none of them
+    received = [p for _t, kind, p in run.yarn_log if kind == "am_received"]
+    assert sum(n for n, _ in received) >= 60 and sum(k for _, k in received) == 60
 
 
 def test_busy_cluster_packs_executors(cluster):
     """When few nodes have room, YARN puts several containers on the same node (one per heartbeat)."""
     tight = build_cluster(ClusterSpec(cluster_timestamp=1, racks=2, hosts_per_rack=6, occupancy=(0.6, 0.8)), seed=2)
-    p = place_application(tight, ExecutorSizing(instances=30, memory_mb=8 * 1024), YarnApp(1, 1), 0, seed=2)
-    hosts = {e.host.name for e in p.executors}
-    assert len(hosts) < 30
+    run, _, _ = _allocate(tight, ExecutorSizing(instances=30, memory_mb=8 * 1024), YarnApp(1, 1), 0, 2, 120_000)
+    hosts = {e.host.name for e in run.launched}
+    assert len(run.launched) == 30 and len(hosts) < 30
 
 
 # --------------------------------------------------------------------------- HDFS

@@ -57,3 +57,11 @@ In query 2, compare `number of output rows` of the `HashAggregate` before the
 produced `events_enriched`: what was its data hash-partitioned on just before
 the write?
 </details>
+
+<details><summary>Hint 8: the container logs</summary>
+
+On the **Executors** tab, open one executor's `stderr` (and the driver's). Find one task from start to
+finish: `Running task … (TID n)` to `Finished task …`. What does a scan task log, what does a reduce task
+log, what does a write task log? Is there any WARN or ERROR line? Remember what a quiet executor log looks
+like: an incident's log is easier to read when you know what is normally there.
+</details>

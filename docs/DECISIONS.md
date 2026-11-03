@@ -311,3 +311,88 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   downstream scans have 600 tasks), 5.5 min, the customers scan reads 1.7 GiB of its 58.3 GiB (5 of 20 columns).
   `solution.md` was rewritten from `scripts/evidence.py`; the "2x tasks from file packing" lesson no longer occurs
   and was replaced by the SQL-tab lessons (E15–E19).
+
+## ADR-021 — YARN allocation runs inside the simulation; Scenario 00 re-baselined
+
+- **Date:** 2026-11-03
+- **Status:** accepted; replaces the static `place_application` of ADR-013
+- **Context:** Phase 3 placed every executor before the run. Executor loss, replacement containers and
+  dynamic allocation need containers requested, granted and released *during* the run, by the same
+  mechanism.
+- **Decision:** `engine/yarn_am.py` ports Spark 3.5.9's `ApplicationMaster.allocationThreadImpl` +
+  `YarnAllocator` (requests = target − pending − running; poll every 200 ms doubling to the 3 s heartbeat
+  while requests or loss-reason queries are pending; woken when the driver raises the target) and models
+  the RM side: one OFF_SWITCH container per NodeManager heartbeat on nodes with room, and YARN's absolute
+  asks, re-sent before the AM matched the containers in the same response. That last rule reproduces the
+  over-allocation seen on our reference cluster ("Received 1 containers from YARN, launching executors on 0
+  of them", container 000005 of ref01) and YARN-1902 in production; the extras are released and use up
+  container numbers. Container ids carry the RM epoch (`e23`), `CLUSTER_ID` the RM HA cluster id.
+- **Consequences:** Scenario 00 shifted slightly (executors register over ~4 s instead of ~3 s): 9,447 tasks
+  (was 9,448: one fewer coalesced partition), E6/E10/E12/E14/E18/E19 re-derived with `scripts/evidence.py`.
+  Locality requests (`LocalityPreferredContainerPlacementStrategy`), preemption and queue limits are not
+  modelled yet.
+
+## ADR-022 — Container memory is a model of RSS; YARN kills follow from it
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** Scenario 03 (memoryOverhead kills) needs YARN to kill containers *because* their physical
+  memory exceeds the container size, not on a schedule.
+- **Decision:** `model/memory.py` computes what the NodeManager measures every 3 s: committed heap (JVM
+  default `-Xms` = RAM/64, growing towards `-Xmx` with busy core-seconds, never below 1.25x the live heap)
+  + G1 native structures (4.5 % of committed) + metaspace/code cache + netty direct buffers + thread stacks
+  + malloc arenas per core (+ Python workers), each JVM with a seeded spread (`[norm]` constants in
+  `calibration.py`). Above the container size the container is killed with Hadoop's diagnostics; the
+  driver path follows Spark (block manager removed at disconnect, ExecutorLostFailure when the AM gives the
+  reason, ExecutorRemoved twice), the tasks re-run, YARN starts a replacement.
+- **Consequences:** Scenario 00 peaks at 16.4–17.2 GiB of its 18 GiB containers (tested: busy executors commit
+  their heap, nothing is killed). A 384 MiB overhead on a 512 MB allocation grid kills executors from
+  minute 2 on (`tests/test_executor_loss.py`). Executor loss requires `spark.shuffle.service.enabled`
+  (cluster default here); without it the engine stops with NotImplementedError until FetchFailed / stage
+  retry (Scenario 12) exist. A task failing `spark.task.maxFailures` times raises `TaskSetAborted` (job
+  abort is not modelled yet).
+
+## ADR-023 — Dynamic allocation is a port of ExecutorAllocationManager
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Decision:** `engine/dynalloc.py`: the 100 ms `schedule()` loop, `maxNeeded = ceil((pending + running) ×
+  ratio / cores)`, exponential ramp-up after `schedulerBacklogTimeout`, immediate target drop, idle timeout
+  (60 s) with the `minExecutors`/target guards, `initializing` until the first stage; kills go through the
+  AM (release → NodeManager SIGTERM → "Executor killed by driver."). Shuffle files don't pin executors
+  because the external shuffle service serves them.
+- **Consequences:** Scenario 14 (slow ramp / queue starvation) and dynamic-allocation thrash can be built
+  from causes. Scenario 00 keeps `spark.dynamicAllocation.enabled=false`.
+
+## ADR-024 — Container logs are derived from the run and served by a NodeManager mock
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** Phase 5's done-when: an executor's stderr link in the History Server opens a log that matches
+  what that executor did. The links in the event log point at production NodeManager hosts.
+- **Decision:** `sparksim/yarnlogs` writes `yarn-logs/<appId>/<containerId>/{stdout,stderr}` from the run's
+  records only (tasks, timings, file splits, shuffle blocks, broadcasts, writes, spills, kills). Message
+  texts come from the reference container logs and the Spark/Hadoop source; the driver's per-job INFO
+  lines from the source (our capture runs the driver at WARN). `services/nm-logs` serves them under the
+  NodeManager's `/node/containerlogs/<container>/<user>/<file>?start=-4096` paths, and the History Server's
+  `spark.history.custom.executor.log.url` points every executor's and the driver's links at it. The mock
+  NodeManager is not the Spark UI, so it is ours to build (non-negotiable 1 is about Spark's pages).
+- **Proof:** `tests/test_scenario00_hs.py::test_executor_log_links_open_matching_logs` opens all 41 links
+  through the real History Server and checks each executor's `Running task … (TID n)` set against the
+  REST task list.
+- **Consequences:** ~22 MB of logs for Scenario 00 (~5 s). Not modelled: GC logs, Python worker output,
+  `ShufflePartitionsUtil` / `FileSourceStrategy` planning lines, ContextCleaner removals.
+
+## ADR-025 — The Environment tab comes from a real driver's configuration plus a production site config
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Decision:** Hadoop Properties = the 974 keys a real Spark 3.5.9 driver on Hadoop 3.3.6 logged (ref01),
+  with the 19 keys our harness set reset to Hadoop's defaults (`scripts/extract_hadoop_defaults.py` →
+  `data/hadoop-3.3.6-defaults.json`), plus the production cluster's site files derived from `ClusterSpec`
+  (RM HA + recovery, NodeManager resources and dirs, `spark_shuffle` aux service, log aggregation,
+  topology script). Spark Properties start from the cluster's `spark-defaults.conf`
+  (`CLUSTER_SPARK_DEFAULTS`: shuffle service, native library paths, SHS address). System Properties have
+  every key the reference AMs logged.
+- **Consequences:** The configuration the learner reads (allocation grid, NodeManager memory, overhead,
+  shuffle service, dirs) is the one the simulation ran with, and the container logs use the same dirs.

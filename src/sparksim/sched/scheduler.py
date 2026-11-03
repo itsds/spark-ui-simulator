@@ -15,8 +15,15 @@
   with no reject since the last reset. Tasks without preferred locations are
   launched as PROCESS_LOCAL, exactly like Spark (`dequeueTaskHelper`).
 
+* **Executor loss.** `disable_executor` stops offers to an executor (pending
+  removal or pending loss reason, `isExecutorActive`); `remove_executor`
+  fails its running tasks (`on_fail`), puts them back in the pending lists
+  (`addPendingTask`) and counts the failure towards `spark.task.maxFailures`
+  when the exit was caused by the app. The next attempt of a task gets the
+  next attempt number, as `TaskSetManager.taskAttempts` does.
+
 The scheduler knows nothing about costs: `on_launch` returns a task's
-duration, and `on_finish` is called when it ends.
+duration, `on_finish` is called when it ends and `on_fail` when it is lost.
 """
 
 from __future__ import annotations
@@ -44,6 +51,7 @@ class Launch:
     task_id: int = -1
     finish_time: int = -1
     result: object = None
+    lost: bool = False  # its executor was lost before it finished
 
 
 @dataclass
@@ -56,6 +64,7 @@ class TaskSet:
     preferred: list[tuple[str, ...]]  # per task index: preferred hosts
     on_launch: Callable[[Launch], int]  # returns the task's duration in ms
     on_finish: Callable[[Launch], None]
+    on_fail: Callable[[Launch], None] | None = None
     done: Signal | None = None
     # --- TaskSetManager state
     launched: list[bool] = field(default_factory=list)
@@ -71,6 +80,8 @@ class TaskSet:
     last_reset: int = 0
     no_rejects_since_reset: bool = True
     launches: list[Launch] = field(default_factory=list)
+    attempts: list[int] = field(default_factory=list)  # attempts launched so far, per index
+    failures: list[int] = field(default_factory=list)  # failures counted towards spark.task.maxFailures
 
     @property
     def num_tasks(self) -> int:
@@ -79,6 +90,18 @@ class TaskSet:
     @property
     def has_pending(self) -> bool:
         return self.num_launched < len(self.preferred)
+
+    @property
+    def num_pending(self) -> int:
+        return len(self.preferred) - self.num_launched
+
+    @property
+    def num_running(self) -> int:
+        return self.num_launched - self.num_done
+
+
+class TaskSetAborted(RuntimeError):
+    """A task failed spark.task.maxFailures times (job abort is not modelled yet)."""
 
 
 class TaskScheduler:
@@ -91,6 +114,9 @@ class TaskScheduler:
         self.executors: dict[str, Executor] = {}
         self.free: dict[str, int] = {}
         self.order: list[str] = []  # registration order (offers are shuffled anyway)
+        self.disabled: set[str] = set()  # pending removal / pending loss reason: no offers
+        self.running: dict[str, dict[int, Launch]] = {}  # executor -> task id -> running attempt
+        self.max_failures = 4  # spark.task.maxFailures
         self.tasksets: list[TaskSet] = []
         self.next_task_id = 0
         self.started = False
@@ -103,10 +129,55 @@ class TaskScheduler:
         self.executors[ex.id] = ex
         self.free[ex.id] = ex.cores
         self.order.append(ex.id)
+        self.running[ex.id] = {}
         for ts in self.tasksets:
             self._recompute_levels(ts)
         if self.started:
             self._offer(list(self.order), all_free=True)
+
+    def disable_executor(self, eid: str) -> None:
+        """No more offers for this executor (CoarseGrainedSchedulerBackend.isExecutorActive is false)."""
+        self.disabled.add(eid)
+
+    def remove_executor(self, eid: str, counts_as_failure: bool) -> list[Launch]:
+        """`TaskSchedulerImpl.executorLost`: fail the executor's running tasks and re-queue them.
+
+        Returns the lost attempts (their `on_fail` has been called). Shuffle outputs on the executor stay
+        available: the engine only allows executor loss with the external shuffle service.
+        """
+        lost = sorted(self.running.pop(eid, {}).values(), key=lambda a: a.task_id)
+        self.executors.pop(eid, None)
+        self.free.pop(eid, None)
+        self.disabled.discard(eid)
+        if eid in self.order:
+            self.order.remove(eid)
+        for a in lost:
+            ts = a.taskset
+            a.lost = True
+            a.finish_time = self.sim.now
+            ts.launched[a.index] = False
+            ts.num_launched -= 1
+            if ts.on_fail is not None:
+                ts.on_fail(a)
+            if counts_as_failure:
+                ts.failures[a.index] += 1
+                if ts.failures[a.index] >= self.max_failures:
+                    raise TaskSetAborted(f"Task {a.index} in stage {ts.stage_id}.{ts.attempt} failed "
+                                         f"{self.max_failures} times")
+            self._add_pending(ts, a.index)
+        for ts in self.tasksets:
+            self._recompute_levels(ts)
+        if lost and self.started:
+            self._offer(list(self.order), all_free=True)
+        return lost
+
+    @property
+    def num_pending_tasks(self) -> int:
+        return sum(ts.num_pending for ts in self.tasksets)
+
+    @property
+    def num_running_tasks(self) -> int:
+        return sum(len(r) for r in self.running.values())
 
     def start(self) -> None:
         """Scheduling begins (YarnClusterScheduler.postStartHook returned)."""
@@ -125,15 +196,11 @@ class TaskScheduler:
         n = ts.num_tasks
         ts.launched = [False] * n
         ts.succeeded = [False] * n
+        ts.attempts = [0] * n
+        ts.failures = [0] * n
         ts.done = ts.done or self.sim.signal()
         for i in reversed(range(n)):  # addPendingTasks: reversed so dequeue() pops index 0 first
-            prefs = ts.preferred[i]
-            for h in prefs:
-                ts.for_host.setdefault(h, []).append(i)
-                ts.for_rack.setdefault(self.rack_of(h), []).append(i)
-            if not prefs:
-                ts.no_prefs.append(i)
-            ts.all_pending.append(i)
+            self._add_pending(ts, i)
         self._recompute_levels(ts)
         ts.cur = 0
         ts.last_reset = self.sim.now
@@ -141,6 +208,16 @@ class TaskScheduler:
         self.tasksets.sort(key=lambda t: (t.priority, t.stage_id))
         if self.started:  # submitTasks → reviveOffers: the round runs a few ms later (task binary broadcast)
             self.sim.after(self.rng.randint(*cal.STAGE_LAUNCH_DELAY_MS), self._offer, list(self.order), True)
+
+    def _add_pending(self, ts: TaskSet, i: int) -> None:
+        """`TaskSetManager.addPendingTask`."""
+        prefs = ts.preferred[i]
+        for h in prefs:
+            ts.for_host.setdefault(h, []).append(i)
+            ts.for_rack.setdefault(self.rack_of(h), []).append(i)
+        if not prefs:
+            ts.no_prefs.append(i)
+        ts.all_pending.append(i)
 
     def _recompute_levels(self, ts: TaskSet) -> None:
         prev = ts.levels[ts.cur] if ts.levels else None
@@ -246,7 +323,7 @@ class TaskScheduler:
 
     def _offer(self, executor_ids: list[str], all_free: bool) -> None:
         now = self.sim.now
-        offers = [e for e in executor_ids if self.free.get(e, 0) > 0]
+        offers = [e for e in executor_ids if self.free.get(e, 0) > 0 and e not in self.disabled]
         if not offers:
             return
         self.rng.shuffle(offers)
@@ -290,20 +367,25 @@ class TaskScheduler:
         ts.launched[idx] = True
         ts.num_launched += 1
         self.free[eid] -= 1
-        attempt = Launch(ts, idx, ex, loc, t, task_id=self.next_task_id)
+        attempt = Launch(ts, idx, ex, loc, t, attempt=ts.attempts[idx], task_id=self.next_task_id)
+        ts.attempts[idx] += 1
         self.next_task_id += 1
         duration = ts.on_launch(attempt)
         attempt.finish_time = t + max(1, int(duration))
         ts.launches.append(attempt)
         self.launch_log.append(attempt)
+        self.running[eid][attempt.task_id] = attempt
         self.sim.at(attempt.finish_time, self._finish, attempt)
 
     def _finish(self, a: Launch) -> None:
+        if a.lost:
+            return
         ts = a.taskset
+        eid = a.executor.id
+        del self.running[eid][a.task_id]
         ts.succeeded[a.index] = True
         ts.num_done += 1
         ts.on_finish(a)
-        eid = a.executor.id
         self.free[eid] += 1
         if ts.num_done == ts.num_tasks:
             self.tasksets.remove(ts)
@@ -315,7 +397,8 @@ class TaskScheduler:
         """The driver's revive timer fires every second; only schedule ticks while something waits."""
         if self._revive_at is not None:
             return
-        if not any(ts.has_pending for ts in self.tasksets) or not any(self.free.values()):
+        if not any(ts.has_pending for ts in self.tasksets) or not any(
+                v for e, v in self.free.items() if e not in self.disabled):
             return
         t = (self.sim.now // cal.REVIVE_INTERVAL_MS + 1) * cal.REVIVE_INTERVAL_MS
         self._revive_at = t

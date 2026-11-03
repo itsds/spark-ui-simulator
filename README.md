@@ -89,7 +89,8 @@ below. On macOS with Homebrew's `openjdk@17`, that's
 ```bash
 git clone https://github.com/itsds/spark-ui-simulator.git && cd spark-ui-simulator
 uv sync                                              # Python 3.11 + PySpark 3.5.9 (contains the History Server)
-uv run sparksim generate 00-healthy-baseline         # Scenario 00: 40 executors, ~9.4k tasks, 3 SQL queries, ~10 s to generate
+uv run sparksim generate 00-healthy-baseline         # Scenario 00: event log + YARN container logs, ~10 s
+services/nm-logs/run.sh &                            # mock NodeManager log server on :8042 (executor stdout/stderr)
 services/history-server/run.sh event-logs            # foreground; Ctrl+C to stop
 # open http://localhost:18080, then read scenarios/00-healthy-baseline/ticket.md
 ```
@@ -105,8 +106,13 @@ services/history-server/run.sh reference/event-logs 18081   # http://localhost:1
 ```
 
 The server rescans its directory every 5 s, so newly generated logs appear
-without a restart. Executor `stdout`/`stderr` links point at the simulated
-cluster's NodeManagers and won't open yet. Phase 5 adds a log server for them.
+without a restart. The Executors tab's `stdout`/`stderr` links (and the driver's,
+which is the YARN ApplicationMaster container in cluster mode) open the generated
+container logs through the mock NodeManager log server
+(`spark.history.custom.executor.log.url` in `services/history-server/spark-defaults.conf`).
+The logs match the run: every task an executor ran, the files it read, the shuffle
+blocks it fetched, the broadcasts it pulled, and how its container ended. The
+reference apps' links point at the single-node capture cluster and don't open.
 
 Or with Docker (no local Java needed; not yet verified):
 

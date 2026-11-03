@@ -152,3 +152,44 @@ what was done, what's next, gotchas.
 - **Still open:** exchange reuse, subqueries/DPP, skew-join splits and local reads in AQEShuffleRead, AQE's runtime
   SMJ→BHJ switch, collect/limit actions, Python UDF nodes; MapStatus size quantization (AQE sees exact sizes);
   dynamic contention (ADR-014); the Docker Compose path is unverified.
+
+## 2026-11-03 — Phase 5: YARN realism
+
+- **Done:**
+  - YARN allocation inside the simulation (`engine/yarn_am.py`): Spark's AM allocate loop (200 ms doubling to
+    3 s, woken by a higher target), RM grants one OFF_SWITCH container per NodeManager heartbeat, YARN's absolute
+    asks over-allocate (as on our reference cluster) and Spark releases the extras. Container ids with the RM
+    epoch (`container_e23_…`), RM HA `CLUSTER_ID`, FQDN driver host. `place_application` removed (ADR-021).
+  - Executor loss: container RSS model (`model/memory.py`: committed heap growth + G1/native footprint), the
+    NodeManager's 3 s pmem check, Hadoop's kill diagnostics, Spark's driver path (BlockManagerRemoved at
+    disconnect, ExecutorLostFailure when the AM gives the reason, ExecutorRemoved twice), re-run with the next
+    attempt number, replacement containers (ADR-022). Scheduler: disable/remove executors, attempts, failures.
+  - Dynamic allocation: ExecutorAllocationManager port (`engine/dynalloc.py`, ADR-023).
+  - Container logs (`sparksim/yarnlogs`): executor stderr and the AM's driver log, derived from the run;
+    `services/nm-logs` serves them like a NodeManager; the History Server's custom executor log URL points
+    every link at it (ADR-024). `sparksim generate` writes `yarn-logs/` by default.
+  - Environment tab: Hadoop 3.3.6 defaults from a real driver (`scripts/extract_hadoop_defaults.py`) + production
+    site files, cluster spark-defaults (shuffle service on), JDK system properties (ADR-025). `count()` results
+    are non-nullable; an explicit memoryOverhead is part of the default ResourceProfile.
+  - Scenario 00 re-baselined (9,447 tasks; evidence E3/E6/E7/E10/E12/E14/E18/E19 updated), solution + hint on
+    reading container logs.
+  - Tests: 162 passed (`uv run pytest`), ruff clean. New: `test_yarn.py`, `test_executor_loss.py` (pmem kills,
+    dynamic allocation, their logs), `test_environment.py`, the 41-link check in `test_scenario00_hs.py`.
+- **Next:** Phase 6 (scenario DSL + fault injection → Scenario 01 join skew). The mechanisms Scenario 03 (pmem
+  kills: `spark.executor.memoryOverhead` + a native-memory cause such as Python/Arrow workers, `python_rss` in
+  `ContainerMemory`) and 14 (dynamic allocation / queue starvation) need now exist; they still need job abort
+  after `spark.task.maxFailures` (`TaskSetAborted` is raised) and, for Scenario 12, lost shuffle files without
+  the shuffle service (FetchFailed, stage retry: currently NotImplementedError).
+- **Gotchas:**
+  - A fixed-size allocation grid hides small overheads: on a 1024 MB grid a 16 GiB executor with a 384m or 512m
+    overhead still gets a 17 GiB container, enough for the ~1 GiB native footprint. The loss test uses a 512 MB
+    grid (16.5 GiB containers).
+  - `spark.history.custom.executor.log.url` needs `{{FILE_NAME}}` (from `LOG_FILES`) to produce both stdout and
+    stderr links; it also rewrites the driver's links. Tests pass it through `SPARK_HISTORY_OPTS`.
+  - `ExecutorLostFailure` TaskEnds carry `JVMHeapMemory: -1` in Task Executor Metrics (`ExecutorMetrics(Array.empty)`).
+  - The reference driver logs stop at WARN after start-up (`common.py` sets it): driver INFO texts came from the
+    Spark 3.5.9 source (raw.githubusercontent.com is reachable; Hadoop sources at `rel/release-3.3.6`).
+  - The harness required branch `claude/keen-shannon-045j1o` (not `phase-5/<slug>`).
+- **Still open:** node-local container requests, preemption, queue capacity, app attempt 2, GC logs, Python
+  worker output, `ShufflePartitionsUtil` / `FileSourceStrategy` planning lines; the Docker Compose path is
+  unverified (now with the nm-logs service).

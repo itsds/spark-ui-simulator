@@ -214,6 +214,40 @@ the reference logs from task metrics alone and matches every one.
   `spark.yarn.app.id`, `spark.yarn.archive`, AM filter properties, Hadoop
   properties from the cluster config.
 - Executor removal reasons come in YARN wording (see `ref05-failures`).
+- Container ids carry the ResourceManager epoch once it has restarted with recovery
+  (`container_e23_<clusterTs>_<seq>_01_000002`, `ContainerId.toString`: at least 2 digits); our
+  single-node capture never restarted, so its ids have none. `CLUSTER_ID` is
+  `yarn.resourcemanager.cluster-id` (empty without RM HA). In production `spark.driver.host` and the
+  driver's BlockManagerId host are the AM host's FQDN (`Utils.localCanonicalHostName`).
+
+### 6.1 Executor loss (verified on ref05 + Spark 3.5.9 / Hadoop 3.3.6 source, `engine/yarn_am.py`)
+
+| Step | What happens | Where it shows |
+|---|---|---|
+| Kill | NodeManager `ContainersMonitorImpl` (every 3 s): process-tree RSS > container size → `KILLED_EXCEEDED_PMEM` (-104), SIGTERM, JVM exits 143 | executor stderr ends with `ERROR CoarseGrainedExecutorBackend: RECEIVED SIGNAL TERM` + shutdown hooks |
+| Disconnect | driver `onDisconnected` → `disableExecutor` → `executorLost(LossReasonPending)` → `DAGScheduler.handleExecutorLost` | `SparkListenerBlockManagerRemoved` **first** (ref05: 200 ms before the task failures); no new tasks offered |
+| Reason | NM reports the container at its next heartbeat, the AM at its next allocate call (`processCompletedContainers`) | driver log `WARN YarnAllocator: Container killed by YARN for exceeding physical memory limits. 16.5 GB of 16.5 GB physical memory used. Consider boosting spark.executor.memoryOverhead.` |
+| Tasks | `TaskSetManager.executorLost` → `ExecutorLostFailure(exec, exitCausedByApp, reason)`; counts towards `spark.task.maxFailures` when caused by the app | TaskEnd: `Failed: true`, empty Accumulables, **no** Task Metrics, Task Executor Metrics all 0 but `JVMHeapMemory: -1` (`new ExecutorMetrics(Array.empty)`) |
+| Removed | `SparkListenerExecutorRemoved(reason)`; for an unexpected exit the AM *also* sends `RemoveExecutor`, the second one finds no executor and posts the event again (SPARK-35011) | two ExecutorRemoved, 1 ms apart, same reason (ref05) |
+| Killed by driver | dynamic allocation `killExecutors` → AM releases the container → `ExecutorKilled` | one ExecutorRemoved, `Executor killed by driver.` |
+
+NodeManager diagnostics (what "Container from a bad node … Diagnostics:" quotes): `[yyyy-MM-dd HH:mm:ss.SSS]`
+prefix per entry; a pmem kill is `Container [pid=…,containerID=…] is running NB beyond the 'PHYSICAL'
+memory limit. Current usage: X GB of Y GB physical memory used; … virtual memory used. Killing container.`
++ process-tree dump, then `Container killed on request. Exit code is 143` and `Container exited with a
+non-zero exit code 143. `. An external `kill -9` (ref05) is exit 137 + `Killed by external signal`.
+
+### 6.2 Container logs (`reference/yarn-logs`, `sparksim/yarnlogs`)
+
+- Layout `%d{yy/MM/dd HH:mm:ss} %p %c{1}: %m`, first line `Using Spark's default log4j profile: …`,
+  stderr only (stdout: Python prints). The AM container (000001) holds the driver log.
+- The reference harness sets the driver to WARN after start-up (`common.py`), so the driver's per-job
+  INFO lines (DAGScheduler, TaskSetManager `Starting task … (host, executor N, partition i, LOCALITY,
+  B bytes) ` with a trailing space, `Finished task … in T ms on host (executor N) (k/n)`) follow the
+  Spark 3.5.9 source; executors log at INFO in every reference capture.
+- History Server: `spark.history.custom.executor.log.url` with `{{CONTAINER_ID}}`, `{{USER}}`,
+  `{{FILE_NAME}}` (from `LOG_FILES`) replaces every executor's and the driver's links
+  (`HistoryAppStatusStore`); without it the links point at the NodeManagers in the event log.
 
 ## 7. PySpark tells
 

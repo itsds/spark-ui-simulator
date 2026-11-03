@@ -1,10 +1,14 @@
 """YARN identities as they appear in Spark event logs (cluster deploy mode).
 
-Formats come from the real YARN captures (EVENT_LOG_FORMAT.md §6):
-`application_<clusterTs>_<seq:04>`, `container_<clusterTs>_<seq:04>_<attempt:02>_<n:06>`.
+Formats come from the real YARN captures (EVENT_LOG_FORMAT.md §6) and Hadoop 3.3's
+`ApplicationId` / `ContainerId.toString`:
+`application_<clusterTs>_<seq:04>`, `container_[e<epoch:02>_]<clusterTs>_<seq:04>_<attempt:02>_<n:06>`.
+The epoch prefix appears once the ResourceManager has restarted with work-preserving recovery
+(`yarn.resourcemanager.recovery.enabled`): every restart or HA failover bumps it, and every container
+allocated afterwards carries it. Our single-node reference cluster never restarted, so it has none.
 Container 000001 is the ApplicationMaster, which runs the driver in cluster mode.
 NodeManager log URLs and executor attributes match what YARN's
-`ExecutorRunnable` / `YarnAllocator` report.
+`ExecutorRunnable` / `YarnContainerInfoHelper` report.
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from dataclasses import dataclass
 class NodeManager:
     host: str
     ip: str
-    port: int = 45454  # yarn.nodemanager.address
+    port: int = 45454  # yarn.nodemanager.address (Hadoop's default is an ephemeral port; clusters pin it)
     http_port: int = 8042  # yarn.nodemanager.webapp.address
 
     @property
@@ -29,13 +33,20 @@ class YarnApp:
     cluster_timestamp: int  # ResourceManager start time (ms)
     seq: int
     attempt: int = 1
+    epoch: int = 0  # ResourceManager epoch (work-preserving restarts / HA failovers so far)
 
     @property
     def app_id(self) -> str:
         return f"application_{self.cluster_timestamp}_{self.seq:04d}"
 
+    @property
+    def attempt_id(self) -> str:
+        """`appattempt_<clusterTs>_<seq:04>_<attempt:06>` (ApplicationAttemptId.toString)."""
+        return f"appattempt_{self.cluster_timestamp}_{self.seq:04d}_{self.attempt:06d}"
+
     def container_id(self, n: int) -> str:
-        return f"container_{self.cluster_timestamp}_{self.seq:04d}_{self.attempt:02d}_{n:06d}"
+        epoch = f"e{self.epoch:02d}_" if self.epoch > 0 else ""
+        return f"container_{epoch}{self.cluster_timestamp}_{self.seq:04d}_{self.attempt:02d}_{n:06d}"
 
     @property
     def am_container_id(self) -> str:

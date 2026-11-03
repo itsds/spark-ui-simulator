@@ -1,12 +1,11 @@
-"""The YARN cluster an app runs on: racks, NodeManagers, and where our containers land.
+"""The YARN cluster an app runs on: racks, NodeManagers, other tenants' load, container sizing.
 
-Static allocation (Phase 3). The ApplicationMaster (which hosts the driver in
-cluster mode) asks the ResourceManager for `spark.executor.instances`
-containers with no locality preference. The CapacityScheduler hands out at
-most one such OFF_SWITCH container per NodeManager heartbeat
-(`per-node-heartbeat.maximum-offswitch-assignments = 1`), and only on nodes
-with enough free memory left by other tenants. So the executors spread over
-many hosts, and how many share a host follows from how busy the cluster is.
+Where our containers land is decided during the simulation (`engine.yarn_am`): the ApplicationMaster
+(which hosts the driver in cluster mode) asks the ResourceManager for executor containers with no
+locality preference. The CapacityScheduler hands out at most one such OFF_SWITCH container per
+NodeManager heartbeat (`per-node-heartbeat.maximum-offswitch-assignments = 1`), and only on nodes with
+enough free memory left by other tenants. So the executors spread over many hosts, and how many share a
+host follows from how busy the cluster is.
 
 Container sizes follow Spark's YARN rules: `spark.executor.memory` +
 `memoryOverhead` (default max(384 MiB, 10 %)), rounded up to a multiple of
@@ -15,13 +14,12 @@ Container sizes follow Spark's YARN rules: `spark.executor.memory` +
 
 from __future__ import annotations
 
-import heapq
 import math
 from dataclasses import dataclass, field
 
 from ..cost import calibration as cal
 from ..rng import substream
-from ..yarn import MiB, NodeManager, YarnApp, unified_memory_max
+from ..yarn import MiB, NodeManager
 
 
 @dataclass(frozen=True)
@@ -50,8 +48,13 @@ class ClusterSpec:
     domain: str = "hadoop.prod.internal"
     host_prefix: str = "wn"
     subnet: str = "10.31"
-    rm_host: str = "rm1.hadoop.prod.internal"
+    rm_host: str = "rm1.hadoop.prod.internal"  # the active ResourceManager
     namenode: str = "nn1.hadoop.prod.internal"
+    # ResourceManager HA: standby RMs (yarn.resourcemanager.ha.rm-ids), the cluster id executors report as
+    # CLUSTER_ID, and the RM epoch (work-preserving restarts/failovers) that prefixes container ids.
+    rm_standby_hosts: tuple[str, ...] = ()
+    rm_cluster_id: str = ""
+    rm_epoch: int = 0
     # Share of each NodeManager's memory used by other tenants' containers when our app starts.
     occupancy: tuple[float, float] = (0.55, 0.97)
     host_speed_sigma: float = cal.HOST_SPEED_SIGMA
@@ -164,74 +167,14 @@ class Executor:
     max_memory: int  # BlockManager "Maximum Memory" (unified memory)
     removed_at: int | None = None
     extra: dict = field(default_factory=dict)
-
-
-@dataclass
-class Placement:
-    am_host: Host
-    executors: list[Executor]
-    request_time: int
-
-
-def place_application(cluster: Cluster, sizing: ExecutorSizing, app: YarnApp, driver_start: int,
-                      seed: int, am_host: str | None = None) -> Placement:
-    """Place the AM and the executor containers; return executors in registration order."""
-    rng = substream(seed, "yarn-allocation")
-    spec = cluster.spec
-    free = dict(cluster.free_mb)
-    am_mb = sizing.am_container_mb(spec.min_allocation_mb)
-    exec_mb = sizing.container_mb(spec.min_allocation_mb)
-    if exec_mb > spec.max_allocation_mb:
-        raise ValueError(f"executor container {exec_mb} MB exceeds yarn.scheduler.maximum-allocation-mb")
-
-    if am_host is None:
-        candidates = [h for h in cluster.hosts if free[h.name] >= am_mb]
-        am = rng.choice(candidates)
-    else:
-        am = cluster.host(am_host)
-    free[am.name] -= am_mb
-
-    request = driver_start + rng.randint(*cal.AM_REQUEST_DELAY_MS)
-    phase = {h.name: rng.randrange(cal.NM_HEARTBEAT_MS) for h in cluster.hosts}
-
-    # NodeManager heartbeats after the request, in time order; one off-switch container per heartbeat.
-    heap = []
-    for h in cluster.hosts:
-        first = request + (phase[h.name] - request) % cal.NM_HEARTBEAT_MS
-        heap.append((first, h.name))
-    heapq.heapify(heap)
-    allocations: list[tuple[int, Host]] = []
-    deadline = request + 600_000
-    while len(allocations) < sizing.instances:
-        t, name = heapq.heappop(heap)
-        if t > deadline:
-            raise RuntimeError("cluster has no room for the requested executors")
-        if free[name] >= exec_mb:
-            free[name] -= exec_mb
-            allocations.append((t, cluster.host(name)))
-        heapq.heappush(heap, (t + cal.NM_HEARTBEAT_MS, name))
-
-    # The AM's allocate() loop picks containers up every 200 ms and launches them in that order;
-    # executor ids follow container order (YarnAllocator.executorIdCounter).
-    executors = []
-    for k, (t_alloc, host) in enumerate(allocations):
-        pickup = request + -(-(t_alloc - request) // cal.AM_ALLOCATE_INTERVAL_MS) * cal.AM_ALLOCATE_INTERVAL_MS
-        launch = pickup + rng.randint(5, 60)
-        registered = launch + int(rng.randint(*cal.EXECUTOR_START_MS) / host.speed)
-        n = k + 2  # 000001 is the AM
-        executors.append(Executor(
-            id=str(k + 1), host=host, container_n=n, container_id=app.container_id(n), cores=sizing.cores,
-            heap_bytes=sizing.heap_bytes, allocated_at=t_alloc, registered_at=registered,
-            block_manager_at=registered + rng.randint(*cal.EXECUTOR_BLOCK_MANAGER_MS),
-            block_manager_port=rng.randint(30000, 60999), max_memory=unified_memory_max(sizing.heap_bytes),
-        ))
-    executors.sort(key=lambda e: (e.registered_at, int(e.id)))
-    return Placement(am, executors, request)
-
-
-def scheduling_start(placement: Placement, instances: int, driver_ready: int) -> int:
-    """When the driver may start scheduling: YarnClusterScheduler waits for 80 % of executors (or 30 s)."""
-    need = math.ceil(instances * cal.MIN_REGISTERED_RATIO)
-    times = sorted(e.registered_at for e in placement.executors)
-    ready = times[need - 1] if need <= len(times) else times[-1]
-    return max(driver_ready, min(ready, driver_ready + cal.MAX_REGISTERED_WAIT_MS))
+    launched_at: int = 0  # YarnAllocator launched the container (NM startContainer)
+    container_mb: int = 0  # what YARN enforces
+    pid: int = 0  # the executor JVM's process id (container log, NM diagnostics)
+    # --- end of life (None while it runs until the app ends)
+    nm_kill_at: int | None = None  # NodeManager stopped the container (SIGTERM)
+    exit_at: int | None = None  # JVM exited
+    exit_status: int | None = None  # ContainerStatus exit status the AM sees (-104 pmem, 143, ...)
+    diagnostics: str = ""  # NodeManager container diagnostics
+    removed_reason: str = ""  # SparkListenerExecutorRemoved reason
+    exit_caused_by_app: bool = False
+    killed_by_driver: bool = False
