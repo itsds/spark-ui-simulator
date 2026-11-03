@@ -69,11 +69,44 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
 ## ADR-007 — Toolchain
 
 - **Date:** 2026-11-03
-- **Status:** proposed (Phase 1 finalizes)
-- **Decision:** Python 3.11 managed by `uv` (inside PySpark 3.5's supported
-  range). Generator package `sparksim`. Real PySpark 3.5.9 only for capturing
-  reference logs. History Server via Docker Compose, with a no-Docker script
-  as a fallback.
-- **Open:** Java version. Spark 3.5 officially supports 8/11/17; the dev
-  container ships 21. Use 17 (Docker image or a JDK download) if 21 causes
-  problems.
+- **Status:** accepted (finalized in Phase 1)
+- **Decision:** Python 3.11 managed by `uv`. Generator package `sparksim`.
+  Real PySpark 3.5.9 only for capturing reference logs and for running the
+  History Server locally (its bundled Spark distribution has
+  `start-history-server.sh`, `spark-class` and the `spark-yarn` jar).
+  **JDK 17** everywhere (`scripts/env.sh` picks it). History Server via
+  `services/history-server/run.sh`, or Docker Compose (`apache/spark:3.5.9-java17`).
+- **Evidence:** JDK 21 runs plain Spark 3.5.9 jobs but **breaks Arrow**:
+  pandas UDFs, `mapInPandas` and Arrow `toPandas` fail with
+  `UnsupportedOperationException: sun.misc.Unsafe or java.nio.DirectByteBuffer.<init>(long, int) not available`.
+  Spark 3.5 officially supports Java 8/11/17 only.
+- **Not verified:** the Docker Compose path (the cloud dev container has no
+  Docker daemon). The image tag exists on Docker Hub.
+
+## ADR-008 — Reference logs come from real YARN in cluster mode
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Context:** `local-cluster[...]` mode was tried first. Its teardown in
+  3.5.9 races and logs dozens of bogus `ExecutorRemoved` events ("Shutdown
+  hooks cannot be modified during shutdown") for executors that never
+  existed. It also lacks every YARN-specific field (container IDs,
+  NodeManager log URLs, executor attributes, YARN exit codes).
+- **Decision:** Capture reference logs with `spark-submit --master yarn
+  --deploy-mode cluster` on a single-node Hadoop 3.3.6 cluster (HDFS + YARN,
+  `reference/yarn/`). Spark jars come via `spark.yarn.archive`, the
+  physical-memory check is on, and container logs are retained and copied to
+  `reference/yarn-logs/`. `local-cluster` stays available
+  (`REF_MODE=local-cluster`) as a fallback for machines without Hadoop.
+- **Consequences:** Reference logs are exactly what a YARN production
+  cluster writes, except for single-node artifacts (one host, all shuffle
+  reads local), listed in `EVENT_LOG_FORMAT.md` §8.
+
+## ADR-009 — Reference artifacts are committed uncompressed
+
+- **Date:** 2026-11-03
+- **Status:** accepted
+- **Decision:** Commit `reference/event-logs/*` (plain JSON lines, about 10 MB
+  total) and `reference/yarn-logs/**` (container stdout/stderr) uncompressed,
+  so sessions can grep them directly. Git compresses them in its object store.
+  Generated scenario logs (`event-logs/`) are never committed.

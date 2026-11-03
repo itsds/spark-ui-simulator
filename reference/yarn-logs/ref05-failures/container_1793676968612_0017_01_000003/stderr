@@ -1,0 +1,575 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/03 04:03:47 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 23409@vm
+26/11/03 04:03:47 INFO SignalUtils: Registering signal handler for TERM
+26/11/03 04:03:47 INFO SignalUtils: Registering signal handler for HUP
+26/11/03 04:03:47 INFO SignalUtils: Registering signal handler for INT
+26/11/03 04:03:47 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/03 04:03:47 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/03 04:03:48 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/03 04:03:48 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:03:48 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:03:48 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:03:48 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:03:48 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:03:49 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:36349 after 131 ms (0 ms spent in bootstraps)
+26/11/03 04:03:49 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:03:49 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:03:49 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:03:49 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:03:49 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:03:49 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:36349 after 3 ms (0 ms spent in bootstraps)
+26/11/03 04:03:49 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/blockmgr-caef0f3a-c87b-413c-9709-c341f5b8e7c3
+26/11/03 04:03:49 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/03 04:03:50 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:36349
+26/11/03 04:03:50 INFO ResourceUtils: ==============================================================
+26/11/03 04:03:50 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/03 04:03:50 INFO ResourceUtils: ==============================================================
+26/11/03 04:03:50 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/03 04:03:50 INFO Executor: Starting executor ID 2 on host localhost
+26/11/03 04:03:50 INFO Executor: OS info Linux, 6.18.44-fc-v230, amd64
+26/11/03 04:03:50 INFO Executor: Java version 17.0.20.1
+26/11/03 04:03:50 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 33191.
+26/11/03 04:03:50 INFO NettyBlockTransferService: Server created on localhost:33191
+26/11/03 04:03:50 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/03 04:03:50 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(2, localhost, 33191, None)
+26/11/03 04:03:50 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(2, localhost, 33191, None)
+26/11/03 04:03:50 INFO BlockManager: Initialized BlockManager: BlockManagerId(2, localhost, 33191, None)
+26/11/03 04:03:50 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/container_1793676968612_0017_01_000003/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/container_1793676968612_0017_01_000003/__app__.jar'
+26/11/03 04:03:50 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@27bcb0e7 for default.
+26/11/03 04:03:55 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 1
+26/11/03 04:03:55 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 4
+26/11/03 04:03:55 INFO Executor: Running task 4.0 in stage 0.0 (TID 4)
+26/11/03 04:03:55 INFO Executor: Running task 1.0 in stage 0.0 (TID 1)
+26/11/03 04:03:55 INFO TorrentBroadcast: Started reading broadcast variable 0 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:03:56 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:34735 after 6 ms (0 ms spent in bootstraps)
+26/11/03 04:03:56 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 13.9 KiB, free 741.6 MiB)
+26/11/03 04:03:56 INFO TorrentBroadcast: Reading broadcast variable 0 took 185 ms
+26/11/03 04:03:56 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 30.1 KiB, free 741.6 MiB)
+26/11/03 04:03:57 INFO CodeGenerator: Code generated in 374.525148 ms
+26/11/03 04:03:57 INFO CodeGenerator: Code generated in 33.639115 ms
+26/11/03 04:03:58 INFO CodeGenerator: Code generated in 88.888518 ms
+26/11/03 04:03:59 INFO CodeGenerator: Code generated in 97.986982 ms
+26/11/03 04:03:59 INFO PythonUDFRunner: Times: total = 1780, boot = 928, init = 669, finish = 183
+26/11/03 04:03:59 INFO Executor: Finished task 1.0 in stage 0.0 (TID 1). 2689 bytes result sent to driver
+26/11/03 04:03:59 INFO PythonUDFRunner: Times: total = 1987, boot = 899, init = 966, finish = 122
+26/11/03 04:03:59 INFO Executor: Finished task 4.0 in stage 0.0 (TID 4). 2646 bytes result sent to driver
+26/11/03 04:04:00 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 10
+26/11/03 04:04:00 INFO Executor: Running task 0.0 in stage 3.0 (TID 10)
+26/11/03 04:04:00 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 13
+26/11/03 04:04:00 INFO MapOutputTrackerWorker: Updating epoch to 1 and clearing cache
+26/11/03 04:04:00 INFO Executor: Running task 3.0 in stage 3.0 (TID 13)
+26/11/03 04:04:00 INFO TorrentBroadcast: Started reading broadcast variable 2 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:04:00 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 13.7 KiB, free 741.6 MiB)
+26/11/03 04:04:00 INFO TorrentBroadcast: Reading broadcast variable 2 took 38 ms
+26/11/03 04:04:00 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 29.8 KiB, free 741.6 MiB)
+26/11/03 04:04:01 INFO PythonUDFRunner: Times: total = 274, boot = -1130, init = 1325, finish = 79
+26/11/03 04:04:01 INFO Executor: Finished task 3.0 in stage 3.0 (TID 13). 2689 bytes result sent to driver
+26/11/03 04:04:01 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 16
+26/11/03 04:04:01 INFO Executor: Running task 6.0 in stage 3.0 (TID 16)
+26/11/03 04:04:01 INFO PythonUDFRunner: Times: total = 506, boot = -909, init = 1260, finish = 155
+26/11/03 04:04:01 INFO Executor: Finished task 0.0 in stage 3.0 (TID 10). 2689 bytes result sent to driver
+26/11/03 04:04:01 INFO PythonUDFRunner: Times: total = 386, boot = -113, init = 443, finish = 56
+26/11/03 04:04:01 INFO Executor: Finished task 6.0 in stage 3.0 (TID 16). 2689 bytes result sent to driver
+26/11/03 04:04:02 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 22
+26/11/03 04:04:02 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 25
+26/11/03 04:04:02 INFO Executor: Running task 4.0 in stage 4.0 (TID 25)
+26/11/03 04:04:02 INFO Executor: Running task 1.0 in stage 4.0 (TID 22)
+26/11/03 04:04:02 INFO TorrentBroadcast: Started reading broadcast variable 3 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:04:02 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 7.7 KiB, free 741.5 MiB)
+26/11/03 04:04:02 INFO TorrentBroadcast: Reading broadcast variable 3 took 54 ms
+26/11/03 04:04:02 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 12.9 KiB, free 741.5 MiB)
+26/11/03 04:04:03 INFO PythonRunner: Times: total = 876, boot = 602, init = 156, finish = 118
+26/11/03 04:04:03 INFO PythonRunner: Times: total = 1117, boot = 606, init = 289, finish = 222
+26/11/03 04:04:04 INFO Executor: Finished task 4.0 in stage 4.0 (TID 25). 1595 bytes result sent to driver
+26/11/03 04:04:04 INFO Executor: Finished task 1.0 in stage 4.0 (TID 22). 1552 bytes result sent to driver
+26/11/03 04:04:04 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 27
+26/11/03 04:04:04 INFO Executor: Running task 6.0 in stage 4.0 (TID 27)
+26/11/03 04:04:04 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 28
+26/11/03 04:04:04 INFO Executor: Running task 7.0 in stage 4.0 (TID 28)
+26/11/03 04:04:04 INFO PythonRunner: Times: total = 633, boot = -804, init = 1103, finish = 334
+26/11/03 04:04:04 INFO Executor: Finished task 7.0 in stage 4.0 (TID 28). 1595 bytes result sent to driver
+26/11/03 04:04:05 INFO PythonRunner: Times: total = 925, boot = -658, init = 1035, finish = 548
+26/11/03 04:04:05 INFO Executor: Finished task 6.0 in stage 4.0 (TID 27). 1595 bytes result sent to driver
+26/11/03 04:04:05 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 34
+26/11/03 04:04:05 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 37
+26/11/03 04:04:05 INFO Executor: Running task 4.0 in stage 5.0 (TID 37)
+26/11/03 04:04:05 INFO Executor: Running task 1.0 in stage 5.0 (TID 34)
+26/11/03 04:04:05 INFO MapOutputTrackerWorker: Updating epoch to 2 and clearing cache
+26/11/03 04:04:05 INFO TorrentBroadcast: Started reading broadcast variable 4 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:04:05 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:33585 after 5 ms (0 ms spent in bootstraps)
+26/11/03 04:04:05 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 7.5 KiB, free 741.6 MiB)
+26/11/03 04:04:05 INFO TorrentBroadcast: Reading broadcast variable 4 took 247 ms
+26/11/03 04:04:05 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 13.1 KiB, free 741.6 MiB)
+26/11/03 04:04:05 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 2, fetching them
+26/11/03 04:04:05 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:36349)
+26/11/03 04:04:05 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 2, fetching them
+26/11/03 04:04:05 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:04:05 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 4 (4.1 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (8.2 KiB) remote blocks
+26/11/03 04:04:05 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 4 (4.1 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (8.2 KiB) remote blocks
+26/11/03 04:04:05 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:35803 after 2 ms (0 ms spent in bootstraps)
+26/11/03 04:04:05 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 28 ms
+26/11/03 04:04:05 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 31 ms
+26/11/03 04:04:05 WARN TransportChannelHandler: Exception in connection from localhost/127.0.0.1:33585
+java.net.SocketException: Connection reset
+	at java.base/sun.nio.ch.SocketChannelImpl.throwConnectionReset(SocketChannelImpl.java:394)
+	at java.base/sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:426)
+	at io.netty.buffer.PooledByteBuf.setBytes(PooledByteBuf.java:254)
+	at io.netty.buffer.AbstractByteBuf.writeBytes(AbstractByteBuf.java:1132)
+	at io.netty.channel.socket.nio.NioSocketChannel.doReadBytes(NioSocketChannel.java:357)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:151)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:05 ERROR TransportResponseHandler: Still have 2 requests outstanding when connection from localhost/127.0.0.1:33585 is closed
+26/11/03 04:04:05 ERROR OneForOneBlockFetcher: Failed while starting block fetches
+java.net.SocketException: Connection reset
+	at java.base/sun.nio.ch.SocketChannelImpl.throwConnectionReset(SocketChannelImpl.java:394)
+	at java.base/sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:426)
+	at io.netty.buffer.PooledByteBuf.setBytes(PooledByteBuf.java:254)
+	at io.netty.buffer.AbstractByteBuf.writeBytes(AbstractByteBuf.java:1132)
+	at io.netty.channel.socket.nio.NioSocketChannel.doReadBytes(NioSocketChannel.java:357)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:151)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:05 INFO RetryingBlockTransferor: Retrying fetch (1/3) for 4 outstanding blocks after 5000 ms
+26/11/03 04:04:05 ERROR OneForOneBlockFetcher: Failed while starting block fetches
+java.net.SocketException: Connection reset
+	at java.base/sun.nio.ch.SocketChannelImpl.throwConnectionReset(SocketChannelImpl.java:394)
+	at java.base/sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:426)
+	at io.netty.buffer.PooledByteBuf.setBytes(PooledByteBuf.java:254)
+	at io.netty.buffer.AbstractByteBuf.writeBytes(AbstractByteBuf.java:1132)
+	at io.netty.channel.socket.nio.NioSocketChannel.doReadBytes(NioSocketChannel.java:357)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:151)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:05 INFO RetryingBlockTransferor: Retrying fetch (1/3) for 4 outstanding blocks after 5000 ms
+26/11/03 04:04:10 INFO TransportClientFactory: Found inactive connection to localhost/127.0.0.1:33585, creating a new one.
+26/11/03 04:04:11 INFO TransportClientFactory: Found inactive connection to localhost/127.0.0.1:33585, creating a new one.
+26/11/03 04:04:11 ERROR RetryingBlockTransferor: Exception while beginning fetch of 4 outstanding blocks (after 1 retries)
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR RetryingBlockTransferor: Exception while beginning fetch of 4 outstanding blocks (after 1 retries)
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:33585
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR PythonRunner: Python worker exited unexpectedly (crashed)
+org.apache.spark.api.python.PythonException: Traceback (most recent call last):
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/container_1793676968612_0017_01_000003/pyspark.zip/pyspark/worker.py", line 1225, in main
+    eval_type = read_int(infile)
+                ^^^^^^^^^^^^^^^^
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/container_1793676968612_0017_01_000003/pyspark.zip/pyspark/serializers.py", line 596, in read_int
+    raise EOFError
+EOFError
+
+	at org.apache.spark.api.python.BasePythonRunner$ReaderIterator.handlePythonException(PythonRunner.scala:572)
+	at org.apache.spark.api.python.PythonRunner$$anon$3.read(PythonRunner.scala:784)
+	at org.apache.spark.api.python.PythonRunner$$anon$3.read(PythonRunner.scala:766)
+	at org.apache.spark.api.python.BasePythonRunner$ReaderIterator.hasNext(PythonRunner.scala:525)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator.foreach(Iterator.scala:943)
+	at scala.collection.Iterator.foreach$(Iterator.scala:943)
+	at org.apache.spark.InterruptibleIterator.foreach(InterruptibleIterator.scala:28)
+	at scala.collection.generic.Growable.$plus$plus$eq(Growable.scala:62)
+	at scala.collection.generic.Growable.$plus$plus$eq$(Growable.scala:53)
+	at scala.collection.mutable.ArrayBuffer.$plus$plus$eq(ArrayBuffer.scala:105)
+	at scala.collection.mutable.ArrayBuffer.$plus$plus$eq(ArrayBuffer.scala:49)
+	at scala.collection.TraversableOnce.to(TraversableOnce.scala:366)
+	at scala.collection.TraversableOnce.to$(TraversableOnce.scala:364)
+	at org.apache.spark.InterruptibleIterator.to(InterruptibleIterator.scala:28)
+	at scala.collection.TraversableOnce.toBuffer(TraversableOnce.scala:358)
+	at scala.collection.TraversableOnce.toBuffer$(TraversableOnce.scala:358)
+	at org.apache.spark.InterruptibleIterator.toBuffer(InterruptibleIterator.scala:28)
+	at scala.collection.TraversableOnce.toArray(TraversableOnce.scala:345)
+	at scala.collection.TraversableOnce.toArray$(TraversableOnce.scala:339)
+	at org.apache.spark.InterruptibleIterator.toArray(InterruptibleIterator.scala:28)
+	at org.apache.spark.rdd.RDD.$anonfun$collect$2(RDD.scala:1049)
+	at org.apache.spark.SparkContext.$anonfun$runJob$5(SparkContext.scala:2433)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at scala.collection.Iterator.foreach(Iterator.scala:943)
+	at scala.collection.Iterator.foreach$(Iterator.scala:943)
+	at scala.collection.AbstractIterator.foreach(Iterator.scala:1431)
+	at org.apache.spark.api.python.PythonRDD$.writeIteratorToStream(PythonRDD.scala:322)
+	at org.apache.spark.api.python.PythonRunner$$anon$2.writeIteratorToStream(PythonRunner.scala:751)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.$anonfun$run$1(PythonRunner.scala:451)
+	at org.apache.spark.util.Utils$.logUncaughtExceptions(Utils.scala:1928)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.run(PythonRunner.scala:282)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR PythonRunner: Python worker exited unexpectedly (crashed)
+org.apache.spark.api.python.PythonException: Traceback (most recent call last):
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/container_1793676968612_0017_01_000003/pyspark.zip/pyspark/worker.py", line 1225, in main
+    eval_type = read_int(infile)
+                ^^^^^^^^^^^^^^^^
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/container_1793676968612_0017_01_000003/pyspark.zip/pyspark/serializers.py", line 596, in read_int
+    raise EOFError
+EOFError
+
+	at org.apache.spark.api.python.BasePythonRunner$ReaderIterator.handlePythonException(PythonRunner.scala:572)
+	at org.apache.spark.api.python.PythonRunner$$anon$3.read(PythonRunner.scala:784)
+	at org.apache.spark.api.python.PythonRunner$$anon$3.read(PythonRunner.scala:766)
+	at org.apache.spark.api.python.BasePythonRunner$ReaderIterator.hasNext(PythonRunner.scala:525)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator.foreach(Iterator.scala:943)
+	at scala.collection.Iterator.foreach$(Iterator.scala:943)
+	at org.apache.spark.InterruptibleIterator.foreach(InterruptibleIterator.scala:28)
+	at scala.collection.generic.Growable.$plus$plus$eq(Growable.scala:62)
+	at scala.collection.generic.Growable.$plus$plus$eq$(Growable.scala:53)
+	at scala.collection.mutable.ArrayBuffer.$plus$plus$eq(ArrayBuffer.scala:105)
+	at scala.collection.mutable.ArrayBuffer.$plus$plus$eq(ArrayBuffer.scala:49)
+	at scala.collection.TraversableOnce.to(TraversableOnce.scala:366)
+	at scala.collection.TraversableOnce.to$(TraversableOnce.scala:364)
+	at org.apache.spark.InterruptibleIterator.to(InterruptibleIterator.scala:28)
+	at scala.collection.TraversableOnce.toBuffer(TraversableOnce.scala:358)
+	at scala.collection.TraversableOnce.toBuffer$(TraversableOnce.scala:358)
+	at org.apache.spark.InterruptibleIterator.toBuffer(InterruptibleIterator.scala:28)
+	at scala.collection.TraversableOnce.toArray(TraversableOnce.scala:345)
+	at scala.collection.TraversableOnce.toArray$(TraversableOnce.scala:339)
+	at org.apache.spark.InterruptibleIterator.toArray(InterruptibleIterator.scala:28)
+	at org.apache.spark.rdd.RDD.$anonfun$collect$2(RDD.scala:1049)
+	at org.apache.spark.SparkContext.$anonfun$runJob$5(SparkContext.scala:2433)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at scala.collection.Iterator.foreach(Iterator.scala:943)
+	at scala.collection.Iterator.foreach$(Iterator.scala:943)
+	at scala.collection.AbstractIterator.foreach(Iterator.scala:1431)
+	at org.apache.spark.api.python.PythonRDD$.writeIteratorToStream(PythonRDD.scala:322)
+	at org.apache.spark.api.python.PythonRunner$$anon$2.writeIteratorToStream(PythonRunner.scala:751)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.$anonfun$run$1(PythonRunner.scala:451)
+	at org.apache.spark.util.Utils$.logUncaughtExceptions(Utils.scala:1928)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.run(PythonRunner.scala:282)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR PythonRunner: This may have been caused by a prior exception:
+org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at scala.collection.Iterator.foreach(Iterator.scala:943)
+	at scala.collection.Iterator.foreach$(Iterator.scala:943)
+	at scala.collection.AbstractIterator.foreach(Iterator.scala:1431)
+	at org.apache.spark.api.python.PythonRDD$.writeIteratorToStream(PythonRDD.scala:322)
+	at org.apache.spark.api.python.PythonRunner$$anon$2.writeIteratorToStream(PythonRunner.scala:751)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.$anonfun$run$1(PythonRunner.scala:451)
+	at org.apache.spark.util.Utils$.logUncaughtExceptions(Utils.scala:1928)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.run(PythonRunner.scala:282)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 ERROR PythonRunner: This may have been caused by a prior exception:
+org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at scala.collection.Iterator.foreach(Iterator.scala:943)
+	at scala.collection.Iterator.foreach$(Iterator.scala:943)
+	at scala.collection.AbstractIterator.foreach(Iterator.scala:1431)
+	at org.apache.spark.api.python.PythonRDD$.writeIteratorToStream(PythonRDD.scala:322)
+	at org.apache.spark.api.python.PythonRunner$$anon$2.writeIteratorToStream(PythonRunner.scala:751)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.$anonfun$run$1(PythonRunner.scala:451)
+	at org.apache.spark.util.Utils$.logUncaughtExceptions(Utils.scala:1928)
+	at org.apache.spark.api.python.BasePythonRunner$WriterThread.run(PythonRunner.scala:282)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 1), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.lambda$initiateRetry$0(RetryingBlockTransferor.java:206)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/03 04:04:11 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 41
+26/11/03 04:04:11 INFO Executor: Running task 1.0 in stage 4.1 (TID 41)
+26/11/03 04:04:11 INFO MapOutputTrackerWorker: Updating epoch to 8 and clearing cache
+26/11/03 04:04:11 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 43
+26/11/03 04:04:11 INFO Executor: Running task 3.0 in stage 4.1 (TID 43)
+26/11/03 04:04:11 INFO TorrentBroadcast: Started reading broadcast variable 5 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:04:11 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 7.7 KiB, free 741.6 MiB)
+26/11/03 04:04:11 INFO TorrentBroadcast: Reading broadcast variable 5 took 64 ms
+26/11/03 04:04:11 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 12.9 KiB, free 741.6 MiB)
+26/11/03 04:04:12 INFO PythonRunner: Times: total = 385, boot = 20, init = 194, finish = 171
+26/11/03 04:04:12 INFO Executor: Finished task 1.0 in stage 4.1 (TID 41). 1595 bytes result sent to driver
+26/11/03 04:04:12 INFO PythonRunner: Times: total = 409, boot = 11, init = 216, finish = 182
+26/11/03 04:04:12 INFO Executor: Finished task 3.0 in stage 4.1 (TID 43). 1552 bytes result sent to driver
+26/11/03 04:04:12 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 44
+26/11/03 04:04:12 INFO Executor: Running task 0.0 in stage 5.1 (TID 44)
+26/11/03 04:04:12 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 46
+26/11/03 04:04:12 INFO Executor: Running task 2.0 in stage 5.1 (TID 46)
+26/11/03 04:04:12 INFO MapOutputTrackerWorker: Updating epoch to 9 and clearing cache
+26/11/03 04:04:12 INFO TorrentBroadcast: Started reading broadcast variable 6 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:04:12 INFO MemoryStore: Block broadcast_6_piece0 stored as bytes in memory (estimated size 7.5 KiB, free 741.6 MiB)
+26/11/03 04:04:12 INFO TorrentBroadcast: Reading broadcast variable 6 took 37 ms
+26/11/03 04:04:12 INFO MemoryStore: Block broadcast_6 stored as values in memory (estimated size 13.1 KiB, free 741.5 MiB)
+26/11/03 04:04:12 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 2, fetching them
+26/11/03 04:04:12 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:36349)
+26/11/03 04:04:12 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 2, fetching them
+26/11/03 04:04:12 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:04:12 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:12 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 15 ms
+26/11/03 04:04:12 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:12 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 53 ms
+26/11/03 04:04:13 INFO PythonRunner: Times: total = 139, boot = -645, init = 777, finish = 7
+26/11/03 04:04:13 INFO Executor: Finished task 2.0 in stage 5.1 (TID 46). 2054 bytes result sent to driver
+26/11/03 04:04:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 49
+26/11/03 04:04:13 INFO Executor: Running task 5.0 in stage 5.1 (TID 49)
+26/11/03 04:04:13 INFO PythonRunner: Times: total = 165, boot = -486, init = 650, finish = 1
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 1 ms
+26/11/03 04:04:13 INFO Executor: Finished task 0.0 in stage 5.1 (TID 44). 2054 bytes result sent to driver
+26/11/03 04:04:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 50
+26/11/03 04:04:13 INFO Executor: Running task 6.0 in stage 5.1 (TID 50)
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 11 ms
+26/11/03 04:04:13 INFO PythonRunner: Times: total = 207, boot = -10, init = 210, finish = 7
+26/11/03 04:04:13 INFO Executor: Finished task 5.0 in stage 5.1 (TID 49). 2054 bytes result sent to driver
+26/11/03 04:04:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 53
+26/11/03 04:04:13 INFO Executor: Running task 9.0 in stage 5.1 (TID 53)
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:13 INFO PythonRunner: Times: total = 183, boot = 10, init = 171, finish = 2
+26/11/03 04:04:13 INFO Executor: Finished task 6.0 in stage 5.1 (TID 50). 2054 bytes result sent to driver
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 54 ms
+26/11/03 04:04:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 54
+26/11/03 04:04:13 INFO Executor: Running task 10.0 in stage 5.1 (TID 54)
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 1 ms
+26/11/03 04:04:13 INFO PythonRunner: Times: total = 262, boot = -35, init = 295, finish = 2
+26/11/03 04:04:13 INFO Executor: Finished task 9.0 in stage 5.1 (TID 53). 2097 bytes result sent to driver
+26/11/03 04:04:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 57
+26/11/03 04:04:13 INFO Executor: Running task 13.0 in stage 5.1 (TID 57)
+26/11/03 04:04:13 INFO PythonRunner: Times: total = 267, boot = -47, init = 312, finish = 2
+26/11/03 04:04:13 INFO Executor: Finished task 10.0 in stage 5.1 (TID 54). 2054 bytes result sent to driver
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 58
+26/11/03 04:04:13 INFO Executor: Running task 14.0 in stage 5.1 (TID 58)
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 14 ms
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:13 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 1 ms
+26/11/03 04:04:13 INFO PythonRunner: Times: total = 181, boot = -4, init = 184, finish = 1
+26/11/03 04:04:14 INFO PythonRunner: Times: total = 331, boot = -46, init = 375, finish = 2
+26/11/03 04:04:14 INFO Executor: Finished task 13.0 in stage 5.1 (TID 57). 2097 bytes result sent to driver
+26/11/03 04:04:14 INFO Executor: Finished task 14.0 in stage 5.1 (TID 58). 2140 bytes result sent to driver
+26/11/03 04:04:14 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 63
+26/11/03 04:04:14 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 64
+26/11/03 04:04:14 INFO Executor: Running task 19.0 in stage 5.1 (TID 63)
+26/11/03 04:04:14 INFO Executor: Running task 20.0 in stage 5.1 (TID 64)
+26/11/03 04:04:14 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:14 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 2 ms
+26/11/03 04:04:14 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:14 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 1 ms
+26/11/03 04:04:14 INFO PythonRunner: Times: total = 183, boot = -201, init = 382, finish = 2
+26/11/03 04:04:14 INFO Executor: Finished task 19.0 in stage 5.1 (TID 63). 2054 bytes result sent to driver
+26/11/03 04:04:14 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 67
+26/11/03 04:04:14 INFO Executor: Running task 23.0 in stage 5.1 (TID 67)
+26/11/03 04:04:14 INFO ShuffleBlockFetcherIterator: Getting 12 (12.3 KiB) non-empty blocks including 6 (6.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (6.2 KiB) remote blocks
+26/11/03 04:04:14 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 3 ms
+26/11/03 04:04:14 INFO PythonRunner: Times: total = 94, boot = -13, init = 105, finish = 2
+26/11/03 04:04:14 INFO Executor: Finished task 23.0 in stage 5.1 (TID 67). 2054 bytes result sent to driver
+26/11/03 04:04:14 INFO PythonRunner: Times: total = 299, boot = -165, init = 459, finish = 5
+26/11/03 04:04:14 INFO Executor: Finished task 20.0 in stage 5.1 (TID 64). 2054 bytes result sent to driver
+26/11/03 04:04:14 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/03 04:04:14 INFO MemoryStore: MemoryStore cleared
+26/11/03 04:04:14 INFO BlockManager: BlockManager stopped
+26/11/03 04:04:14 INFO ShutdownHookManager: Shutdown hook called
+26/11/03 04:04:14 INFO ShutdownHookManager: Deleting directory /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0017/spark-c1c69db6-708d-45a1-8890-aa324ba1d939

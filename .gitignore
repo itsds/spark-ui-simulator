@@ -1,6 +1,6 @@
 # Generated output — never edit by hand
-event-logs/
-build/
+/event-logs/
+/build/
 
 # Python
 .venv/

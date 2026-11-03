@@ -1,0 +1,17 @@
+# One-command local stack. Phase 1: History Server only.
+# Phase 5 adds the mock YARN NodeManager log server, Phase 7 the scenario portal.
+#
+#   docker compose up                                        # browse generated scenarios (./event-logs)
+#   EVENT_LOG_DIR=./reference/event-logs docker compose up   # browse real reference captures
+services:
+  history-server:
+    image: apache/spark:3.5.9-java17
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
+    environment:
+      SPARK_CONF_DIR: /opt/hs-conf
+      SPARK_HISTORY_OPTS: "-Dspark.history.fs.logDirectory=file:///event-logs"
+    volumes:
+      - ./services/history-server/spark-defaults.conf:/opt/hs-conf/spark-defaults.conf:ro
+      - ${EVENT_LOG_DIR:-./event-logs}:/event-logs:ro
+    ports:
+      - "18080:18080"

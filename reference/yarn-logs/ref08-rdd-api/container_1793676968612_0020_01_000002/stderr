@@ -1,0 +1,378 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/03 04:06:15 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 27009@vm
+26/11/03 04:06:15 INFO SignalUtils: Registering signal handler for TERM
+26/11/03 04:06:15 INFO SignalUtils: Registering signal handler for HUP
+26/11/03 04:06:15 INFO SignalUtils: Registering signal handler for INT
+26/11/03 04:06:16 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/03 04:06:16 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/03 04:06:16 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/03 04:06:16 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:06:16 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:06:16 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:06:16 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:06:16 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:06:17 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:45585 after 223 ms (0 ms spent in bootstraps)
+26/11/03 04:06:17 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:06:17 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:06:17 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:06:17 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:06:17 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:06:17 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:45585 after 4 ms (0 ms spent in bootstraps)
+26/11/03 04:06:17 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0020/blockmgr-417f684f-6f65-400f-82ad-253acc2b7c0b
+26/11/03 04:06:17 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/03 04:06:18 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:45585
+26/11/03 04:06:18 INFO ResourceUtils: ==============================================================
+26/11/03 04:06:18 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/03 04:06:18 INFO ResourceUtils: ==============================================================
+26/11/03 04:06:18 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/03 04:06:18 INFO Executor: Starting executor ID 1 on host localhost
+26/11/03 04:06:18 INFO Executor: OS info Linux, 6.18.44-fc-v230, amd64
+26/11/03 04:06:18 INFO Executor: Java version 17.0.20.1
+26/11/03 04:06:18 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 36109.
+26/11/03 04:06:18 INFO NettyBlockTransferService: Server created on localhost:36109
+26/11/03 04:06:18 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/03 04:06:18 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(1, localhost, 36109, None)
+26/11/03 04:06:18 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(1, localhost, 36109, None)
+26/11/03 04:06:18 INFO BlockManager: Initialized BlockManager: BlockManagerId(1, localhost, 36109, None)
+26/11/03 04:06:18 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0020/container_1793676968612_0020_01_000002/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0020/container_1793676968612_0020_01_000002/__app__.jar'
+26/11/03 04:06:18 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@27bcb0e7 for default.
+26/11/03 04:06:21 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 1
+26/11/03 04:06:21 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 4
+26/11/03 04:06:21 INFO Executor: Running task 4.0 in stage 0.0 (TID 4)
+26/11/03 04:06:21 INFO Executor: Running task 1.0 in stage 0.0 (TID 1)
+26/11/03 04:06:22 INFO TorrentBroadcast: Started reading broadcast variable 0 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:22 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:38611 after 2 ms (0 ms spent in bootstraps)
+26/11/03 04:06:22 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 7.8 KiB, free 741.6 MiB)
+26/11/03 04:06:22 INFO TorrentBroadcast: Reading broadcast variable 0 took 171 ms
+26/11/03 04:06:22 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 12.9 KiB, free 741.6 MiB)
+26/11/03 04:06:23 INFO PythonRunner: Times: total = 906, boot = 625, init = 164, finish = 117
+26/11/03 04:06:23 INFO PythonRunner: Times: total = 902, boot = 637, init = 154, finish = 111
+26/11/03 04:06:24 INFO Executor: Finished task 1.0 in stage 0.0 (TID 1). 1583 bytes result sent to driver
+26/11/03 04:06:24 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 6
+26/11/03 04:06:24 INFO Executor: Finished task 4.0 in stage 0.0 (TID 4). 1540 bytes result sent to driver
+26/11/03 04:06:24 INFO Executor: Running task 6.0 in stage 0.0 (TID 6)
+26/11/03 04:06:24 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 7
+26/11/03 04:06:24 INFO Executor: Running task 7.0 in stage 0.0 (TID 7)
+26/11/03 04:06:24 INFO PythonRunner: Times: total = 581, boot = -655, init = 985, finish = 251
+26/11/03 04:06:24 INFO PythonRunner: Times: total = 485, boot = -619, init = 811, finish = 293
+26/11/03 04:06:24 INFO Executor: Finished task 6.0 in stage 0.0 (TID 6). 1497 bytes result sent to driver
+26/11/03 04:06:24 INFO Executor: Finished task 7.0 in stage 0.0 (TID 7). 1497 bytes result sent to driver
+26/11/03 04:06:25 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 13
+26/11/03 04:06:25 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 16
+26/11/03 04:06:25 INFO Executor: Running task 4.0 in stage 1.0 (TID 16)
+26/11/03 04:06:25 INFO Executor: Running task 1.0 in stage 1.0 (TID 13)
+26/11/03 04:06:25 INFO MapOutputTrackerWorker: Updating epoch to 1 and clearing cache
+26/11/03 04:06:25 INFO TorrentBroadcast: Started reading broadcast variable 1 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:25 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:42953 after 3 ms (0 ms spent in bootstraps)
+26/11/03 04:06:25 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 6.9 KiB, free 741.6 MiB)
+26/11/03 04:06:25 INFO TorrentBroadcast: Reading broadcast variable 1 took 92 ms
+26/11/03 04:06:25 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 12.1 KiB, free 741.6 MiB)
+26/11/03 04:06:25 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/03 04:06:25 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/03 04:06:25 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:45585)
+26/11/03 04:06:25 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:06:25 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:25 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:25 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:41085 after 2 ms (0 ms spent in bootstraps)
+26/11/03 04:06:25 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 76 ms
+26/11/03 04:06:25 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 81 ms
+26/11/03 04:06:26 INFO PythonRunner: Times: total = 280, boot = -1046, init = 1288, finish = 38
+26/11/03 04:06:26 INFO Executor: Finished task 1.0 in stage 1.0 (TID 13). 2055 bytes result sent to driver
+26/11/03 04:06:26 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 22
+26/11/03 04:06:26 INFO Executor: Running task 10.0 in stage 1.0 (TID 22)
+26/11/03 04:06:26 INFO PythonRunner: Times: total = 344, boot = -1115, init = 1409, finish = 50
+26/11/03 04:06:26 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:26 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 5 ms
+26/11/03 04:06:26 INFO Executor: Finished task 4.0 in stage 1.0 (TID 16). 2098 bytes result sent to driver
+26/11/03 04:06:26 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 23
+26/11/03 04:06:26 INFO Executor: Running task 11.0 in stage 1.0 (TID 23)
+26/11/03 04:06:26 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:26 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 23 ms
+26/11/03 04:06:26 INFO PythonRunner: Times: total = 237, boot = -46, init = 259, finish = 24
+26/11/03 04:06:26 INFO Executor: Finished task 10.0 in stage 1.0 (TID 22). 2055 bytes result sent to driver
+26/11/03 04:06:26 INFO PythonRunner: Times: total = 253, boot = -99, init = 334, finish = 18
+26/11/03 04:06:26 INFO Executor: Finished task 11.0 in stage 1.0 (TID 23). 2098 bytes result sent to driver
+26/11/03 04:06:26 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 26
+26/11/03 04:06:26 INFO Executor: Running task 2.0 in stage 2.0 (TID 26)
+26/11/03 04:06:26 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 29
+26/11/03 04:06:26 INFO Executor: Running task 5.0 in stage 2.0 (TID 29)
+26/11/03 04:06:26 INFO TorrentBroadcast: Started reading broadcast variable 2 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:26 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 8.0 KiB, free 741.6 MiB)
+26/11/03 04:06:26 INFO TorrentBroadcast: Reading broadcast variable 2 took 32 ms
+26/11/03 04:06:26 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 13.4 KiB, free 741.5 MiB)
+26/11/03 04:06:27 INFO PythonRunner: Times: total = 270, boot = -267, init = 345, finish = 192
+26/11/03 04:06:27 INFO Executor: Finished task 2.0 in stage 2.0 (TID 26). 1497 bytes result sent to driver
+26/11/03 04:06:27 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 30
+26/11/03 04:06:27 INFO Executor: Running task 6.0 in stage 2.0 (TID 30)
+26/11/03 04:06:27 INFO PythonRunner: Times: total = 655, boot = -145, init = 251, finish = 549
+26/11/03 04:06:27 INFO Executor: Finished task 5.0 in stage 2.0 (TID 29). 1497 bytes result sent to driver
+26/11/03 04:06:27 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 34
+26/11/03 04:06:27 INFO Executor: Running task 10.0 in stage 2.0 (TID 34)
+26/11/03 04:06:27 INFO PythonRunner: Times: total = 540, boot = -239, init = 432, finish = 347
+26/11/03 04:06:27 INFO Executor: Finished task 6.0 in stage 2.0 (TID 30). 1497 bytes result sent to driver
+26/11/03 04:06:28 INFO PythonRunner: Times: total = 627, boot = -6, init = 273, finish = 360
+26/11/03 04:06:28 INFO Executor: Finished task 10.0 in stage 2.0 (TID 34). 1583 bytes result sent to driver
+26/11/03 04:06:28 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 36
+26/11/03 04:06:28 INFO Executor: Running task 0.0 in stage 3.0 (TID 36)
+26/11/03 04:06:28 INFO MapOutputTrackerWorker: Updating epoch to 2 and clearing cache
+26/11/03 04:06:28 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 39
+26/11/03 04:06:28 INFO Executor: Running task 3.0 in stage 3.0 (TID 39)
+26/11/03 04:06:28 INFO TorrentBroadcast: Started reading broadcast variable 3 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:28 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 7.6 KiB, free 741.5 MiB)
+26/11/03 04:06:28 INFO TorrentBroadcast: Reading broadcast variable 3 took 35 ms
+26/11/03 04:06:28 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 13.8 KiB, free 741.5 MiB)
+26/11/03 04:06:28 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/03 04:06:28 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:45585)
+26/11/03 04:06:28 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/03 04:06:28 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Getting 12 (195.4 KiB) non-empty blocks including 4 (65.1 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (130.3 KiB) remote blocks
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Getting 12 (195.4 KiB) non-empty blocks including 4 (65.1 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (130.3 KiB) remote blocks
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 8 ms
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 10 ms
+26/11/03 04:06:28 INFO PythonRunner: Times: total = 317, boot = -249, init = 502, finish = 64
+26/11/03 04:06:28 INFO Executor: Finished task 0.0 in stage 3.0 (TID 36). 2055 bytes result sent to driver
+26/11/03 04:06:28 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 43
+26/11/03 04:06:28 INFO Executor: Running task 7.0 in stage 3.0 (TID 43)
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Getting 12 (195.4 KiB) non-empty blocks including 4 (65.1 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (130.3 KiB) remote blocks
+26/11/03 04:06:28 INFO PythonRunner: Times: total = 365, boot = -499, init = 792, finish = 72
+26/11/03 04:06:28 INFO Executor: Finished task 3.0 in stage 3.0 (TID 39). 2055 bytes result sent to driver
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 7 ms
+26/11/03 04:06:28 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 44
+26/11/03 04:06:28 INFO Executor: Running task 8.0 in stage 3.0 (TID 44)
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Getting 12 (195.4 KiB) non-empty blocks including 4 (65.1 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (130.3 KiB) remote blocks
+26/11/03 04:06:28 INFO PythonRunner: Times: total = 131, boot = -10, init = 113, finish = 28
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 11 ms
+26/11/03 04:06:28 INFO Executor: Finished task 7.0 in stage 3.0 (TID 43). 2055 bytes result sent to driver
+26/11/03 04:06:28 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 47
+26/11/03 04:06:28 INFO Executor: Running task 11.0 in stage 3.0 (TID 47)
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Getting 12 (195.4 KiB) non-empty blocks including 4 (65.1 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (130.3 KiB) remote blocks
+26/11/03 04:06:28 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 24 ms
+26/11/03 04:06:29 INFO PythonRunner: Times: total = 167, boot = -41, init = 182, finish = 26
+26/11/03 04:06:29 INFO Executor: Finished task 8.0 in stage 3.0 (TID 44). 2098 bytes result sent to driver
+26/11/03 04:06:29 INFO PythonRunner: Times: total = 179, boot = -6, init = 165, finish = 20
+26/11/03 04:06:29 INFO Executor: Finished task 11.0 in stage 3.0 (TID 47). 2055 bytes result sent to driver
+26/11/03 04:06:29 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 48
+26/11/03 04:06:29 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 51
+26/11/03 04:06:29 INFO Executor: Running task 3.0 in stage 4.0 (TID 51)
+26/11/03 04:06:29 INFO Executor: Running task 0.0 in stage 4.0 (TID 48)
+26/11/03 04:06:29 INFO TorrentBroadcast: Started reading broadcast variable 4 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:29 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 7.8 KiB, free 741.6 MiB)
+26/11/03 04:06:29 INFO TorrentBroadcast: Reading broadcast variable 4 took 50 ms
+26/11/03 04:06:29 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 12.9 KiB, free 741.6 MiB)
+26/11/03 04:06:29 INFO PythonRunner: Times: total = 212, boot = -274, init = 362, finish = 124
+26/11/03 04:06:29 INFO Executor: Finished task 0.0 in stage 4.0 (TID 48). 1497 bytes result sent to driver
+26/11/03 04:06:29 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 54
+26/11/03 04:06:29 INFO Executor: Running task 6.0 in stage 4.0 (TID 54)
+26/11/03 04:06:30 INFO PythonRunner: Times: total = 643, boot = -205, init = 393, finish = 455
+26/11/03 04:06:30 INFO Executor: Finished task 3.0 in stage 4.0 (TID 51). 1497 bytes result sent to driver
+26/11/03 04:06:30 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 59
+26/11/03 04:06:30 INFO Executor: Running task 11.0 in stage 4.0 (TID 59)
+26/11/03 04:06:30 INFO PythonRunner: Times: total = 402, boot = -72, init = 260, finish = 214
+26/11/03 04:06:30 INFO Executor: Finished task 6.0 in stage 4.0 (TID 54). 1497 bytes result sent to driver
+26/11/03 04:06:30 INFO PythonRunner: Times: total = 361, boot = -43, init = 250, finish = 154
+26/11/03 04:06:30 INFO Executor: Finished task 11.0 in stage 4.0 (TID 59). 1583 bytes result sent to driver
+26/11/03 04:06:30 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 61
+26/11/03 04:06:30 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 64
+26/11/03 04:06:30 INFO Executor: Running task 4.0 in stage 5.0 (TID 64)
+26/11/03 04:06:30 INFO Executor: Running task 1.0 in stage 5.0 (TID 61)
+26/11/03 04:06:30 INFO MapOutputTrackerWorker: Updating epoch to 3 and clearing cache
+26/11/03 04:06:30 INFO TorrentBroadcast: Started reading broadcast variable 5 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:30 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 6.9 KiB, free 741.6 MiB)
+26/11/03 04:06:30 INFO TorrentBroadcast: Reading broadcast variable 5 took 21 ms
+26/11/03 04:06:30 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 12.1 KiB, free 741.5 MiB)
+26/11/03 04:06:30 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 2, fetching them
+26/11/03 04:06:30 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:45585)
+26/11/03 04:06:30 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 2, fetching them
+26/11/03 04:06:30 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 1 ms
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 5 ms
+26/11/03 04:06:30 INFO PythonRunner: Times: total = 118, boot = -92, init = 199, finish = 11
+26/11/03 04:06:30 INFO Executor: Finished task 4.0 in stage 5.0 (TID 64). 2055 bytes result sent to driver
+26/11/03 04:06:30 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 66
+26/11/03 04:06:30 INFO Executor: Running task 6.0 in stage 5.0 (TID 66)
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 6 ms
+26/11/03 04:06:30 INFO PythonRunner: Times: total = 318, boot = -381, init = 646, finish = 53
+26/11/03 04:06:30 INFO Executor: Finished task 1.0 in stage 5.0 (TID 61). 2055 bytes result sent to driver
+26/11/03 04:06:30 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 70
+26/11/03 04:06:30 INFO Executor: Running task 10.0 in stage 5.0 (TID 70)
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 2 ms
+26/11/03 04:06:30 INFO PythonRunner: Times: total = 202, boot = -39, init = 210, finish = 31
+26/11/03 04:06:30 INFO Executor: Finished task 6.0 in stage 5.0 (TID 66). 2055 bytes result sent to driver
+26/11/03 04:06:30 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 71
+26/11/03 04:06:30 INFO Executor: Running task 11.0 in stage 5.0 (TID 71)
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:30 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 8 ms
+26/11/03 04:06:31 INFO PythonRunner: Times: total = 195, boot = -6, init = 191, finish = 10
+26/11/03 04:06:31 INFO Executor: Finished task 11.0 in stage 5.0 (TID 71). 2055 bytes result sent to driver
+26/11/03 04:06:31 INFO PythonRunner: Times: total = 304, boot = -6, init = 290, finish = 20
+26/11/03 04:06:31 INFO Executor: Finished task 10.0 in stage 5.0 (TID 70). 2055 bytes result sent to driver
+26/11/03 04:06:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 72
+26/11/03 04:06:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 75
+26/11/03 04:06:31 INFO Executor: Running task 3.0 in stage 7.0 (TID 75)
+26/11/03 04:06:31 INFO TorrentBroadcast: Started reading broadcast variable 6 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:31 INFO Executor: Running task 0.0 in stage 7.0 (TID 72)
+26/11/03 04:06:31 INFO MemoryStore: Block broadcast_6_piece0 stored as bytes in memory (estimated size 6.7 KiB, free 741.6 MiB)
+26/11/03 04:06:31 INFO TorrentBroadcast: Reading broadcast variable 6 took 30 ms
+26/11/03 04:06:31 INFO MemoryStore: Block broadcast_6 stored as values in memory (estimated size 11.4 KiB, free 741.5 MiB)
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 4 ms
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 15 ms
+26/11/03 04:06:31 INFO PythonRunner: Times: total = 203, boot = -263, init = 446, finish = 20
+26/11/03 04:06:31 INFO Executor: Finished task 0.0 in stage 7.0 (TID 72). 2174 bytes result sent to driver
+26/11/03 04:06:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 78
+26/11/03 04:06:31 INFO Executor: Running task 6.0 in stage 7.0 (TID 78)
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 5 ms
+26/11/03 04:06:31 INFO PythonRunner: Times: total = 452, boot = -163, init = 601, finish = 14
+26/11/03 04:06:31 INFO Executor: Finished task 3.0 in stage 7.0 (TID 75). 2243 bytes result sent to driver
+26/11/03 04:06:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 81
+26/11/03 04:06:31 INFO Executor: Running task 9.0 in stage 7.0 (TID 81)
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:31 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 9 ms
+26/11/03 04:06:31 INFO PythonRunner: Times: total = 185, boot = -29, init = 184, finish = 30
+26/11/03 04:06:31 INFO Executor: Finished task 6.0 in stage 7.0 (TID 78). 2203 bytes result sent to driver
+26/11/03 04:06:32 INFO PythonRunner: Times: total = 149, boot = -33, init = 174, finish = 8
+26/11/03 04:06:32 INFO Executor: Finished task 9.0 in stage 7.0 (TID 81). 2261 bytes result sent to driver
+26/11/03 04:06:32 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 86
+26/11/03 04:06:32 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 89
+26/11/03 04:06:32 INFO Executor: Running task 2.0 in stage 9.0 (TID 86)
+26/11/03 04:06:32 INFO Executor: Running task 5.0 in stage 9.0 (TID 89)
+26/11/03 04:06:32 INFO TorrentBroadcast: Started reading broadcast variable 7 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:32 INFO MemoryStore: Block broadcast_7_piece0 stored as bytes in memory (estimated size 8.0 KiB, free 741.6 MiB)
+26/11/03 04:06:32 INFO TorrentBroadcast: Reading broadcast variable 7 took 18 ms
+26/11/03 04:06:32 INFO MemoryStore: Block broadcast_7 stored as values in memory (estimated size 13.1 KiB, free 741.6 MiB)
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 2 ms
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 7 ms
+26/11/03 04:06:32 INFO PythonRunner: Times: total = 142, boot = -327, init = 437, finish = 32
+26/11/03 04:06:32 INFO Executor: Finished task 5.0 in stage 9.0 (TID 89). 2228 bytes result sent to driver
+26/11/03 04:06:32 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 90
+26/11/03 04:06:32 INFO Executor: Running task 6.0 in stage 9.0 (TID 90)
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 2 ms
+26/11/03 04:06:32 INFO PythonRunner: Times: total = 228, boot = -266, init = 453, finish = 41
+26/11/03 04:06:32 INFO Executor: Finished task 2.0 in stage 9.0 (TID 86). 2271 bytes result sent to driver
+26/11/03 04:06:32 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 95
+26/11/03 04:06:32 INFO Executor: Running task 11.0 in stage 9.0 (TID 95)
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:32 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 2 ms
+26/11/03 04:06:32 INFO PythonRunner: Times: total = 169, boot = -18, init = 177, finish = 10
+26/11/03 04:06:32 INFO Executor: Finished task 6.0 in stage 9.0 (TID 90). 2271 bytes result sent to driver
+26/11/03 04:06:32 INFO PythonRunner: Times: total = 131, boot = -106, init = 227, finish = 10
+26/11/03 04:06:32 INFO Executor: Finished task 11.0 in stage 9.0 (TID 95). 2228 bytes result sent to driver
+26/11/03 04:06:33 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 99
+26/11/03 04:06:33 INFO Executor: Running task 2.0 in stage 11.0 (TID 99)
+26/11/03 04:06:33 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 102
+26/11/03 04:06:33 INFO MapOutputTrackerWorker: Updating epoch to 4 and clearing cache
+26/11/03 04:06:33 INFO Executor: Running task 5.0 in stage 11.0 (TID 102)
+26/11/03 04:06:33 INFO TorrentBroadcast: Started reading broadcast variable 9 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:33 INFO MemoryStore: Block broadcast_9_piece0 stored as bytes in memory (estimated size 7.8 KiB, free 741.6 MiB)
+26/11/03 04:06:33 INFO TorrentBroadcast: Reading broadcast variable 9 took 18 ms
+26/11/03 04:06:33 INFO MemoryStore: Block broadcast_9 stored as values in memory (estimated size 12.9 KiB, free 741.6 MiB)
+26/11/03 04:06:33 INFO PythonRunner: Times: total = 214, boot = -563, init = 664, finish = 113
+26/11/03 04:06:33 INFO Executor: Finished task 5.0 in stage 11.0 (TID 102). 1540 bytes result sent to driver
+26/11/03 04:06:33 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 104
+26/11/03 04:06:33 INFO Executor: Running task 7.0 in stage 11.0 (TID 104)
+26/11/03 04:06:33 INFO PythonRunner: Times: total = 504, boot = -400, init = 535, finish = 369
+26/11/03 04:06:33 INFO Executor: Finished task 2.0 in stage 11.0 (TID 99). 1497 bytes result sent to driver
+26/11/03 04:06:33 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 107
+26/11/03 04:06:33 INFO Executor: Running task 10.0 in stage 11.0 (TID 107)
+26/11/03 04:06:34 INFO PythonRunner: Times: total = 212, boot = 7, init = 79, finish = 126
+26/11/03 04:06:34 INFO Executor: Finished task 10.0 in stage 11.0 (TID 107). 1497 bytes result sent to driver
+26/11/03 04:06:34 INFO PythonRunner: Times: total = 588, boot = -51, init = 418, finish = 221
+26/11/03 04:06:34 INFO Executor: Finished task 7.0 in stage 11.0 (TID 104). 1497 bytes result sent to driver
+26/11/03 04:06:34 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 111
+26/11/03 04:06:34 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 114
+26/11/03 04:06:34 INFO Executor: Running task 2.0 in stage 12.0 (TID 111)
+26/11/03 04:06:34 INFO Executor: Running task 5.0 in stage 12.0 (TID 114)
+26/11/03 04:06:34 INFO MapOutputTrackerWorker: Updating epoch to 5 and clearing cache
+26/11/03 04:06:34 INFO TorrentBroadcast: Started reading broadcast variable 10 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:34 INFO MemoryStore: Block broadcast_10_piece0 stored as bytes in memory (estimated size 9.8 KiB, free 741.6 MiB)
+26/11/03 04:06:34 INFO TorrentBroadcast: Reading broadcast variable 10 took 22 ms
+26/11/03 04:06:34 INFO MemoryStore: Block broadcast_10 stored as values in memory (estimated size 22.1 KiB, free 741.5 MiB)
+26/11/03 04:06:34 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 5, fetching them
+26/11/03 04:06:34 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:45585)
+26/11/03 04:06:34 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 5, fetching them
+26/11/03 04:06:34 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:06:34 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:34 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:34 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 1 ms
+26/11/03 04:06:34 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 5 ms
+26/11/03 04:06:34 INFO PythonRunner: Times: total = 308, boot = -224, init = 511, finish = 21
+26/11/03 04:06:34 INFO PythonRunner: Times: total = 301, boot = -144, init = 406, finish = 39
+26/11/03 04:06:34 INFO PythonRunner: Times: total = 496, boot = 39, init = 454, finish = 3
+26/11/03 04:06:34 INFO Executor: Finished task 5.0 in stage 12.0 (TID 114). 2277 bytes result sent to driver
+26/11/03 04:06:34 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 118
+26/11/03 04:06:34 INFO Executor: Running task 9.0 in stage 12.0 (TID 118)
+26/11/03 04:06:34 INFO ShuffleBlockFetcherIterator: Getting 12 (110.3 KiB) non-empty blocks including 4 (36.8 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 8 (73.5 KiB) remote blocks
+26/11/03 04:06:34 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 1 ms
+26/11/03 04:06:35 INFO PythonRunner: Times: total = 603, boot = 54, init = 537, finish = 12
+26/11/03 04:06:35 INFO Executor: Finished task 2.0 in stage 12.0 (TID 111). 2277 bytes result sent to driver
+26/11/03 04:06:35 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 121
+26/11/03 04:06:35 INFO Executor: Running task 12.0 in stage 12.0 (TID 121)
+26/11/03 04:06:35 INFO PythonRunner: Times: total = 312, boot = -312, init = 567, finish = 57
+26/11/03 04:06:35 INFO PythonRunner: Times: total = 353, boot = -148, init = 456, finish = 45
+26/11/03 04:06:35 INFO Executor: Finished task 9.0 in stage 12.0 (TID 118). 2234 bytes result sent to driver
+26/11/03 04:06:35 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 124
+26/11/03 04:06:35 INFO Executor: Running task 15.0 in stage 12.0 (TID 124)
+26/11/03 04:06:35 INFO PythonRunner: Times: total = 335, boot = -34, init = 361, finish = 8
+26/11/03 04:06:35 INFO PythonRunner: Times: total = 464, boot = -308, init = 746, finish = 26
+26/11/03 04:06:35 INFO PythonRunner: Times: total = 388, boot = -6, init = 337, finish = 57
+26/11/03 04:06:35 INFO Executor: Finished task 15.0 in stage 12.0 (TID 124). 1503 bytes result sent to driver
+26/11/03 04:06:35 INFO PythonRunner: Times: total = 557, boot = -61, init = 557, finish = 61
+26/11/03 04:06:35 INFO Executor: Finished task 12.0 in stage 12.0 (TID 121). 1503 bytes result sent to driver
+26/11/03 04:06:35 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 129
+26/11/03 04:06:35 INFO Executor: Running task 2.0 in stage 13.0 (TID 129)
+26/11/03 04:06:35 INFO MapOutputTrackerWorker: Updating epoch to 6 and clearing cache
+26/11/03 04:06:35 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 132
+26/11/03 04:06:35 INFO Executor: Running task 5.0 in stage 13.0 (TID 132)
+26/11/03 04:06:35 INFO TorrentBroadcast: Started reading broadcast variable 11 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:06:35 INFO MemoryStore: Block broadcast_11_piece0 stored as bytes in memory (estimated size 8.5 KiB, free 741.5 MiB)
+26/11/03 04:06:35 INFO TorrentBroadcast: Reading broadcast variable 11 took 20 ms
+26/11/03 04:06:35 INFO MemoryStore: Block broadcast_11 stored as values in memory (estimated size 15.6 KiB, free 741.6 MiB)
+26/11/03 04:06:35 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 4, fetching them
+26/11/03 04:06:35 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:45585)
+26/11/03 04:06:35 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 4, fetching them
+26/11/03 04:06:35 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Getting 8 (18.5 KiB) non-empty blocks including 3 (7.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 5 (10.9 KiB) remote blocks
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Getting 8 (18.5 KiB) non-empty blocks including 3 (7.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 5 (10.9 KiB) remote blocks
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 51 ms
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 47 ms
+26/11/03 04:06:36 INFO PythonRunner: Times: total = 182, boot = -302, init = 479, finish = 5
+26/11/03 04:06:36 INFO Executor: Finished task 2.0 in stage 13.0 (TID 129). 2055 bytes result sent to driver
+26/11/03 04:06:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 138
+26/11/03 04:06:36 INFO Executor: Running task 11.0 in stage 13.0 (TID 138)
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Getting 8 (18.5 KiB) non-empty blocks including 3 (7.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 5 (10.9 KiB) remote blocks
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 1 ms
+26/11/03 04:06:36 INFO PythonRunner: Times: total = 238, boot = -241, init = 439, finish = 40
+26/11/03 04:06:36 INFO Executor: Finished task 5.0 in stage 13.0 (TID 132). 2055 bytes result sent to driver
+26/11/03 04:06:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 139
+26/11/03 04:06:36 INFO Executor: Running task 12.0 in stage 13.0 (TID 139)
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Getting 8 (18.5 KiB) non-empty blocks including 2 (3.3 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (15.2 KiB) remote blocks
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 1 ms
+26/11/03 04:06:36 INFO PythonRunner: Times: total = 188, boot = -435, init = 614, finish = 9
+26/11/03 04:06:36 INFO Executor: Finished task 11.0 in stage 13.0 (TID 138). 2098 bytes result sent to driver
+26/11/03 04:06:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 142
+26/11/03 04:06:36 INFO Executor: Running task 15.0 in stage 13.0 (TID 142)
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Getting 8 (18.5 KiB) non-empty blocks including 3 (7.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 5 (10.9 KiB) remote blocks
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 6 ms
+26/11/03 04:06:36 INFO PythonRunner: Times: total = 185, boot = -466, init = 645, finish = 6
+26/11/03 04:06:36 INFO Executor: Finished task 12.0 in stage 13.0 (TID 139). 2055 bytes result sent to driver
+26/11/03 04:06:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 144
+26/11/03 04:06:36 INFO Executor: Running task 17.0 in stage 13.0 (TID 144)
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Getting 8 (18.5 KiB) non-empty blocks including 3 (7.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 5 (10.9 KiB) remote blocks
+26/11/03 04:06:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 21 ms
+26/11/03 04:06:36 INFO PythonRunner: Times: total = 100, boot = -257, init = 352, finish = 5
+26/11/03 04:06:36 INFO PythonRunner: Times: total = 171, boot = -191, init = 353, finish = 9
+26/11/03 04:06:36 INFO Executor: Finished task 15.0 in stage 13.0 (TID 142). 2098 bytes result sent to driver
+26/11/03 04:06:36 INFO Executor: Finished task 17.0 in stage 13.0 (TID 144). 2141 bytes result sent to driver
+26/11/03 04:06:36 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/03 04:06:36 INFO MemoryStore: MemoryStore cleared
+26/11/03 04:06:36 INFO BlockManager: BlockManager stopped
+26/11/03 04:06:36 INFO ShutdownHookManager: Shutdown hook called

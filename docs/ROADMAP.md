@@ -8,7 +8,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Foundation and project memory | ✅ |
-| 1 | Reference capture + real History Server harness | ⬜ |
+| 1 | Reference capture + real History Server harness | ✅ |
 | 2 | Event-log writer (minimal synthetic app) | ⬜ |
 | 3 | Cluster, cost model, scheduler → Scenario 00 at production scale | ⬜ |
 | 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ⬜ |
@@ -25,21 +25,23 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 - [x] `docs/ARCHITECTURE.md`, `DECISIONS.md`, `ROADMAP.md`, `SCENARIOS.md`, `SESSION_LOG.md`
 - [x] `README.md`, `.gitignore`
 
-## Phase 1 — Reference capture + real History Server harness
+## Phase 1 — Reference capture + real History Server harness ✅
 
 Goal: real Spark 3.5.9 event logs that we can trust as format and calibration truth, plus a History Server we can start with one command.
 
-- [ ] `uv` project: Python 3.11, `pyproject.toml`, package skeleton `src/sparksim/`, `pytest` + `ruff`
-- [ ] Settle the Java version (ADR-007) and record it
-- [ ] `services/history-server/`: start HS 3.5.9 pointing at a log dir (Docker Compose service + no-Docker script)
-- [ ] `reference/jobs/*.py`: small real PySpark jobs with `spark.eventLog.enabled=true`, covering:
-      parquet scan + filter + agg, sort-merge join, broadcast join, AQE coalesce + skew join,
-      cache/persist, write to partitioned parquet, a task failure and retry, a stage retry (fetch failure if feasible),
-      a Python UDF, `collect()` to the driver
-- [ ] `reference/event-logs/`: captured logs (small; committed)
-- [ ] `docs/EVENT_LOG_FORMAT.md`: every event type seen, its fields, and **which UI element it feeds**
-- [ ] `scripts/hs_api.py`: helper to query the HS REST API (apps, jobs, stages, taskList, executors, sql)
-- **Done when:** HS shows every reference app with no replay errors, and `hs_api.py` returns their stages.
+- [x] `uv` project: Python 3.11, `pyproject.toml`, package skeleton `src/sparksim/`, `pytest` + `ruff`
+- [x] Settle the Java version → **JDK 17** (JDK 21 breaks Arrow in Spark 3.5; ADR-007)
+- [x] `services/history-server/`: `run.sh` (no Docker, uses PySpark's bundled Spark) + `docker-compose.yml` (`apache/spark:3.5.9-java17`, **not yet verified**: no Docker daemon in the cloud dev container)
+- [x] Single-node **real YARN** cluster for capture: `reference/yarn/` (HDFS + YARN 3.3.6, cluster mode; ADR-008)
+- [x] `reference/jobs/ref00–ref08`: datagen/partitioned writes, AQE ETL (BHJ + SMJ), static plan + spill, skew join (AQE skew off/on),
+      cache vs recompute (+ block updates), failures (task retry, failed job, executor kill → stage retry), Python/pandas UDFs,
+      driver-bound (collect/toPandas/gaps/small files), pure RDD API
+- [x] `reference/event-logs/` (9 apps) + `reference/yarn-logs/` (real container stdout/stderr)
+- [x] `docs/EVENT_LOG_FORMAT.md` (data path, file naming, event order, event → UI mapping, accumulators, YARN fields, PySpark tells, single-node artifacts)
+      + generated `docs/event-log-schema.md` (`scripts/event_inventory.py`)
+- [x] `scripts/hs_api.py`: REST helper + `validate` (log vs server counts); `scripts/screenshot.py` (Playwright)
+- [x] Tests: `tests/test_reference_logs.py` (well-formed, YARN cluster mode) + integration replay test
+- **Done when:** HS shows every reference app with no replay errors, and `hs_api.py` returns their stages. ✅
 
 ## Phase 2 — Event-log writer (minimal synthetic app)
 

@@ -1,0 +1,390 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/03 04:05:12 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 25875@vm
+26/11/03 04:05:12 INFO SignalUtils: Registering signal handler for TERM
+26/11/03 04:05:12 INFO SignalUtils: Registering signal handler for HUP
+26/11/03 04:05:12 INFO SignalUtils: Registering signal handler for INT
+26/11/03 04:05:12 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/03 04:05:12 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/03 04:05:12 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/03 04:05:12 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:05:12 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:05:12 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:05:12 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:05:12 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:05:13 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:40907 after 108 ms (0 ms spent in bootstraps)
+26/11/03 04:05:13 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:05:13 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:05:13 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:05:13 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:05:13 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:05:13 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:40907 after 3 ms (0 ms spent in bootstraps)
+26/11/03 04:05:13 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0019/blockmgr-7888ba78-167a-4c6c-b682-ff3ea753ef69
+26/11/03 04:05:13 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/03 04:05:14 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:40907
+26/11/03 04:05:14 INFO ResourceUtils: ==============================================================
+26/11/03 04:05:14 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/03 04:05:14 INFO ResourceUtils: ==============================================================
+26/11/03 04:05:14 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/03 04:05:14 INFO Executor: Starting executor ID 1 on host localhost
+26/11/03 04:05:14 INFO Executor: OS info Linux, 6.18.44-fc-v230, amd64
+26/11/03 04:05:14 INFO Executor: Java version 17.0.20.1
+26/11/03 04:05:14 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 34325.
+26/11/03 04:05:14 INFO NettyBlockTransferService: Server created on localhost:34325
+26/11/03 04:05:14 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/03 04:05:14 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(1, localhost, 34325, None)
+26/11/03 04:05:14 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(1, localhost, 34325, None)
+26/11/03 04:05:14 INFO BlockManager: Initialized BlockManager: BlockManagerId(1, localhost, 34325, None)
+26/11/03 04:05:14 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0019/container_1793676968612_0019_01_000002/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1793676968612_0019/container_1793676968612_0019_01_000002/__app__.jar'
+26/11/03 04:05:14 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@67f59daa for default.
+26/11/03 04:05:18 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 0
+26/11/03 04:05:18 INFO Executor: Running task 0.0 in stage 0.0 (TID 0)
+26/11/03 04:05:19 INFO TorrentBroadcast: Started reading broadcast variable 0 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:19 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:36985 after 2 ms (0 ms spent in bootstraps)
+26/11/03 04:05:19 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 41.7 KiB, free 741.6 MiB)
+26/11/03 04:05:19 INFO TorrentBroadcast: Reading broadcast variable 0 took 116 ms
+26/11/03 04:05:19 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 153.9 KiB, free 741.4 MiB)
+26/11/03 04:05:20 INFO Executor: Finished task 0.0 in stage 0.0 (TID 0). 2148 bytes result sent to driver
+26/11/03 04:05:24 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 2
+26/11/03 04:05:24 INFO Executor: Running task 0.0 in stage 2.0 (TID 2)
+26/11/03 04:05:24 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 5
+26/11/03 04:05:24 INFO Executor: Running task 3.0 in stage 2.0 (TID 5)
+26/11/03 04:05:24 INFO TorrentBroadcast: Started reading broadcast variable 3 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:24 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 6.6 KiB, free 741.6 MiB)
+26/11/03 04:05:24 INFO TorrentBroadcast: Reading broadcast variable 3 took 46 ms
+26/11/03 04:05:24 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 15.9 KiB, free 741.6 MiB)
+26/11/03 04:05:24 INFO CodeGenerator: Code generated in 291.389972 ms
+26/11/03 04:05:24 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-02/part-00018-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 5067227-10134454, partition values: [20728]
+26/11/03 04:05:24 INFO TorrentBroadcast: Started reading broadcast variable 1 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:24 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-02/part-00018-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 10134454-11008105, partition values: [20728]
+26/11/03 04:05:25 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:33073 after 4 ms (0 ms spent in bootstraps)
+26/11/03 04:05:25 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 39.5 KiB, free 741.5 MiB)
+26/11/03 04:05:25 INFO TorrentBroadcast: Reading broadcast variable 1 took 56 ms
+26/11/03 04:05:25 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 462.9 KiB, free 741.1 MiB)
+26/11/03 04:05:25 INFO Executor: Finished task 3.0 in stage 2.0 (TID 5). 1746 bytes result sent to driver
+26/11/03 04:05:25 INFO CodecPool: Got brand-new decompressor [.snappy]
+26/11/03 04:05:25 INFO MemoryStore: Block taskresult_2 stored as bytes in memory (estimated size 8.9 MiB, free 732.2 MiB)
+26/11/03 04:05:25 INFO Executor: Finished task 0.0 in stage 2.0 (TID 2). 9285360 bytes result sent via BlockManager)
+26/11/03 04:05:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 6
+26/11/03 04:05:31 INFO Executor: Running task 0.0 in stage 3.0 (TID 6)
+26/11/03 04:05:31 INFO TorrentBroadcast: Started reading broadcast variable 5 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:31 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 6.7 KiB, free 741.1 MiB)
+26/11/03 04:05:31 INFO TorrentBroadcast: Reading broadcast variable 5 took 46 ms
+26/11/03 04:05:31 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 15.8 KiB, free 741.1 MiB)
+26/11/03 04:05:31 INFO CodeGenerator: Code generated in 37.176516 ms
+26/11/03 04:05:31 INFO BaseAllocator: Debug mode disabled.
+26/11/03 04:05:31 INFO DefaultAllocationManagerOption: allocation manager type not specified, using netty as the default type
+26/11/03 04:05:31 INFO CheckAllocator: Using DefaultAllocationManager at memory-netty-12.0.1.jar!/org/apache/arrow/memory/DefaultAllocationManagerFactory.class
+26/11/03 04:05:31 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-03/part-00032-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 0-4194304, partition values: [20729]
+26/11/03 04:05:31 INFO TorrentBroadcast: Started reading broadcast variable 4 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:31 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 39.5 KiB, free 741.0 MiB)
+26/11/03 04:05:31 INFO TorrentBroadcast: Reading broadcast variable 4 took 17 ms
+26/11/03 04:05:31 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 462.9 KiB, free 740.6 MiB)
+26/11/03 04:05:31 INFO Executor: Finished task 0.0 in stage 3.0 (TID 6). 1508 bytes result sent to driver
+26/11/03 04:05:32 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 9
+26/11/03 04:05:32 INFO Executor: Running task 0.0 in stage 4.0 (TID 9)
+26/11/03 04:05:32 INFO TorrentBroadcast: Started reading broadcast variable 7 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:32 INFO MemoryStore: Block broadcast_7_piece0 stored as bytes in memory (estimated size 8.0 KiB, free 740.6 MiB)
+26/11/03 04:05:32 INFO TorrentBroadcast: Reading broadcast variable 7 took 33 ms
+26/11/03 04:05:32 INFO MemoryStore: Block broadcast_7 stored as values in memory (estimated size 17.7 KiB, free 740.6 MiB)
+26/11/03 04:05:33 INFO CodeGenerator: Code generated in 33.708114 ms
+26/11/03 04:05:33 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-01/part-00010-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 0-4194304, partition values: [20727]
+26/11/03 04:05:33 INFO TorrentBroadcast: Started reading broadcast variable 6 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:33 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:41433 after 1 ms (0 ms spent in bootstraps)
+26/11/03 04:05:33 INFO MemoryStore: Block broadcast_6_piece0 stored as bytes in memory (estimated size 39.4 KiB, free 740.5 MiB)
+26/11/03 04:05:33 INFO TorrentBroadcast: Reading broadcast variable 6 took 51 ms
+26/11/03 04:05:33 INFO MemoryStore: Block broadcast_6 stored as values in memory (estimated size 462.9 KiB, free 740.1 MiB)
+26/11/03 04:05:33 INFO Executor: Finished task 0.0 in stage 4.0 (TID 9). 2128 bytes result sent to driver
+26/11/03 04:05:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 13
+26/11/03 04:05:36 INFO Executor: Running task 0.0 in stage 7.0 (TID 13)
+26/11/03 04:05:36 INFO MapOutputTrackerWorker: Updating epoch to 1 and clearing cache
+26/11/03 04:05:36 INFO TorrentBroadcast: Started reading broadcast variable 10 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:36 INFO MemoryStore: Block broadcast_10_piece0 stored as bytes in memory (estimated size 8.0 KiB, free 740.1 MiB)
+26/11/03 04:05:36 INFO TorrentBroadcast: Reading broadcast variable 10 took 60 ms
+26/11/03 04:05:36 INFO MemoryStore: Block broadcast_10 stored as values in memory (estimated size 17.7 KiB, free 740.1 MiB)
+26/11/03 04:05:36 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-02/part-00018-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 0-4194304, partition values: [20728]
+26/11/03 04:05:36 INFO TorrentBroadcast: Started reading broadcast variable 9 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:36 INFO MemoryStore: Block broadcast_9_piece0 stored as bytes in memory (estimated size 39.4 KiB, free 740.1 MiB)
+26/11/03 04:05:37 INFO TorrentBroadcast: Reading broadcast variable 9 took 20 ms
+26/11/03 04:05:37 INFO MemoryStore: Block broadcast_9 stored as values in memory (estimated size 462.9 KiB, free 739.6 MiB)
+26/11/03 04:05:37 INFO Executor: Finished task 0.0 in stage 7.0 (TID 13). 2085 bytes result sent to driver
+26/11/03 04:05:40 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 18
+26/11/03 04:05:40 INFO Executor: Running task 1.0 in stage 10.0 (TID 18)
+26/11/03 04:05:40 INFO MapOutputTrackerWorker: Updating epoch to 2 and clearing cache
+26/11/03 04:05:40 INFO TorrentBroadcast: Started reading broadcast variable 13 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:40 INFO MemoryStore: Block broadcast_13_piece0 stored as bytes in memory (estimated size 8.0 KiB, free 739.6 MiB)
+26/11/03 04:05:40 INFO TorrentBroadcast: Reading broadcast variable 13 took 41 ms
+26/11/03 04:05:40 INFO MemoryStore: Block broadcast_13 stored as values in memory (estimated size 17.7 KiB, free 739.6 MiB)
+26/11/03 04:05:40 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-03/part-00032-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 4194304-8388608, partition values: [20729]
+26/11/03 04:05:40 INFO TorrentBroadcast: Started reading broadcast variable 12 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:40 INFO MemoryStore: Block broadcast_12_piece0 stored as bytes in memory (estimated size 39.4 KiB, free 739.5 MiB)
+26/11/03 04:05:40 INFO TorrentBroadcast: Reading broadcast variable 12 took 46 ms
+26/11/03 04:05:40 INFO MemoryStore: Block broadcast_12 stored as values in memory (estimated size 462.9 KiB, free 739.1 MiB)
+26/11/03 04:05:40 INFO Executor: Finished task 1.0 in stage 10.0 (TID 18). 2128 bytes result sent to driver
+26/11/03 04:05:40 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 20
+26/11/03 04:05:40 INFO Executor: Running task 0.0 in stage 12.0 (TID 20)
+26/11/03 04:05:40 INFO MapOutputTrackerWorker: Updating epoch to 3 and clearing cache
+26/11/03 04:05:40 INFO TorrentBroadcast: Started reading broadcast variable 14 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:40 INFO MemoryStore: Block broadcast_14_piece0 stored as bytes in memory (estimated size 6.0 KiB, free 739.1 MiB)
+26/11/03 04:05:40 INFO TorrentBroadcast: Reading broadcast variable 14 took 15 ms
+26/11/03 04:05:40 INFO MemoryStore: Block broadcast_14 stored as values in memory (estimated size 12.5 KiB, free 739.1 MiB)
+26/11/03 04:05:40 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 2, fetching them
+26/11/03 04:05:40 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:40907)
+26/11/03 04:05:40 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/03 04:05:40 INFO ShuffleBlockFetcherIterator: Getting 3 (180.0 B) non-empty blocks including 1 (60.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 2 (120.0 B) remote blocks
+26/11/03 04:05:40 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 25 ms
+26/11/03 04:05:40 INFO CodeGenerator: Code generated in 23.714689 ms
+26/11/03 04:05:40 INFO Executor: Finished task 0.0 in stage 12.0 (TID 20). 3995 bytes result sent to driver
+26/11/03 04:05:44 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 23
+26/11/03 04:05:44 INFO Executor: Running task 2.0 in stage 13.0 (TID 23)
+26/11/03 04:05:44 INFO TorrentBroadcast: Started reading broadcast variable 16 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:44 INFO MemoryStore: Block broadcast_16_piece0 stored as bytes in memory (estimated size 8.0 KiB, free 739.1 MiB)
+26/11/03 04:05:44 INFO TorrentBroadcast: Reading broadcast variable 16 took 19 ms
+26/11/03 04:05:44 INFO MemoryStore: Block broadcast_16 stored as values in memory (estimated size 17.7 KiB, free 739.1 MiB)
+26/11/03 04:05:44 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-04/part-00038-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 8388608-11007183, partition values: [20730]
+26/11/03 04:05:44 INFO TorrentBroadcast: Started reading broadcast variable 15 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:44 INFO MemoryStore: Block broadcast_15_piece0 stored as bytes in memory (estimated size 39.4 KiB, free 739.0 MiB)
+26/11/03 04:05:44 INFO TorrentBroadcast: Reading broadcast variable 15 took 16 ms
+26/11/03 04:05:44 INFO MemoryStore: Block broadcast_15 stored as values in memory (estimated size 462.9 KiB, free 738.6 MiB)
+26/11/03 04:05:44 INFO Executor: Finished task 2.0 in stage 13.0 (TID 23). 2085 bytes result sent to driver
+26/11/03 04:05:47 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 27
+26/11/03 04:05:47 INFO Executor: Running task 2.0 in stage 16.0 (TID 27)
+26/11/03 04:05:47 INFO MapOutputTrackerWorker: Updating epoch to 4 and clearing cache
+26/11/03 04:05:47 INFO TorrentBroadcast: Started reading broadcast variable 19 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:47 INFO MemoryStore: Block broadcast_19_piece0 stored as bytes in memory (estimated size 8.0 KiB, free 738.6 MiB)
+26/11/03 04:05:47 INFO TorrentBroadcast: Reading broadcast variable 19 took 22 ms
+26/11/03 04:05:47 INFO MemoryStore: Block broadcast_19 stored as values in memory (estimated size 17.7 KiB, free 738.5 MiB)
+26/11/03 04:05:47 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/orders/dt=2026-10-05/part-00004-1cca8fd6-b6cd-4e3d-acba-0445351bbc53.c000.snappy.parquet, range: 8388608-11007029, partition values: [20731]
+26/11/03 04:05:47 INFO TorrentBroadcast: Started reading broadcast variable 18 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:47 INFO MemoryStore: Block broadcast_18_piece0 stored as bytes in memory (estimated size 39.4 KiB, free 738.5 MiB)
+26/11/03 04:05:47 INFO TorrentBroadcast: Reading broadcast variable 18 took 27 ms
+26/11/03 04:05:47 INFO MemoryStore: Block broadcast_18 stored as values in memory (estimated size 462.9 KiB, free 738.0 MiB)
+26/11/03 04:05:47 INFO Executor: Finished task 2.0 in stage 16.0 (TID 27). 2128 bytes result sent to driver
+26/11/03 04:05:51 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 30
+26/11/03 04:05:51 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 33
+26/11/03 04:05:51 INFO Executor: Running task 3.0 in stage 20.0 (TID 33)
+26/11/03 04:05:51 INFO Executor: Running task 0.0 in stage 20.0 (TID 30)
+26/11/03 04:05:51 INFO MapOutputTrackerWorker: Updating epoch to 5 and clearing cache
+26/11/03 04:05:51 INFO TorrentBroadcast: Started reading broadcast variable 23 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:51 INFO MemoryStore: Block broadcast_23_piece0 stored as bytes in memory (estimated size 17.6 KiB, free 738.0 MiB)
+26/11/03 04:05:51 INFO TorrentBroadcast: Reading broadcast variable 23 took 40 ms
+26/11/03 04:05:51 INFO MemoryStore: Block broadcast_23 stored as values in memory (estimated size 39.0 KiB, free 738.0 MiB)
+26/11/03 04:05:51 INFO CodeGenerator: Code generated in 181.680071 ms
+26/11/03 04:05:51 INFO CodeGenerator: Code generated in 16.043881 ms
+26/11/03 04:05:51 INFO CodeGenerator: Code generated in 14.808999 ms
+26/11/03 04:05:51 INFO CodeGenerator: Code generated in 23.067222 ms
+26/11/03 04:05:52 INFO CodeGenerator: Code generated in 47.430985 ms
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00184-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1187, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00153-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO TorrentBroadcast: Started reading broadcast variable 22 with 1 pieces (estimated total size 4.0 MiB)
+26/11/03 04:05:52 INFO MemoryStore: Block broadcast_22_piece0 stored as bytes in memory (estimated size 39.5 KiB, free 705.5 MiB)
+26/11/03 04:05:52 INFO TorrentBroadcast: Reading broadcast variable 22 took 132 ms
+26/11/03 04:05:52 INFO MemoryStore: Block broadcast_22 stored as values in memory (estimated size 462.9 KiB, free 705.0 MiB)
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00154-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00028-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00158-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00061-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00163-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00122-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00166-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00235-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00168-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00171-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00245-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00307-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00176-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00450-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00179-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO CodecPool: Got brand-new decompressor [.snappy]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00181-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00501-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00555-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1186, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00186-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00189-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00002-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00194-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00005-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00030-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00197-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00033-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00199-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00202-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00084-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00204-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:52 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00107-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00156-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00207-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00209-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00253-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00212-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00258-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00214-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00286-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00215-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00332-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00217-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00337-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00218-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00343-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00220-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00222-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00368-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00371-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00224-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00225-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00394-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00399-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00227-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00401-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00230-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00422-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00232-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00430-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00238-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00432-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO Executor: Finished task 3.0 in stage 20.0 (TID 33). 2829 bytes result sent to driver
+26/11/03 04:05:53 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 37
+26/11/03 04:05:53 INFO Executor: Running task 7.0 in stage 20.0 (TID 37)
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00445-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1185, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00491-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00492-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00494-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO Executor: Finished task 0.0 in stage 20.0 (TID 30). 2829 bytes result sent to driver
+26/11/03 04:05:53 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 40
+26/11/03 04:05:53 INFO Executor: Running task 10.0 in stage 20.0 (TID 40)
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00495-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:53 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00496-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00080-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00499-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00504-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00082-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00083-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00507-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00086-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00509-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00512-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00088-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00093-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00514-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00095-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00517-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00098-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00519-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00100-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00522-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00103-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00105-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00527-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00532-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00106-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00108-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00535-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00537-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00109-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00540-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00111-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00113-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00542-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00114-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00545-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00116-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:54 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00547-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00118-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00550-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00119-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00123-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00551-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00126-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00552-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00127-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00554-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00558-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00128-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00560-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00563-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00129-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00565-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00568-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00570-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1184, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00132-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO Executor: Finished task 7.0 in stage 20.0 (TID 37). 2829 bytes result sent to driver
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00134-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 44
+26/11/03 04:05:55 INFO Executor: Running task 14.0 in stage 20.0 (TID 44)
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00136-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00344-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00137-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00139-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00142-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00346-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00144-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00347-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO Executor: Finished task 10.0 in stage 20.0 (TID 40). 2829 bytes result sent to driver
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00349-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 46
+26/11/03 04:05:55 INFO Executor: Running task 16.0 in stage 20.0 (TID 46)
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00351-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00352-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00479-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00356-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00480-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00357-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00359-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00482-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00361-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:55 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00484-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00362-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00485-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00364-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00487-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00367-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00489-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00370-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00490-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00374-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00497-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00375-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00498-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00379-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00500-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00380-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00383-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00502-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00385-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00503-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00387-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00390-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00505-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00508-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00392-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00393-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00510-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00511-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00395-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00513-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00397-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00515-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00398-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00402-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00518-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00403-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00520-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00406-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00408-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00521-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00410-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00523-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO Executor: Finished task 14.0 in stage 20.0 (TID 44). 2829 bytes result sent to driver
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00525-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00526-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00528-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00530-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00531-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00533-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00534-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00536-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/events_small_files/part-00538-4f6bba47-fb65-4cea-84a4-3738108514ee-c000.snappy.parquet, range: 0-1182, partition values: [empty row]
+26/11/03 04:05:56 INFO Executor: Finished task 16.0 in stage 20.0 (TID 46). 2829 bytes result sent to driver
+26/11/03 04:05:57 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/03 04:05:57 INFO MemoryStore: MemoryStore cleared
+26/11/03 04:05:57 INFO BlockManager: BlockManager stopped
+26/11/03 04:05:57 INFO ShutdownHookManager: Shutdown hook called

@@ -1,0 +1,70 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/03 04:04:12 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 23940@vm
+26/11/03 04:04:12 INFO SignalUtils: Registering signal handler for TERM
+26/11/03 04:04:12 INFO SignalUtils: Registering signal handler for HUP
+26/11/03 04:04:12 INFO SignalUtils: Registering signal handler for INT
+26/11/03 04:04:12 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/03 04:04:12 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/03 04:04:13 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/03 04:04:13 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:04:13 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:04:13 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:04:13 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:04:13 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:04:14 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:36349 after 169 ms (0 ms spent in bootstraps)
+26/11/03 04:04:14 INFO SecurityManager: Changing view acls to: root
+26/11/03 04:04:14 INFO SecurityManager: Changing modify acls to: root
+26/11/03 04:04:14 INFO SecurityManager: Changing view acls groups to: 
+26/11/03 04:04:14 INFO SecurityManager: Changing modify acls groups to: 
+26/11/03 04:04:14 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/03 04:04:14 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:36349 after 9 ms (0 ms spent in bootstraps)
+26/11/03 04:04:14 INFO TransportClientFactory: Found inactive connection to /192.0.2.2:36349, creating a new one.
+Exception in thread "main" java.lang.reflect.UndeclaredThrowableException
+	at org.apache.hadoop.security.UserGroupInformation.doAs(UserGroupInformation.java:1894)
+	at org.apache.spark.deploy.SparkHadoopUtil.runAsSparkUser(SparkHadoopUtil.scala:61)
+	at org.apache.spark.executor.CoarseGrainedExecutorBackend$.run(CoarseGrainedExecutorBackend.scala:429)
+	at org.apache.spark.executor.YarnCoarseGrainedExecutorBackend$.main(YarnCoarseGrainedExecutorBackend.scala:83)
+	at org.apache.spark.executor.YarnCoarseGrainedExecutorBackend.main(YarnCoarseGrainedExecutorBackend.scala)
+Caused by: org.apache.spark.SparkException: Exception thrown in awaitResult: 
+	at org.apache.spark.util.SparkThreadUtils$.awaitResult(SparkThreadUtils.scala:56)
+	at org.apache.spark.util.ThreadUtils$.awaitResult(ThreadUtils.scala:310)
+	at org.apache.spark.rpc.RpcTimeout.awaitResult(RpcTimeout.scala:75)
+	at org.apache.spark.rpc.RpcEnv.setupEndpointRefByURI(RpcEnv.scala:102)
+	at org.apache.spark.rpc.RpcEnv.setupEndpointRef(RpcEnv.scala:110)
+	at org.apache.spark.util.RpcUtils$.makeDriverRef(RpcUtils.scala:36)
+	at org.apache.spark.SparkEnv$.registerOrLookupEndpoint$1(SparkEnv.scala:292)
+	at org.apache.spark.SparkEnv$.create(SparkEnv.scala:339)
+	at org.apache.spark.SparkEnv$.createExecutorEnv(SparkEnv.scala:210)
+	at org.apache.spark.executor.CoarseGrainedExecutorBackend$.$anonfun$run$7(CoarseGrainedExecutorBackend.scala:499)
+	at org.apache.spark.deploy.SparkHadoopUtil$$anon$1.run(SparkHadoopUtil.scala:62)
+	at org.apache.spark.deploy.SparkHadoopUtil$$anon$1.run(SparkHadoopUtil.scala:61)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:712)
+	at java.base/javax.security.auth.Subject.doAs(Subject.java:439)
+	at org.apache.hadoop.security.UserGroupInformation.doAs(UserGroupInformation.java:1878)
+	... 4 more
+Caused by: java.io.IOException: Failed to connect to /192.0.2.2:36349
+	at org.apache.spark.network.client.TransportClientFactory.createClient(TransportClientFactory.java:294)
+	at org.apache.spark.network.client.TransportClientFactory.createClient(TransportClientFactory.java:214)
+	at org.apache.spark.network.client.TransportClientFactory.createClient(TransportClientFactory.java:226)
+	at org.apache.spark.rpc.netty.NettyRpcEnv.createClient(NettyRpcEnv.scala:204)
+	at org.apache.spark.rpc.netty.Outbox$$anon$1.call(Outbox.scala:202)
+	at org.apache.spark.rpc.netty.Outbox$$anon$1.call(Outbox.scala:198)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: /192.0.2.2:36349
+Caused by: java.net.ConnectException: Connection refused
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:684)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:946)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:337)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:334)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:776)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:840)
