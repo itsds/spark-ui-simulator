@@ -83,6 +83,9 @@ class OpTrace:
     node: object = None  # the physical plan node (SQL metrics)
     cpu_ns: float = 0.0  # this operator's CPU work, before host speed / noise / GC
     mem: float = 0.0  # execution memory it holds (sort pages, hash map)
+    spill: float = 0.0  # bytes of that memory it spilled to disk (Spill (Memory) share)
+    spill_ms: float = 0.0  # writing and reading back its spill files
+    spill_cpu_ns: float = 0.0  # serializing + compressing what it spilled (CPU, before host speed / noise / GC)
 
 
 @dataclass
@@ -152,7 +155,8 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
     ex = env.executor
     host = ex.host
     noise = lognormal(rng, cal.TASK_NOISE_SIGMA)
-    io_speed = math.sqrt(host.speed)
+    io_speed = host.disk_speed  # local disks
+    net = host.net_factor  # its NIC (1.0 unless the node is degraded)
     page = page_size(ex.heap_bytes, ex.cores)
     trace: list[OpTrace] = []
 
@@ -175,7 +179,8 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
             nbytes = round(part.data_bytes * src.dataset.read_fraction) + len(part.files) * cal.PARQUET_FOOTER_READ
             rows = part.rows
             m.input = InputMetrics(nbytes, rows)
-            mbps = cal.HDFS_READ_MBPS[env.data_locality] * io_speed
+            remote = env.data_locality != "NODE_LOCAL"  # through a DataNode over the network
+            mbps = cal.HDFS_READ_MBPS[env.data_locality] * io_speed * (net if remote else 1.0)
             src_io = nbytes / (mbps * MiB) * 1e3 + len(part.files) * cal.HDFS_READ_OPEN_MS
             src_cpu = nbytes * cal.PARQUET_DECODE_NS_PER_BYTE + rows * cal.SCAN_NS_PER_ROW
             io_ms += src_io
@@ -198,7 +203,7 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
             sr = SourceRead(src.node, st.records, src_cpu, src_io, stats=st)
             if st.remote_blocks:
                 requests = max(st.remote_hosts, math.ceil(st.remote_blocks / cal.SHUFFLE_BLOCKS_PER_REQUEST))
-                transfer = st.remote_bytes / (cal.SHUFFLE_REMOTE_MBPS * MiB) * 1e3
+                transfer = st.remote_bytes / (cal.SHUFFLE_REMOTE_MBPS * net * MiB) * 1e3
                 latency = requests * cal.SHUFFLE_REQUEST_LATENCY_MS / 5  # up to 5 requests in flight
                 fetch_wait_ms += transfer * (1 - cal.SHUFFLE_FETCH_OVERLAP) + latency
                 reqs = round((transfer * 3 + requests * cal.SHUFFLE_REQUEST_LATENCY_MS) * lognormal(rng, 0.2))
@@ -211,17 +216,20 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
 
     # ---------------------------------------------------------------- operators
     mem_side = 0.0
+    side_ix: list[int] = []  # trace entries of the operators below the join (they hold memory together)
     for i, (rows, rb) in enumerate(sides):
         for op in (spec.side_ops[i] if i < len(spec.side_ops) else ()):
             out = _apply(op, rows, None, ctx, plan)
             cpu_ns += rows * op.ns_per_row
             mem = _op_memory(op, rows, out, rb, page)
             mem_side += mem
+            side_ix.append(len(trace))
             trace.append(OpTrace(op.kind, rows, out, op.node, rows * op.ns_per_row, mem))
             rows, rb = out, op.out_row_bytes or rb
         sides[i] = (rows, rb)
     rows, rb = sides[0]
     mem_after = 0.0
+    after_ix: list[int] = []
     for op in spec.ops:
         if op.kind == "smj":
             right_rows = sum(r for r, _ in sides[1:])
@@ -234,21 +242,30 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
         cpu_ns += rows * op.ns_per_row
         mem = _op_memory(op, rows, out, rb, page)
         mem_after = max(mem_after, mem)
+        after_ix.append(len(trace))
         trace.append(OpTrace(op.kind, rows, out, op.node, rows * op.ns_per_row, mem))
         rows, rb = out, op.out_row_bytes or rb
     mem_need = max(mem_side, mem_after)
 
     # ---------------------------------------------------------------- spill (sort / aggregation over the task's share)
-    spill_ms = 0.0
     exec_mem = mem_need
     spill_op = None
+    spill_ms = 0.0
     if mem_need > env.memory_per_task:
-        spill_op = max(range(len(trace)), key=lambda i: trace[i].mem) if trace else None
-        spilled = mem_need - env.memory_per_task * 0.5
+        # The sorts below a join fill up together; each operator after the join on its own.
+        _spill_group(trace, side_ix, env.memory_per_task)
+        for i in after_ix:
+            _spill_group(trace, [i], env.memory_per_task)
+        spilled = sum(t.spill for t in trace)
         m.memory_bytes_spilled = round(spilled)
         m.disk_bytes_spilled = round(spilled * cal.LZ4_SHUFFLE_RATIO)
-        spill_ms = m.disk_bytes_spilled / (cal.SHUFFLE_DISK_WRITE_MBPS * io_speed * MiB) * 1e3 * 2
-        cpu_ns += spilled * cal.SHUFFLE_SERIALIZE_NS_PER_BYTE * 0.6
+        rate = cal.SHUFFLE_DISK_WRITE_MBPS * io_speed * MiB
+        for t in trace:  # write the spill files, read them back for the merge
+            t.spill_ms = t.spill * cal.LZ4_SHUFFLE_RATIO / rate * 1e3 * 2
+            t.spill_cpu_ns = t.spill * cal.SHUFFLE_SERIALIZE_NS_PER_BYTE * 0.6
+        spill_ms = sum(t.spill_ms for t in trace)
+        spill_op = max(range(len(trace)), key=lambda i: trace[i].spill)
+        cpu_ns += sum(t.spill_cpu_ns for t in trace)
         exec_mem = env.memory_per_task
     m.peak_execution_memory = round(exec_mem)
 
@@ -277,7 +294,7 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
         sink_cpu = rows * cal.PARQUET_ENCODE_NS_PER_ROW + nbytes * cal.PARQUET_ENCODE_NS_PER_BYTE
         cpu_ns += sink_cpu
         commit_ms = cal.TASK_COMMIT_MS * lognormal(rng, 0.3)
-        write_ms += nbytes / (cal.HDFS_WRITE_MBPS * io_speed * MiB) * 1e3 + commit_ms
+        write_ms += nbytes / (cal.HDFS_WRITE_MBPS * io_speed * net * MiB) * 1e3 + commit_ms  # 3-replica pipeline
         m.output = OutputMetrics(nbytes, rows)
         output_file = (nbytes, rows) if rows else None
         result_bytes += 3_900 + rng.randint(0, 600)  # WriteTaskResult: commit message + written file stats
@@ -287,7 +304,7 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
         result_bytes += round(rows * sink.bytes_per_row)
 
     # ---------------------------------------------------------------- time
-    cpu_ms = cpu_ns / 1e6 / host.speed * noise
+    cpu_ms = cpu_ns / 1e6 / host.cpu_speed * noise
     compile_ms = 0.0
     if env.first_on_executor:
         compile_ms = cal.CODEGEN_COMPILE_MS * lognormal(rng, 0.3)
@@ -300,7 +317,7 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
     compute_ms = cpu_ms + compile_ms + gc_ms
     # Remote fetches overlap computation; whatever doesn't fit behind it is exposed as fetch wait.
     if fetch_wait_ms:
-        transfer_left = (rd.remote_bytes_read / (cal.SHUFFLE_REMOTE_MBPS * MiB) * 1e3) - compute_ms
+        transfer_left = (rd.remote_bytes_read / (cal.SHUFFLE_REMOTE_MBPS * net * MiB) * 1e3) - compute_ms
         fetch_wait_ms = max(fetch_wait_ms, transfer_left) * lognormal(rng, 0.25)
         rd.fetch_wait_time = round(fetch_wait_ms)
     run_ms = compute_ms + io_ms + fetch_wait_ms + write_ms + spill_ms
@@ -334,6 +351,22 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
                 sr.fetch_wait_ms = round(rd.fetch_wait_time * sr.stats.remote_bytes / rd.remote_bytes_read)
     return TaskResult(m, deser_ms, run, ser_ms, sched_ms, round(exec_mem), fetching, output_file,
                       rows, trace, sources, wall_per_cpu, sink_rows, sink_rb, sink_cpu, commit_ms, spill_op, spill_ms)
+
+
+def _spill_group(trace: list[OpTrace], ix: list[int], available: float) -> None:
+    """Memory consumers that hold memory at the same time, with `available` bytes for the task.
+
+    UnsafeExternalSorter / the aggregation map spill when they can't get another page; TaskMemoryManager
+    spills the biggest consumer first. A consumer that spills keeps on average half the task's memory
+    for its last, in-memory run, so a single consumer of M > A spills M - A/2.
+    """
+    remaining = sum(trace[i].mem for i in ix)
+    for i in sorted(ix, key=lambda i: -trace[i].mem):
+        if remaining <= available:
+            break
+        x = min(trace[i].mem, remaining - 0.5 * available)
+        trace[i].spill = x
+        remaining -= x
 
 
 def _apply(op: Op, rows: int, row_bytes, ctx: StageContext, plan: TaskPlan) -> int:

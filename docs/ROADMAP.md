@@ -13,7 +13,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 3 | Cluster, cost model, scheduler → Scenario 00 at production scale | ✅ |
 | 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ✅ |
 | 5 | YARN realism: IDs, containers, executor logs, Environment tab | ✅ |
-| 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ⬜ |
+| 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ✅ |
 | 7 | Scenario portal + one-command startup | ⬜ |
 | 8+ | Scenario library (one or two scenarios per session) | ⬜ |
 
@@ -118,14 +118,26 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
   tasks the REST API shows for that executor; screenshots of the Executors tab, a log page and the
   Environment tab reviewed)
 
-## Phase 6 — Scenario DSL + fault injection → Scenario 01 (join skew)
+## Phase 6 — Scenario DSL + fault injection → Scenario 01 (join skew) ✅
 
-- [ ] `scenario.yaml` schema (pydantic) and validator
-- [ ] Fault mechanisms: key distributions (hot keys, Zipf), config faults, node faults, memory pressure, failures
-- [ ] Generator emits "last good run" + "bad run" per scenario (ADR-006)
-- [ ] Scenario 01: ticket, hints, solution; skew comes **only** from the key distribution
-- [ ] Solution-evidence test: the numbers quoted in `solution.md` are asserted via the HS REST API
-- **Done when:** Scenario 01 can be investigated end to end in HS, and its evidence test passes.
+- [x] `scenario.yaml` schema (pydantic) and validator: job (workload, cluster, executors, `--conf`) + runs
+      (`baseline`, or `last_good` + `incident` with params, data overrides and faults); `sparksim validate`
+      also builds every run against its workload (datasets, key columns, params). Workloads are Python
+      (`apps/<module>.py: WORKLOAD`); Scenario 00 moved to YAML byte for byte (ADR-026)
+- [x] Fault mechanisms, each tested on a scaled Scenario 00 (`tests/test_faults.py`, ADR-029): key
+      distributions (hot keys in Spark's Murmur3 partition, Zipf; ADR-027), config (`--conf` set/unset,
+      executor sizing; the engine reads the broadcast threshold and AQE coalescing settings), node faults
+      (CPU/disk/NIC factors), memory pressure (native memory per task → pmem kills), failures (SIGKILL →
+      exit 137 → ExecutorLostFailure). Spill is per operator now (ADR-028). AQE skew join on + a skewed join
+      partition is refused (not modelled yet) instead of faked
+- [x] Generator emits "last good run" + "bad run" per scenario (ADR-006): `sparksim generate 01-join-skew`
+- [x] Scenario 01: ticket, hints, solution; skew comes **only** from the key distribution (+15 % events,
+      13 % of them with `customer_id = -1`; the last good run is Scenario 00's run; ADR-030)
+- [x] Solution-evidence test: the 17 numbers quoted in `solution.md` (both runs, SQL tab, the straggler's
+      container log) are asserted via the HS REST API (`tests/test_scenario01_hs.py`)
+- **Done when:** Scenario 01 can be investigated end to end in HS, and its evidence test passes. ✅
+  (checked in HS 3.5.9: application list, Jobs timeline with the 1.5 h job, stage 5 summary metrics /
+  task table / timeline / aggregated by executor, SQL plan metrics, Environment, executor 40's stderr)
 
 ## Phase 7 — Portal + one-command startup
 

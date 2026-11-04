@@ -1,0 +1,38 @@
+# Scenario 00: a normal night of the clickstream enrichment. Onboarding: learn what healthy looks like.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 00-healthy-baseline
+id: 00-healthy-baseline
+title: "Before your first on-call shift: learn the healthy baseline"
+difficulty: intro
+topics: [Jobs and stages, AQE, SQL tab, locality, executor logs]
+summary: >-
+  Last night's clickstream enrichment ran fine. Open it in the History Server and write down its
+  baseline (runtime, stages, task spread, shuffle, plans), so you can tell what changed the next
+  time it pages you.
+
+job:
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377          # the active RM (rm1) started 2026-10-13
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23                              # work-preserving RM restarts since then
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # spark-submit --conf, in this order
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false   # in the job's spark-submit since its Spark 3.0 migration
+
+runs:
+  baseline:
+    label: "Nightly run of 2026-11-03 (dt=2026-11-02)"
+    app_seq: 48213
+    seed: 20261102
+    started_at: "2026-11-03T02:10:07.318Z"
+    params: {dt: "2026-11-02"}

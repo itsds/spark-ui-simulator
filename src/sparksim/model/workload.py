@@ -32,6 +32,14 @@ from ..cost import calibration as cal
 
 
 @dataclass(frozen=True)
+class HotKey:
+    """One key value that holds a fixed share of the rows (a sentinel like `customer_id = -1`, a bot)."""
+
+    value: tuple  # one value per key column, e.g. (-1,) or ("2026-11-03", -1)
+    share: float  # share of the shuffled rows that carry this key
+
+
+@dataclass(frozen=True)
 class KeySpace:
     """The values of a key column that data is hash-partitioned or grouped on.
 
@@ -39,11 +47,31 @@ class KeySpace:
     `freq_cv`: coefficient of variation of rows per key (0 = every key has the
     same number of rows). It widens the spread of hash-partition sizes:
     relative std ≈ sqrt(R / distinct * (1 + cv²)).
+
+    Skewed keys (fault injection, `sparksim.scenario.faults`):
+
+    * `hot`: explicit heavy hitters. Each lands in the partition Spark's
+      `pmod(Murmur3Hash(key, 42), n)` gives its value (`dtypes` are the key
+      columns' SQL types), with its share of the rows.
+    * `zipf`: rows per key follow a Zipf law with this exponent over the other
+      keys (replaces `freq_cv`): the top ranks are placed one by one, the tail's
+      spread follows from the law's second moment.
     """
 
     name: str
     distinct: int
     freq_cv: float = 1.0
+    dtypes: tuple[str, ...] = ("bigint",)
+    hot: tuple[HotKey, ...] = ()
+    zipf: float = 0.0
+
+    @property
+    def skewed(self) -> bool:
+        return bool(self.hot) or self.zipf > 0
+
+    @property
+    def hot_share(self) -> float:
+        return sum(h.share for h in self.hot)
 
 
 def expected_distinct(groups: int, rows: int) -> int:

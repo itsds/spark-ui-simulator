@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..rng import numpy_rng
+from .murmur3 import partition_id
 from .workload import KeySpace
 
 MiB = 1024 * 1024
@@ -36,12 +37,72 @@ def key_shares(key: KeySpace, num_partitions: int, seed: int) -> np.ndarray:
 
 
 def row_shares(key: KeySpace, num_partitions: int, seed: int) -> np.ndarray:
-    """Share of the rows that hash to each partition: key shares widened by uneven rows per key."""
-    base = key_shares(key, num_partitions, seed)
-    rng = numpy_rng(seed, f"rows/{key.name}/{num_partitions}")
-    rel = math.sqrt(num_partitions / max(1, key.distinct)) * key.freq_cv
-    w = base * _gamma_spread(rng, rel, num_partitions)
-    return w / w.sum()
+    """Share of the rows that hash to each partition: key shares widened by uneven rows per key,
+    plus the key's heavy hitters (hot keys, Zipf head) in the partitions their values hash to."""
+    return row_shares_split(key, num_partitions, seed)[0]
+
+
+def row_shares_split(key: KeySpace, num_partitions: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """(row shares, the tail's shares alone). The tail (every key but the heavy hitters) is what a
+    partition's share of the *distinct* keys follows; files written from it are clustered on that share."""
+    n = num_partitions
+    base = key_shares(key, n, seed)
+    rng = numpy_rng(seed, f"rows/{key.name}/{n}")
+    head = np.zeros(n)
+    cv = key.freq_cv
+    if key.skewed:
+        for hk in key.hot:
+            head[partition_id(hk.value, key.dtypes, n)] += hk.share
+        if key.zipf > 0:
+            zh, cv = _zipf_head(key, n, seed)
+            head += zh
+    rel = math.sqrt(n / max(1, key.distinct)) * cv
+    w = base * _gamma_spread(rng, rel, n)
+    tail = w / w.sum()
+    if not key.skewed:
+        return tail, tail
+    return tail * (1.0 - head.sum()) + head, tail
+
+
+# Zipf ranks placed one by one; the rest is summarized by its second moment.
+ZIPF_EXPLICIT_RANKS = 4096
+
+
+def _power_sum(a: int, b: int, t: float) -> float:
+    """sum_{k=a}^{b} k^-t: exact up to ZIPF_EXPLICIT_RANKS, then the midpoint integral."""
+    if b < a:
+        return 0.0
+    exact_to = min(b, ZIPF_EXPLICIT_RANKS)
+    total = float(np.sum(np.arange(a, exact_to + 1, dtype=float) ** -t)) if exact_to >= a else 0.0
+    lo = max(a, exact_to + 1)
+    if lo <= b:
+        x0, x1 = lo - 0.5, b + 0.5
+        total += math.log(x1 / x0) if abs(t - 1.0) < 1e-12 else (x1 ** (1 - t) - x0 ** (1 - t)) / (1 - t)
+    return total
+
+
+def _zipf_head(key: KeySpace, n: int, seed: int) -> tuple[np.ndarray, float]:
+    """Rows of the top Zipf ranks per partition, and the rows-per-key CV of the remaining tail.
+
+    p_k = k^-s / H(N, s) of the rows not taken by explicit hot keys. A rank's partition is the pmod of a
+    seeded 32-bit hash (its value is unknown), so the same key lands in the same partition for any n.
+    """
+    s = key.zipf
+    keys = max(1, key.distinct - len(key.hot))
+    mass = 1.0 - key.hot_share
+    h_all = _power_sum(1, keys, s)
+    k_top = min(keys, ZIPF_EXPLICIT_RANKS)
+    ranks = np.arange(1, k_top + 1, dtype=float)
+    p = ranks ** -s / h_all * mass
+    hashes = numpy_rng(seed, f"zipf/{key.name}").integers(-(2 ** 31), 2 ** 31, k_top)
+    head = np.bincount(np.mod(hashes, n), weights=p, minlength=n).astype(float)
+    tail_keys = keys - k_top
+    if tail_keys <= 0:
+        return head, 0.0
+    t_share = _power_sum(k_top + 1, keys, s) / h_all  # tail rows / Zipf rows
+    t_sq = _power_sum(k_top + 1, keys, 2 * s) / h_all ** 2
+    cv2 = max(0.0, tail_keys * t_sq / t_share ** 2 - 1.0)  # n Σp² / (Σp)² - 1
+    return head, math.sqrt(cv2)
 
 
 def _gamma_spread(rng, rel_std: float, n: int) -> np.ndarray:
@@ -74,6 +135,9 @@ class ShuffleExchange:
     num_maps: int
     num_partitions: int
     shares: np.ndarray
+    # Share of the key's distinct values per partition (files written from a reducer range hold those keys);
+    # None: the same as `shares`.
+    cluster_shares: np.ndarray | None = field(default=None, repr=False)
     records: np.ndarray = field(init=False, repr=False)
     bytes: np.ndarray = field(init=False, repr=False)
     map_host: list[str | None] = field(init=False)
@@ -107,6 +171,11 @@ class ShuffleExchange:
     @property
     def complete(self) -> bool:
         return all(h is not None for h in self.map_host)
+
+    def key_fraction(self, start: int, end: int) -> float:
+        """Share of the key's values hashed to reducers [start, end)."""
+        sh = self.shares if self.cluster_shares is None else self.cluster_shares
+        return float(sh[start:end].sum())
 
     def bytes_by_partition(self) -> np.ndarray:
         return self.bytes.sum(axis=0)

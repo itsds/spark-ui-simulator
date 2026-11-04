@@ -27,30 +27,25 @@
            F.min("event_ts").alias("first_seen"), F.max("event_ts").alias("last_seen"))
       .write.mode("overwrite").partitionBy("dt").parquet(f"{WH}/analytics.db/customer_daily_activity"))
 
-Nothing is wrong with this run: it is what "normal" looks like. The physical plans, the SQL tab and
-every number come from the queries and tables below through the planner, the cost model and the
-scheduler.
+The workload `clickstream_enrichment`: the queries above, the tables' schemas and how big the day's input
+usually is. Scenarios run it (`scenarios/00-healthy-baseline` is a normal night; `01-join-skew` a night
+whose events carry a hot `customer_id`). The physical plans, the SQL tab and every number come from the
+queries and the data through the planner, the cost model and the scheduler.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
-
-from ..engine.emit import build_events
-from ..engine.runtime import AppRun, AppSpec, InputDataset
-from ..eventlog import write_event_log
-from ..model.cluster import ClusterSpec, ExecutorSizing
+from ..engine.runtime import InputDataset
 from ..model.workload import KeySpace, WriteSink
 from ..sql.dataframe import Column, SparkSession, SqlQuery, Table, agg
 from ..sql.expr import Func, Not
-from ..yarnlogs import write_container_logs
+from .base import Params, Workload
 
 MiB = 1024 * 1024
 NN = "hdfs://nn1.hadoop.prod.internal:8020"
 WH = f"{NN}/warehouse"
-DT = "2026-11-02"
 
+# The customer ids of a day of events: the snapshot's 208 M customers, rows per customer spread with CV 2.5.
 CUSTOMER = KeySpace("customer_id", distinct=208_000_000, freq_cv=2.5)
 ACTIVE_CUSTOMER = KeySpace("dt,customer_id", distinct=61_000_000, freq_cv=2.5)
 FUNNEL = KeySpace("dt,page_type,funnel_step,device,country", distinct=57_600)
@@ -97,94 +92,73 @@ ENRICHED = Table(ENRICHED_ROOT, (
     (C("dt", "date"),))
 
 
-def enrich(spark: SparkSession):
-    events = spark.read(EVENTS, f"{EVENTS.root}/dt={DT}")
-    customers = spark.read(CUSTOMERS)
-    pages = spark.read(PAGES)
-    e = events
-    cols = [e[c] for c in ("event_id", "event_ts", "session_id", "customer_id", "page_id", "event_type",
-                           "device", "country", "revenue")]
-    campaign = Func("lower", (Func("regexp_extract", (e["page_url"], "utm_campaign=([^&]+)", 1), "string", 6),),
-                    "string", 6)
-    enriched = (events.where(Not(e["is_bot"]), selectivity=0.93)
-                .select(*cols, campaign.alias("campaign"), e["dt"], ns=PARSE_NS)
-                .join(pages.select(pages["page_id"], pages["page_type"], pages["funnel_step"]), "page_id",
-                      broadcast=True)
-                .join(customers.where(Not(customers["is_deleted"]), selectivity=0.97)
-                      .select(*(customers[c] for c in ("customer_id", "segment", "loyalty_tier", "home_country"))),
-                      "customer_id", match=0.985, key_space=CUSTOMER))
-    return enriched.write_parquet(ENRICHED_ROOT, ["dt"], WriteSink(f"{ENRICHED_ROOT}/dt={DT}",
-                                                                   ENRICHED.file_bytes_per_row))
+def queries(p: Params, data) -> tuple[SqlQuery, ...]:
+    dt = p["dt"]
+    customer = data["events"].keys["customer_id"]
 
+    def enrich(spark: SparkSession):
+        events = spark.read(EVENTS, f"{EVENTS.root}/dt={dt}")
+        customers = spark.read(CUSTOMERS)
+        pages = spark.read(PAGES)
+        e = events
+        cols = [e[c] for c in ("event_id", "event_ts", "session_id", "customer_id", "page_id", "event_type",
+                               "device", "country", "revenue")]
+        campaign = Func("lower", (Func("regexp_extract", (e["page_url"], "utm_campaign=([^&]+)", 1), "string", 6),),
+                        "string", 6)
+        enriched = (events.where(Not(e["is_bot"]), selectivity=0.93)
+                    .select(*cols, campaign.alias("campaign"), e["dt"], ns=PARSE_NS)
+                    .join(pages.select(pages["page_id"], pages["page_type"], pages["funnel_step"]), "page_id",
+                          broadcast=True)
+                    .join(customers.where(Not(customers["is_deleted"]), selectivity=0.97)
+                          .select(*(customers[c] for c in ("customer_id", "segment", "loyalty_tier", "home_country"))),
+                          "customer_id", match=0.985, key_space=customer))
+        return enriched.write_parquet(ENRICHED_ROOT, ["dt"], WriteSink(f"{ENRICHED_ROOT}/dt={dt}",
+                                                                       ENRICHED.file_bytes_per_row))
 
-def funnel(spark: SparkSession):
-    e = spark.read(ENRICHED, f"{ENRICHED_ROOT}/dt={DT}")
-    out = f"{WH}/analytics.db/daily_funnel"
-    daily = (e.group_by("dt", "page_type", "funnel_step", "device", "country")
-             .agg(agg("count", None, "events"), agg("sum", e["revenue"], "revenue"), groups=FUNNEL))
-    return daily.write_parquet(out, ["dt"], WriteSink(f"{out}/dt={DT}", bytes_per_row=26))
+    def funnel(spark: SparkSession):
+        e = spark.read(ENRICHED, f"{ENRICHED_ROOT}/dt={dt}")
+        out = f"{WH}/analytics.db/daily_funnel"
+        daily = (e.group_by("dt", "page_type", "funnel_step", "device", "country")
+                 .agg(agg("count", None, "events"), agg("sum", e["revenue"], "revenue"), groups=FUNNEL))
+        return daily.write_parquet(out, ["dt"], WriteSink(f"{out}/dt={dt}", bytes_per_row=26))
 
+    def activity(spark: SparkSession):
+        e = spark.read(ENRICHED, f"{ENRICHED_ROOT}/dt={dt}")
+        out = f"{WH}/analytics.db/customer_daily_activity"
+        per_customer = (e.group_by("dt", "customer_id")
+                        .agg(agg("count", None, "events"), agg("sum", e["revenue"], "spend"),
+                             agg("min", e["event_ts"], "first_seen"), agg("max", e["event_ts"], "last_seen"),
+                             groups=ACTIVE_CUSTOMER))
+        return per_customer.write_parquet(out, ["dt"], WriteSink(f"{out}/dt={dt}", bytes_per_row=31))
 
-def activity(spark: SparkSession):
-    e = spark.read(ENRICHED, f"{ENRICHED_ROOT}/dt={DT}")
-    out = f"{WH}/analytics.db/customer_daily_activity"
-    per_customer = (e.group_by("dt", "customer_id")
-                    .agg(agg("count", None, "events"), agg("sum", e["revenue"], "spend"),
-                         agg("min", e["event_ts"], "first_seen"), agg("max", e["event_ts"], "last_seen"),
-                         groups=ACTIVE_CUSTOMER))
-    return per_customer.write_parquet(out, ["dt"], WriteSink(f"{out}/dt={DT}", bytes_per_row=31))
-
-
-def queries() -> tuple[SqlQuery, ...]:
     return (
-        SqlQuery(f"events_enriched dt={DT}: web events + page catalog (broadcast) + customers (sort-merge join)",
+        SqlQuery(f"events_enriched dt={dt}: web events + page catalog (broadcast) + customers (sort-merge join)",
                  enrich, think_ms=(2_400, 4_200)),
-        SqlQuery(f"daily_funnel dt={DT}: events by page type, funnel step, device, country", funnel),
-        SqlQuery(f"customer_daily_activity dt={DT}: events, spend, first and last event per customer", activity),
+        SqlQuery(f"daily_funnel dt={dt}: events by page type, funnel step, device, country", funnel),
+        SqlQuery(f"customer_daily_activity dt={dt}: events, spend, first and last event per customer", activity),
     )
 
 
-SPEC = AppSpec(
-    seed=20261102,
-    app_name="clickstream-daily-enrichment",
-    user="svc_analytics",
+def datasets(p: Params) -> dict[str, InputDataset]:
+    """One day of events (~1.2 TiB), the customer snapshot (~60 GB, 210 M rows), the page catalog (3 MB)."""
+    return {
+        "events": InputDataset(f"{EVENTS.root}/dt={p['dt']}", files=4_300, mean_file_bytes=285 * MiB,
+                               file_size_sigma=0.22, bytes_per_row=EVENTS.file_bytes_per_row,
+                               keys={"customer_id": CUSTOMER}),
+        "customers": InputDataset(CUSTOMERS.root, files=520, mean_file_bytes=116 * MiB, file_size_sigma=0.12,
+                                  bytes_per_row=CUSTOMERS.file_bytes_per_row),
+        "pages": InputDataset(PAGES.root, files=1, mean_file_bytes=3 * MiB, file_size_sigma=0.0,
+                              bytes_per_row=PAGES.file_bytes_per_row),
+    }
+
+
+WORKLOAD = Workload(
+    name="clickstream_enrichment",
     script="daily_enrichment.py",
-    started_at="2026-11-03T02:10:07.318+00:00",
-    app_seq=48213,
-    # RM HA pair; the active RM (rm1) started 2026-10-13, epoch 23 after that many work-preserving restarts.
-    cluster=ClusterSpec(cluster_timestamp=1791902144377, rm_standby_hosts=("rm2.hadoop.prod.internal",),
-                        rm_cluster_id="yarn-prod", rm_epoch=23),
-    sizing=ExecutorSizing(instances=40, cores=4, memory_mb=16 * 1024, driver_memory_mb=8 * 1024, driver_cores=2),
-    inputs=(
-        InputDataset(f"{EVENTS.root}/dt={DT}", files=4_300, mean_file_bytes=285 * MiB, file_size_sigma=0.22,
-                     bytes_per_row=EVENTS.file_bytes_per_row),
-        InputDataset(CUSTOMERS.root, files=520, mean_file_bytes=116 * MiB, file_size_sigma=0.12,
-                     bytes_per_row=CUSTOMERS.file_bytes_per_row),
-        InputDataset(PAGES.root, files=1, mean_file_bytes=3 * MiB, file_size_sigma=0.0,
-                     bytes_per_row=PAGES.file_bytes_per_row),
-    ),
-    queries=queries(),
-    conf=(
-        ("spark.yarn.queue", "etl"),
-        ("spark.dynamicAllocation.enabled", "false"),
-        ("spark.sql.shuffle.partitions", str(SHUFFLE_PARTITIONS)),
-        ("spark.sql.files.maxPartitionBytes", "256m"),
-        ("spark.sql.sources.partitionOverwriteMode", "dynamic"),
-        ("spark.serializer", "org.apache.spark.serializer.KryoSerializer"),
-    ),
-    queue="etl",
+    description="Nightly clickstream enrichment: one day of web events joined with the page catalog (broadcast) "
+                "and the customer snapshot (sort-merge join), written to events_enriched, then two daily "
+                "aggregates of it (daily_funnel, customer_daily_activity).",
+    datasets=datasets,
+    queries=queries,
+    params={"dt": "2026-11-02"},
 )
-
-
-def build(seed: int | None = None):
-    spec = SPEC if seed is None else replace(SPEC, seed=seed)
-    run = AppRun(spec).run()
-    return run, build_events(run)
-
-
-def generate(out_dir: str | Path, seed: int | None = None, logs_dir: str | Path | None = None) -> Path:
-    """Write the event log (and, with `logs_dir`, every container's stdout/stderr for the NodeManager mock)."""
-    run, events = build(seed)
-    if logs_dir is not None:
-        write_container_logs(run, logs_dir)
-    return write_event_log(Path(out_dir) / run.yapp.event_log_name, events)

@@ -37,6 +37,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+import numpy as np
+
 from ..cost import calibration as cal
 from ..cost.model import StageContext, TaskEnv, TaskPlan, TaskResult, simulate_task
 from ..environment import CLUSTER_SPARK_DEFAULTS, PySparkYarnApp, spark_properties
@@ -58,7 +60,7 @@ from ..model.cluster import (
 )
 from ..model.files import max_split_bytes, plan_scan
 from ..model.hdfs import Hdfs
-from ..model.shuffle import ShuffleExchange, coalesce_partitions, key_shares, row_shares
+from ..model.shuffle import ShuffleExchange, coalesce_partitions, key_shares, row_shares_split
 from ..model.workload import ScanSource, ShuffleSink, ShuffleSource, StageSpec, WriteSink
 from ..rng import numpy_rng, substream
 from ..sched.scheduler import LOCALITY_NAMES, Launch, TaskScheduler, TaskSet
@@ -88,7 +90,12 @@ def iso_ms(iso: str) -> int:
 
 @dataclass(frozen=True)
 class InputDataset:
-    """A table directory that exists before the app runs (written by upstream jobs)."""
+    """A table directory that exists before the app runs (written by upstream jobs).
+
+    `keys`: how the values of the columns the queries join or group on are distributed in this data
+    (distinct values, rows per key, hot keys). The engine doesn't read them; the app's queries take
+    their `KeySpace`s from here, which is where key-skew faults change the data (`sparksim.scenario`).
+    """
 
     path: str
     files: int
@@ -96,6 +103,7 @@ class InputDataset:
     file_size_sigma: float
     bytes_per_row: float  # Parquet bytes per row (all columns)
     row_group_bytes: int = 96 * MiB  # compressed Parquet row-group size of the upstream writer
+    keys: dict = field(default_factory=dict, compare=False)  # column -> KeySpace
 
 
 @dataclass(frozen=True)
@@ -115,6 +123,17 @@ class AppSpec:
     aqe: bool = True
     submit_to_start_ms: tuple[int, int] = (5_200, 8_400)  # spark-submit → AM container → SparkContext start
     stop_ms: tuple[int, int] = (600, 1_800)  # last action → SparkContext.stop()
+    # Fault injection (sparksim.scenario.faults): inputs of the simulation, never its outputs.
+    native_memory_per_task: int = 0  # bytes of native memory each running task holds in its container
+    executor_kills: tuple[ExecutorKill, ...] = ()
+
+
+@dataclass(frozen=True)
+class ExecutorKill:
+    """SIGKILL to executor `executor`'s JVM `at_ms` after the application started (exit code 137)."""
+
+    executor: str
+    at_ms: int
 
 
 # --------------------------------------------------------------------------- records
@@ -335,11 +354,17 @@ class AppRun:
         return b.id
 
     def conf_bytes(self, key: str, default: int) -> int:
-        v = dict(self.spec.conf).get(key)
+        """A size property as Spark parses it (`10m`, `256MB`, `10485760`, `-1`)."""
+        v = self.conf.get(key)
         if v is None:
             return default
-        units = {"k": 1024, "m": MiB, "g": 1024 * MiB}
-        return int(v[:-1]) * units[v[-1].lower()] if v[-1].lower() in units else int(v)
+        v = v.strip().lower().removesuffix("b")
+        units = {"k": 1024, "m": MiB, "g": 1024 * MiB, "t": 1024 ** 4}
+        return int(float(v[:-1]) * units[v[-1]]) if v and v[-1] in units else int(v)
+
+    def conf_bool(self, key: str, default: bool) -> bool:
+        v = self.conf.get(key)
+        return default if v is None else v.strip().lower() == "true"
 
     @property
     def default_parallelism(self) -> int:
@@ -351,12 +376,16 @@ class AppRun:
         self.allocator.start(self.am_request_time)
         if self.dynalloc is not None:
             self.dynalloc.start()
+        for k in self.spec.executor_kills:
+            self.sim.at(self.t0 + k.at_ms, self._sigkill, k)
         self.sim.spawn(self._driver())
         self.sim.run()
         assert self.app_end is not None, "driver program did not finish"
         return self
 
     def _driver(self):
+        if not self.conf_bool("spark.sql.adaptive.enabled", True):
+            raise NotImplementedError("spark.sql.adaptive.enabled=false: only AQE plans are modelled so far")
         driver_ready = self.t0 + 1_500
         yield max(0, driver_ready - self.sim.now)
         if not self.ready.fired:  # YarnClusterSchedulerBackend: 80 % registered, or 30 s
@@ -379,7 +408,7 @@ class AppRun:
         self.sim.at(ex.registered_at, self._executor_added, ex)
         rng = substream(self.spec.seed, f"nm-monitor/{ex.container_id}")
         phase = rng.randrange(cal.NM_MONITOR_INTERVAL_MS)
-        mem = container_memory(ex, self.spec.sizing, rng)
+        mem = container_memory(ex, self.spec.sizing, rng, native_per_task=self.spec.native_memory_per_task)
         self.sim.at(ex.launched_at + phase, self._nm_check, ex, mem)
 
     def _executor_added(self, ex: Executor) -> None:
@@ -420,6 +449,24 @@ class AppRun:
             self.sim.at(t_exit, self._jvm_exit, ex)
             return
         self.sim.after(cal.NM_MONITOR_INTERVAL_MS, self._nm_check, ex, mem)
+
+    def _sigkill(self, k) -> None:
+        """SIGKILL from outside YARN (the kernel's OOM killer, an operator): the JVM dies at once, without
+        shutdown hooks; the NodeManager reports exit code 137 (diagnostics as in ref05)."""
+        if self.stopping:
+            return
+        ex = self.executor_by_id.get(k.executor)
+        if ex is None or ex.exit_at is not None or ex.nm_kill_at is not None:
+            raise ValueError(f"executor_killed: executor {k.executor} is not running "
+                             f"{k.at_ms / 1000:.0f} s after the application started")
+        now = self.sim.now
+        d = _nm(now)
+        ex.exit_status = 137
+        ex.diagnostics = (f"[{d}]Container killed on request. Exit code is 137\n"
+                          f"[{d}]Container exited with a non-zero exit code 137. \n"
+                          f"[{d}]Killed by external signal\n")
+        self.yarn_log.append((now, "sigkill", ex))
+        self._jvm_exit(ex)
 
     def _nm_stop_container(self, ex: Executor) -> None:
         """The RM told the NodeManager to stop a container the AM released (SIGTERM)."""
@@ -580,7 +627,9 @@ class AppRun:
         stats = {}
         for d in self.spec.inputs:
             stats[d.path] = sum(f.size for f in self.hdfs.listdir(d.path))
-        return PlanContext(self.spark, self.plan_ids, dataset_stats=stats)
+        threshold = self.conf_bytes("spark.sql.autoBroadcastJoinThreshold", 10 * MiB)
+        return PlanContext(self.spark, self.plan_ids, dataset_stats=stats,
+                           broadcast_threshold=threshold if threshold >= 0 else -1)
 
     def _plan_event(self, kind: str, qrec: QueryRecord, aqe: AdaptiveExecution) -> None:
         """SQLExecutionStart / SQLAdaptiveExecutionUpdate: the metric ids of new nodes are allocated now."""
@@ -591,11 +640,36 @@ class AppRun:
     def _coalescer(self, stages) -> list[tuple[int, int]] | None:
         """CoalesceShufflePartitions over the map output sizes of the shuffles a stage reads."""
         exs = [self.exchanges[s.name] for s in stages]
+        if len(exs) == 2:
+            self._check_skew_join(exs)
         if len({e.num_partitions for e in exs}) != 1:
             return None
+        if not self.conf_bool("spark.sql.adaptive.coalescePartitions.enabled", True):
+            return None
         sizes = sum(e.bytes_by_partition() for e in exs)
-        ranges = coalesce_partitions(sizes, self.default_parallelism)
+        advisory = self.conf_bytes("spark.sql.adaptive.advisoryPartitionSizeInBytes", 64 * MiB)
+        min_size = self.conf_bytes("spark.sql.adaptive.coalescePartitions.minPartitionSize", 1 * MiB)
+        parallelism = (self.default_parallelism
+                       if self.conf_bool("spark.sql.adaptive.coalescePartitions.parallelismFirst", True) else 1)
+        ranges = coalesce_partitions(sizes, parallelism, advisory=advisory, min_partition_size=min_size)
         return ranges if len(ranges) < exs[0].num_partitions else None
+
+    def _check_skew_join(self, exs: list[ShuffleExchange]) -> None:
+        """AQE's OptimizeSkewedJoin (on by default) splits a join partition larger than
+        max(skewedPartitionThresholdInBytes, skewedPartitionFactor x median). We don't model the split yet,
+        so refuse to simulate a run where Spark would have done it rather than show a skew Spark wouldn't."""
+        if not self.conf_bool("spark.sql.adaptive.skewJoin.enabled", True):
+            return
+        threshold = self.conf_bytes("spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes", 256 * MiB)
+        factor = float(self.conf.get("spark.sql.adaptive.skewJoin.skewedPartitionFactor", "5.0"))
+        for ex in exs:
+            sizes = ex.bytes_by_partition()
+            limit = max(threshold, float(np.median(sizes)) * factor)
+            if (sizes > limit).any():
+                raise NotImplementedError(
+                    f"AQE OptimizeSkewedJoin would split {int((sizes > limit).sum())} partition(s) of shuffle "
+                    f"{ex.name} (largest {int(sizes.max()):,} bytes > {int(limit):,}); skew-join splits are not "
+                    "modelled yet: set spark.sql.adaptive.skewJoin.enabled=false for this run")
 
     def _stage_driver_metrics(self, qrec: QueryRecord, plan) -> None:
         """What the driver posts while it builds a stage's RDDs: scan files, AQEShuffleRead specs, partitions."""
@@ -757,8 +831,12 @@ class AppRun:
         if isinstance(spec.sink, ShuffleSink):
             sink = spec.sink
             distinct_rows = sink.unique_keys or (spec.ops and spec.ops[-1].kind == "partial_agg")
-            shares = (key_shares if distinct_rows else row_shares)(sink.key, sink.num_partitions, self.spec.seed)
-            out_ex = ShuffleExchange(sink.exchange, self.shuffle_ids.next(), len(plans), sink.num_partitions, shares)
+            if distinct_rows:
+                shares = cluster = key_shares(sink.key, sink.num_partitions, self.spec.seed)
+            else:
+                shares, cluster = row_shares_split(sink.key, sink.num_partitions, self.spec.seed)
+            out_ex = ShuffleExchange(sink.exchange, self.shuffle_ids.next(), len(plans), sink.num_partitions, shares,
+                                     cluster_shares=cluster)
             self.exchanges[sink.exchange] = out_ex
             self.map_stage_of[sink.exchange] = rec
             rec.exchange = sink.exchange
@@ -889,7 +967,7 @@ class AppRun:
             return None
         name, a, b = plan.reads[0]
         key = self.map_stage_of[name].spec.sink.key
-        return key.name, float(self.exchanges[name].shares[a:b].sum())
+        return key.name, self.exchanges[name].key_fraction(a, b)
 
     def _part_name(self, st: StageRecord, index: int) -> str:
         if not hasattr(st, "_job_uuid"):

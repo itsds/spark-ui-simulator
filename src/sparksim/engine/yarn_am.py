@@ -278,9 +278,9 @@ def exit_reason(ex: Executor) -> tuple[str, bool]:
 
 
 def container_memory(ex: Executor, sizing: ExecutorSizing, rng: random.Random,
-                     python_rss: int = 0) -> ContainerMemory:
+                     python_rss: int = 0, native_per_task: int = 0) -> ContainerMemory:
     return ContainerMemory(heap_max=sizing.heap_bytes, host_ram=ex.host.memory_mb * MiB, cores=ex.cores,
-                           limit=ex.container_mb * MiB, python_rss=python_rss,
+                           limit=ex.container_mb * MiB, python_rss=python_rss, native_per_task=native_per_task,
                            growth_core_s=cal.G1_HEAP_GROWTH_CORE_S * math.exp(rng.gauss(0, cal.G1_HEAP_GROWTH_SIGMA)),
                            native_factor=math.exp(rng.gauss(0, cal.NATIVE_FOOTPRINT_SIGMA)))
 

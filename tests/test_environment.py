@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from sparksim.apps import daily_enrichment as d
 from sparksim.engine.runtime import AppRun
 from sparksim.environment import environment_update, hadoop_defaults
+from sparksim.scenario import load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "reference" / "event-logs" / "ref01-daily-etl-aqe"
@@ -26,8 +26,9 @@ def ref_env():
 
 @pytest.fixture(scope="module")
 def env():
-    run = AppRun(d.SPEC)
-    return run, environment_update(run.env_app, cluster=d.SPEC.cluster)
+    spec = load_scenario("00-healthy-baseline").spec("baseline")
+    run = AppRun(spec)
+    return run, environment_update(run.env_app, cluster=spec.cluster)
 
 
 def test_sections_are_as_complete_as_a_real_driver(ref_env, env):
@@ -54,7 +55,7 @@ def test_hadoop_defaults_are_the_reference_minus_its_site_files():
 def test_configuration_matches_the_simulated_cluster(env):
     run, e = env
     hp, sp = e.hadoop_properties, e.spark_properties
-    c = d.SPEC.cluster
+    c = load_scenario("00-healthy-baseline").spec("baseline").cluster
     assert hp["fs.defaultFS"] == f"hdfs://{c.namenode}:8020"
     assert hp["yarn.nodemanager.resource.memory-mb"] == str(c.nm_memory_mb)
     assert hp["yarn.nodemanager.resource.cpu-vcores"] == str(c.nm_vcores)

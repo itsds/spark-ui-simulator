@@ -193,3 +193,51 @@ what was done, what's next, gotchas.
 - **Still open:** node-local container requests, preemption, queue capacity, app attempt 2, GC logs, Python
   worker output, `ShufflePartitionsUtil` / `FileSourceStrategy` planning lines; the Docker Compose path is
   unverified (now with the nm-logs service).
+
+## 2026-11-04 — Phase 6: scenario DSL + fault injection → Scenario 01 (join skew)
+
+- **Done:**
+  - `scenarios/<id>/scenario.yaml` + `sparksim/scenario/` (pydantic schema, loader, `faults.py`): the job
+    (workload, cluster, executors, ordered `--conf`) and its runs (`baseline`, or `last_good` + `incident`
+    with params, data overrides and faults). Workloads are Python (`apps/base.py: Workload`;
+    `apps/daily_enrichment.py: WORKLOAD = clickstream_enrichment`, queries take their key spaces from the
+    run's datasets). Scenario 00 moved to YAML byte for byte; `daily_enrichment.SPEC/build/generate` are gone
+    (tests use `load_scenario(...).spec/build/generate`). CLI: `sparksim generate <scenario> [--run ROLE]`,
+    `sparksim scenarios`, `sparksim validate` (ADR-026).
+  - Key skew: `model/murmur3.py` (Spark's Murmur3_x86_32 + `pmod`, checked against PySpark), `KeySpace.hot /
+    dtypes / zipf`, `row_shares_split` (tail shares for file clustering; unskewed keys unchanged; ADR-027).
+  - Spill per operator (`cost.model._spill_group`): concurrent consumers below a join, each operator after it;
+    per-op spill bytes, I/O and CPU in the SQL metrics and in per-sorter executor log lines placed in each
+    sorter's fill window (ADR-028).
+  - Fault mechanisms (ADR-029): `key_skew`, `config` (+ the engine reads `autoBroadcastJoinThreshold` and AQE
+    coalescing settings), `slow_node` (`Host.cpu/disk/net_factor`), `memory_pressure` (native memory per task
+    in `ContainerMemory`), `executor_killed` (SIGKILL → exit 137, ref05 diagnostics, log stops). Guards: AQE
+    skew join on + a skewed join partition, and AQE off, raise NotImplementedError.
+  - Scenario 01 `01-join-skew` (ADR-030): last good run = Scenario 00's app 48213; incident app 48391
+    (dt=2026-11-03): +15 % events, `customer_id = -1` on 13 %, skew join off in the job's conf → 5.5 min →
+    1.6 h, task 1993 (= `pmod(hash(-1L), 2400)`) runs 1.5 h, 44.5 GiB shuffle read, 280.7 GiB spill. Ticket
+    (with the "bad node?" red herring: the straggler's spill), 8 hints, solution with 17 evidence values;
+    `scripts/evidence.py` takes app ids from the YAML and can read container logs through the log links.
+  - Scenario 00's job conf gained `spark.sql.adaptive.skewJoin.enabled=false` (no evidence value changed).
+  - Tests: new `test_faults.py` (11), `test_scenario_dsl.py`, `test_scenario01.py`, `test_scenario01_hs.py`;
+    `uv run pytest` all green, ruff clean. ADRs 026–030.
+- **Next:** Phase 7 (portal + one-command startup). `scenario.yaml` already carries what the portal cards need
+  (title, difficulty, topics, summary, run labels, app ids). Then Phase 8 scenarios; the cheapest next ones
+  with today's mechanisms: 02 (too few partitions → spill: `config` + the per-op spill), 09 (bad node:
+  `slow_node`), 05 (missed broadcast: `config` autoBroadcastJoinThreshold, the hint must go), 03 (pmem kills:
+  `memory_pressure`, but "failed after 4 attempts" needs job abort).
+- **Gotchas:**
+  - AQE coalescing changes the reduce task count at small scales: tests on scaled data must look up a task's
+    reducer range (`stage.plans[i].reads`), not assume index = partition.
+  - The stage page's Event Timeline only shows the task table's current page (100 tasks): sort by Duration
+    before expanding it to see a straggler.
+  - The Summary Metrics table rounds durations (`2.8 s` → `3 s`); the evidence quotes both the UI strings and
+    the REST values.
+  - Spark's `OptimizeSkewedJoin` target piece size is max(advisory, mean non-skewed partition), not the
+    advisory size: ~130 MiB pieces for Scenario 01.
+  - Python 3.11: no nested same-quote f-strings (PEP 701 is 3.12); PIL isn't installed, use Playwright element
+    screenshots to zoom into a page.
+  - The harness required branch `claude/gifted-johnson-brvuae` (not `phase-6/<slug>`).
+- **Still open:** AQE skew-join split (a "fixed run"), task exceptions / job abort, lost shuffle files without
+  the shuffle service, dynamic per-task memory (a straggler's peak execution memory is under-reported,
+  ADR-028), GC pressure model; the Docker Compose path is unverified.

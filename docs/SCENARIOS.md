@@ -8,7 +8,7 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 | # | Scenario | Injected cause | Ticket (symptom) | Evidence in Spark UI | Fix |
 |---|---|---|---|---|---|
 | 00 ✅ | Healthy baseline | none | (onboarding: record the baseline) | Learn what normal looks like: task max ≈ 1.5–2× median, low GC, no spill, even executors; SQL tab: BHJ + SMJ plan, row counts per operator, pre-clustered partial aggregation (`scenarios/00-healthy-baseline`) | — |
-| 01 | Join-key skew | hot key (e.g. `customer_id = -1` guest checkouts) in fact table; AQE skew join off | "Nightly enrichment took 3h12m, usually 40m, no code change" | Stage detail: max shuffle read ≫ median; Event Timeline one long bar; 399/400 tasks done; SQL: SortMergeJoin; Environment: `spark.sql.adaptive.skewJoin.enabled=false` | AQE skew join, salting, isolate hot key, broadcast small side |
+| 01 ✅ | Join-key skew | hot key `customer_id = -1` (guest placeholder) on 13 % of the events after an upstream SDK change; AQE skew join off in the job's conf (`scenarios/01-join-skew`) | "Nightly enrichment ran 1h35m, usually 6 min, dashboards stale, no code change" | Stage detail: max shuffle read ≫ median; Event Timeline one long bar; 2399/2400 tasks done; one task spills 280 GiB; SQL: SortMergeJoin, Sort spill size max = total; Environment: `spark.sql.adaptive.skewJoin.enabled=false` | AQE skew join, salting, isolate hot key, broadcast small side |
 | 02 | Shuffle partitions too few → spill | 200 shuffle partitions on ~2 TB shuffle | "Job slow, disk-usage alerts on workers" | Every task spills (memory & disk); ~10 GB/partition; Environment: `spark.sql.shuffle.partitions=200`, AQE off | Raise partitions / AQE coalesce with advisory size |
 | 03 | YARN memoryOverhead kills | off-heap usage (Arrow/netty/Python) > `memoryOverhead` | "Job failed after 4 attempts" | Failed tasks `ExecutorLostFailure`; Executors tab dead executors; stderr: "Container killed by YARN for exceeding physical memory limits", exit 137 | Raise `spark.executor.memoryOverhead`, fewer cores/executor, smaller partitions |
 | 04 | Small files / tiny tasks | input table of 120k small files | "Simple filter job takes 50 min" | 120k tasks, median task 40 ms, scheduler delay & deserialization dominate; SQL scan: number of files read | Compaction, `maxPartitionBytes`/`openCostInBytes`, coalesce |
@@ -24,6 +24,12 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 | 14 | YARN queue starvation / slow ramp | queue at capacity; dynamic allocation can't get containers | "Job sometimes waits 30 min to start working" | Jobs Event Timeline: executors trickle in; tasks pending; few active executors | Queue capacity, min executors, schedule window |
 | 15 | Skewed / small-file output | `repartition(low-cardinality col)` before write | "Write stage takes forever, downstream reads 40k files" | Final stage: a few huge tasks; output size/records per task | Repartition by (col, salt), `maxRecordsPerFile`, AQE rebalance |
 | ★ | Capstone(s) | 2–3 faults combined + red herrings | realistic multi-cause incidents | — | — |
+
+Fault mechanisms available in `scenario.yaml` (Phase 6, ADR-029): `key_skew` (hot keys, Zipf), `config`,
+`slow_node` (CPU/disk/NIC), `memory_pressure` (native memory per task), `executor_killed` (SIGKILL, exit 137).
+Still to build for the backlog: task exceptions + job abort (03's "failed after 4 attempts"), lost shuffle
+files without the shuffle service (12), AQE's skew-join split (a "fixed run" for 01), GC pressure (08),
+Python UDF nodes (10), queue capacity (14).
 
 Later: Structured Streaming (ADR-005), dynamic-allocation thrash, broadcast timeout / driver OOM, "AQE working as intended" (to recognize success).
 

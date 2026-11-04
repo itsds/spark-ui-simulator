@@ -12,7 +12,6 @@ from dataclasses import replace
 
 import pytest
 
-from sparksim.apps import daily_enrichment as d
 from sparksim.engine.emit import build_events
 from sparksim.engine.runtime import AppRun
 from sparksim.eventlog import (
@@ -26,13 +25,16 @@ from sparksim.eventlog import (
     event_to_line,
     line_to_event,
 )
+from sparksim.scenario import load_scenario
+
+BASE = load_scenario("00-healthy-baseline").spec("baseline")
 
 PMEM = re.compile(r"^Container killed by YARN for exceeding physical memory limits\. [0-9.]+ [KMG]B of "
                   r"[0-9.]+ [KMG]B physical memory used\. Consider boosting spark\.executor\.memoryOverhead\.$")
 
 
 def _spec(conf=(), scale=1.0, **changes):
-    s = d.SPEC
+    s = BASE
     over = dict(conf)
     return replace(s, inputs=tuple(replace(i, files=max(1, int(i.files * scale))) for i in s.inputs),
                    conf=tuple(c for c in s.conf if c[0] not in over) + tuple(conf), **changes)
@@ -55,7 +57,7 @@ def pmem_app():
 @pytest.fixture(scope="module")
 def da_app():
     """Dynamic allocation with the external shuffle service; a 95 s driver-side pause between queries."""
-    qs = list(d.queries())
+    qs = list(BASE.queries)
     qs[1] = replace(qs[1], think_ms=(95_000, 100_000))
     spec = _spec((("spark.dynamicAllocation.enabled", "true"), ("spark.shuffle.service.enabled", "true"),
                   ("spark.dynamicAllocation.maxExecutors", "40")), scale=0.25, queries=tuple(qs))

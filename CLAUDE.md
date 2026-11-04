@@ -73,9 +73,10 @@ src/sparksim/          Python package: eventlog/ (typed events, JsonProtocol byt
                        model.py), sched/ (event kernel, TaskScheduler), sql/ (DataFrame API + planner, AQE, explain,
                        plan info, RDD scopes, SQL metrics), engine/ (driver runtime, yarn_am = YARN allocation +
                        NodeManager monitor, dynalloc, emit), yarnlogs/ (container stdout/stderr from the run),
-                       apps/ (tiny smoke app, daily_enrichment = Scenario 00), yarn.py, environment.py, cli.py,
+                       apps/ (workloads: daily_enrichment = clickstream_enrichment; tiny smoke app), scenario/
+                       (scenario.yaml schema, loader, fault mechanisms), yarn.py, environment.py, cli.py,
                        data/ (Spark archive jars, Hadoop 3.3.6 defaults)
-scenarios/NN-slug/     ticket.md, hints.md, solution.md (Evidence table checked by tests); scenario.yaml from Phase 6
+scenarios/NN-slug/     scenario.yaml (job + runs + faults), ticket.md, hints.md, solution.md (Evidence checked by tests)
 reference/jobs/        real PySpark reference jobs (ref00–ref08) + common.py
 reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
 reference/yarn-logs/   REAL container stdout/stderr for those apps (driver = container ..._000001)
@@ -94,9 +95,10 @@ event-logs/, yarn-logs/, build/   GENERATED, gitignored
 Read `docs/EVENT_LOG_FORMAT.md` before writing any event-log code. Emit events through
 `sparksim.eventlog` (`Timeline` + `DriverLedger`): never hand-compute accumulator `Value`s or stage totals.
 Container logs are derived from the run's records (`sparksim.yarnlogs`), never written by hand.
-New apps describe a workload (`engine.runtime.AppSpec`) whose queries are PySpark-like DataFrame code over
-table schemas (`sql.dataframe`), and let `sql/` + `engine/` plan and simulate it; every throughput or overhead
-constant goes in `cost/calibration.py` with its provenance tag. Check plan/explain changes against
+A scenario is `scenarios/<id>/scenario.yaml` over a workload (`apps/<module>.py: WORKLOAD`: params, the usual
+input datasets with their key distributions, PySpark-like DataFrame queries over table schemas). Faults change
+simulation inputs only (`scenario/faults.py`); incidents have a `last_good` and an `incident` run. Every
+throughput or overhead constant goes in `cost/calibration.py` with its provenance tag. Check plan/explain changes against
 `tests/test_sql_golden.py` (ref01 re-planned with our DSL must match the real log).
 
 ## Tooling and commands
@@ -108,7 +110,8 @@ JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
 | Task | Command |
 |---|---|
 | Lint | `uv run ruff check .` |
-| Generate Scenario 00 (~9.4k tasks, ~10 s; + container logs in `yarn-logs/`) | `uv run sparksim generate 00-healthy-baseline --out event-logs` |
+| Generate a scenario, every run (+ container logs in `yarn-logs/`) | `uv run sparksim generate 01-join-skew` (00: ~10 s, 01: ~30 s) |
+| List / validate scenarios | `uv run sparksim scenarios` / `uv run sparksim validate` |
 | Generate the tiny synthetic app | `uv run sparksim generate tiny --out event-logs` |
 | Check the event model on a log (byte round trip) | `uv run sparksim roundtrip <event-log>...` |
 | Unit tests | `uv run pytest -m "not integration"` |
@@ -117,7 +120,7 @@ JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
 | Mock NodeManager logs (executor stdout/stderr links) | `services/nm-logs/run.sh [LOG_DIR] [PORT]` (default `yarn-logs/`, 8042) |
 | Validate replay (log vs server counts) | `uv run scripts/hs_api.py validate --log-dir <dir>` |
 | Query the REST API | `uv run scripts/hs_api.py stages <app-id>` / `summary <app-id> <stage>` / `get <app-id> <path>` / `sql <app-id>` |
-| Check a solution's evidence numbers | `uv run scripts/evidence.py 00-healthy-baseline` (against a running HS) |
+| Check a solution's evidence numbers | `uv run scripts/evidence.py 01-join-skew` (against a running HS + nm-logs) |
 | Screenshot key UI pages | `uv run scripts/screenshot.py <app-id> [--stage N]` → `build/screenshots/` |
 | Start reference YARN cluster | `reference/yarn/cluster.sh start` (needs Hadoop 3.3.x at `/opt/hadoop`) |
 | Re-capture reference logs | `reference/capture.sh [ref0N_name ...]` (YARN cluster mode) |

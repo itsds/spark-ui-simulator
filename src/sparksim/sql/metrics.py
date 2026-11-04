@@ -69,7 +69,7 @@ def task_updates(stage_root: SparkPlan, res: TaskResult) -> list[tuple[int, int]
         if hit is None:
             return 0.0
         i, t = hit
-        return t.cpu_ns / 1e6 * scale + (res.spill_ms if res.spill_op == i else 0.0)
+        return (t.cpu_ns + t.spill_cpu_ns) / 1e6 * scale + t.spill_ms
 
     def read_ms(n: SparkPlan) -> float:
         s = srcs.get(id(n))
@@ -116,8 +116,8 @@ def task_updates(stage_root: SparkPlan, res: TaskResult) -> list[tuple[int, int]
             if t.rows_out:
                 cap = 1 << max(6, (max(1, t.rows_out) * 2 - 1).bit_length())
                 put(n, "avgHashProbe", 10 * (1.0 + t.rows_out / cap))
-            if res.spill_op == i:
-                put(n, "spillSize", res.metrics.memory_bytes_spilled)
+            if t.spill:
+                put(n, "spillSize", t.spill)
         elif isinstance(n, WholeStageCodegen):
             d = elapsed(n.children[0])
             if isinstance(parent, (ShuffleExchange, WriteFiles, BroadcastExchange)):
@@ -151,7 +151,7 @@ def _scan_below(n: SparkPlan) -> FileSourceScan:
 
 def _spill(res: TaskResult, n: SparkPlan, trace) -> int:
     hit = trace.get(id(n))
-    return res.metrics.memory_bytes_spilled if hit and res.spill_op == hit[0] else 0
+    return round(hit[1].spill) if hit else 0
 
 
 def _read_metrics(ex: ShuffleExchange, s, put) -> None:

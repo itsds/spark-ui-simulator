@@ -41,7 +41,7 @@ Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 | # | Scenario |
 |---|---|
 | 00 | Healthy baseline (learn what "normal" looks like) ✅ [`scenarios/00-healthy-baseline`](scenarios/00-healthy-baseline/ticket.md) |
-| 01 | Join-key skew |
+| 01 | Join-key skew ✅ [`scenarios/01-join-skew`](scenarios/01-join-skew/ticket.md) |
 | 02 | Too few shuffle partitions → spill |
 | 03 | YARN memoryOverhead container kills |
 | 04 | Small files / tiny tasks |
@@ -90,12 +90,18 @@ below. On macOS with Homebrew's `openjdk@17`, that's
 git clone https://github.com/itsds/spark-ui-simulator.git && cd spark-ui-simulator
 uv sync                                              # Python 3.11 + PySpark 3.5.9 (contains the History Server)
 uv run sparksim generate 00-healthy-baseline         # Scenario 00: event log + YARN container logs, ~10 s
+uv run sparksim generate 01-join-skew                # Scenario 01: the last good run + the incident run, ~30 s
 services/nm-logs/run.sh &                            # mock NodeManager log server on :8042 (executor stdout/stderr)
 services/history-server/run.sh event-logs            # foreground; Ctrl+C to stop
 # open http://localhost:18080, then read scenarios/00-healthy-baseline/ticket.md
 ```
 
-`uv run sparksim generate tiny` writes the 8-task Phase 2 smoke app instead.
+`uv run sparksim scenarios` lists the scenarios and their runs. Each scenario is a
+`scenarios/<id>/scenario.yaml`: the job (a workload: PySpark-like DataFrame code over
+table schemas), the cluster, the spark-submit options, and for incidents a last good
+run and an incident run with the injected faults (hot keys, config, a slow node,
+memory pressure, a killed executor). `uv run sparksim validate` checks them.
+`uv run sparksim generate tiny` writes the 8-task Phase 2 smoke app.
 
 To browse the nine **real** reference apps captured on YARN in Phase 1 (AQE,
 skew, spill, cache, failures and stage retries, Python UDFs, driver-bound jobs,

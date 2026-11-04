@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from sparksim.apps import daily_enrichment
+from sparksim.scenario import load_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -32,8 +32,8 @@ def stack(tmp_path_factory):
     base = tmp_path_factory.mktemp("scenario00")
     ev_dir, logs_dir = base / "event-logs", base / "yarn-logs"
     ev_dir.mkdir()
-    path = daily_enrichment.generate(ev_dir, logs_dir=logs_dir)
-    app_id = evidence.SCENARIOS[SCENARIO][0]
+    (path,) = load_scenario(SCENARIO).generate(ev_dir, logs_dir)
+    app_id = load_scenario(SCENARIO).app_id("baseline")
     assert path.name == f"{app_id}_1"
     with run_nm_logs(logs_dir) as nm_url:
         log_url = f"{nm_url}/node/containerlogs/{{{{CONTAINER_ID}}}}/{{{{USER}}}}/{{{{FILE_NAME}}}}?start=-4096"
@@ -107,7 +107,7 @@ def test_executor_log_links_open_matching_logs(stack):
         text = _full_log(logs["stderr"])
         assert text.startswith("Using Spark's default log4j profile")
         if e["id"] == "driver":
-            assert f"Submitted application: {daily_enrichment.SPEC.app_name}" in text
+            assert f"Submitted application: {load_scenario(SCENARIO).model.job.app_name}" in text
             assert text.count("INFO TaskSetManager: Finished task ") == sum(len(v["ok"]) for v in by_exec.values())
             assert "Final app status: SUCCEEDED, exitCode: 0" in text
             continue

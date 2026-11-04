@@ -396,3 +396,93 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   every key the reference AMs logged.
 - **Consequences:** The configuration the learner reads (allocation grid, NodeManager memory, overhead,
   shuffle service, dirs) is the one the simulation ran with, and the container logs use the same dirs.
+
+## ADR-026 — Scenarios are YAML over Python workloads; incidents run the same job twice
+
+- **Date:** 2026-11-04
+- **Status:** accepted; supersedes the per-app `SPEC` of ADR-013/020 (`apps/daily_enrichment.py` is now a workload)
+- **Context:** Phase 6 needs scenarios that differ by data, config, nodes and failures while the job's code
+  stays the same, and every incident needs its last good run (ADR-006). DataFrame code doesn't belong in
+  YAML; seeds, dates, cluster, spark-submit options and faults do.
+- **Decision:** A *workload* (`apps/<module>.py`, `WORKLOAD = Workload(...)`) is the PySpark job: its params
+  (the date), its usual input data (`datasets(params)`: files, sizes, and the key distributions of the columns
+  its queries shuffle on) and its DataFrame queries, which take their `KeySpace`s from those datasets. A
+  *scenario* (`scenarios/<id>/scenario.yaml`, pydantic schema in `sparksim/scenario/schema.py`) names the
+  workload and gives the job (app name, user, queue, cluster, executors, `--conf` in order) and its runs:
+  either one `baseline` (no faults) or `last_good` + `incident` (faults only in the incident, the last good
+  run first). Each run has its app sequence number, seed, start time, params, data overrides and faults.
+  The schema checks units, roles, fault fields and hosts; loading also builds every run's `AppSpec`, so
+  unknown datasets, key columns or params fail at `sparksim validate`. `sparksim generate <id>` writes every
+  run's event log and container logs; `scripts/evidence.py` takes app ids from the YAML.
+- **Consequences:** Scenario 00's YAML reproduces the old `SPEC` byte for byte (checked before adding
+  `spark.sql.adaptive.skewJoin.enabled=false` to the job's conf, which changes no number: all 19 evidence
+  values held). Scenario 01's last good run *is* Scenario 00's run (`test_last_good_run_is_scenario_00`),
+  so the learner compares the incident with the baseline they already studied. pydantic and PyYAML are
+  runtime dependencies.
+
+## ADR-027 — Skewed keys: Spark's own hash for hot keys, Zipf head by rank, tail by its second moment
+
+- **Date:** 2026-11-04
+- **Status:** accepted
+- **Decision:** `KeySpace` gains `hot` (explicit values with a share of the rows), `dtypes` and `zipf`.
+  A hot key goes to `pmod(Murmur3Hash(key, 42), n)`, a port of `Murmur3_x86_32` (int, bigint, string,
+  date, multi-column folding) checked against PySpark's `F.hash` and `spark_partition_id()`
+  (`customer_id = -1` → partition 1993 of 2400). A Zipf law places its top 4,096 ranks one by one (a seeded
+  32-bit hash per rank, so a key keeps its partition for any n) and turns the rest into an equivalent
+  rows-per-key CV for the existing gamma spread. Exchanges keep the tail's shares separately
+  (`cluster_shares`): files written from a reducer range are clustered on the share of *distinct* keys,
+  which a hot key barely changes. Unskewed keys take exactly the old code path (Scenario 00 unchanged).
+- **Consequences:** Skew appears only in shuffles keyed on the skewed column, in the partition Spark would
+  pick, and the dimension side of a join stays even. Partial aggregation still collapses a hot key (it
+  writes distinct keys).
+
+## ADR-028 — Spill is per operator; a straggler's sorters spill in their own windows
+
+- **Date:** 2026-11-04
+- **Status:** accepted; refines ADR-014's single-operator spill
+- **Context:** A skewed sort-merge join partition is buffered twice in the same task: by the `Sort` under
+  the join and by the `Sort` before the partitioned write. Spark spills both, and the SQL tab shows each
+  node's `spill size`; the old model charged everything to the biggest operator.
+- **Decision:** Memory consumers that hold memory at the same time (the sorts below a join) form a group;
+  each operator after the join is its own group. Within a group the biggest consumer spills first, down to
+  half the task's execution memory left in memory (a single consumer of M > A spills M − A/2, as before).
+  Each operator keeps its spill bytes, its spill I/O time (write + read back) and its spill CPU
+  (serialization + compression), which count in its SQL timings. Executor logs write one
+  `UnsafeExternalSorter … spilling sort data … (n times so far)` sequence per sorter, spread over the
+  time that sorter fills (from the task's cost breakdown).
+- **Limitation:** a task's execution memory is fixed at (heap − 300 MiB) × 0.6 / cores. In Spark a task
+  alone on its executor may grow to the whole pool, so a straggler's *peak execution memory* is
+  under-reported (2.4 GiB instead of up to ~9 GiB); its spill volume barely changes (280 GiB either way).
+  Dynamic memory sharing belongs with the contention model (ADR-014).
+
+## ADR-029 — Fault mechanisms change inputs; what Spark would do and we don't model is refused
+
+- **Date:** 2026-11-04
+- **Status:** accepted
+- **Decision:** Five fault types, each an input of the simulation (`sparksim/scenario/faults.py`):
+  `key_skew` (ADR-027); `config` (set/unset `--conf`; `spark.executor.memory/cores/instances/memoryOverhead`
+  change the containers); `slow_node` (a host's CPU, disk and NIC factors: CPU work, local disk I/O, remote
+  shuffle fetch, non-local HDFS reads, HDFS writes); `memory_pressure` (native memory per running task in the
+  container RSS model → NodeManager pmem kills); `executor_killed` (SIGKILL at a time: exit 137 with the
+  NodeManager's "Killed by external signal" diagnostics from ref05, ExecutorLostFailure, re-run, replacement
+  container, a log that stops without shutdown hooks). The engine now also reads
+  `spark.sql.autoBroadcastJoinThreshold` and AQE's coalescing settings (enabled, advisory size, minimum
+  size, parallelismFirst). Each mechanism has a test on a scaled Scenario 00 (`tests/test_faults.py`).
+- **Guard:** Spark's default `spark.sql.adaptive.skewJoin.enabled=true` would split a join partition above
+  max(256 MiB, 5 × median). The split isn't modelled yet, so the engine raises NotImplementedError instead of
+  producing a skew Spark wouldn't show; `spark.sql.adaptive.enabled=false` is refused the same way.
+- **Not yet:** task exceptions (ExceptionFailure, retries, job abort), node loss with lost shuffle files,
+  the skew-join split itself (a "fixed run" of Scenario 01 needs it), GC pressure.
+
+## ADR-030 — Scenario 01: a guest sentinel key after an upstream SDK change, AQE skew join off
+
+- **Date:** 2026-11-04
+- **Status:** accepted
+- **Decision:** The incident is the next night of Scenario 00's job. Its only differences are data: +15 %
+  events (logged-out traffic now tracked) and `customer_id = -1` on 13 % of them (0.15 / 1.15), the CRM's
+  guest placeholder, which exists in `customers_snapshot` and so survives the inner join. The job's
+  `--conf spark.sql.adaptive.skewJoin.enabled=false` (in both runs) is why AQE doesn't split the partition.
+  Hot share and volume were chosen so the runtime lands where real skew incidents do (5.5 min → 1.6 h,
+  one task of 1.5 h, 280 GiB spilled), and the ticket adds the realistic red herring of a node whose
+  local dirs filled up (the straggler's spill). The solution's 17 evidence values cover both runs, the SQL
+  tab and the straggler's container log.

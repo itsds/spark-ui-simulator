@@ -9,7 +9,6 @@ from collections import defaultdict
 
 import pytest
 
-from sparksim.apps import daily_enrichment
 from sparksim.eventlog import (
     ApplicationEnd,
     ApplicationStart,
@@ -29,11 +28,12 @@ from sparksim.eventlog import (
     line_to_event,
 )
 from sparksim.eventlog.ordering import java_properties_order, scala_int_hashset_order
+from sparksim.scenario import load_scenario
 
 
 @pytest.fixture(scope="module")
 def app():
-    run, events = daily_enrichment.build()
+    run, events = load_scenario("00-healthy-baseline").build("baseline")
     return run, events
 
 
@@ -266,7 +266,7 @@ def test_executor_metrics_sampled_at_heartbeats(app):
 
 
 def test_deterministic(app, tmp_path):
-    a = daily_enrichment.generate(tmp_path / "a")
+    (a,) = load_scenario("00-healthy-baseline").generate(tmp_path / "a")
     digest = hashlib.sha256(a.read_bytes()).hexdigest()
     expected = hashlib.sha256("".join(event_to_line(e) + "\n" for e in app[1]).encode()).hexdigest()
     assert digest == expected, "same scenario + seed must give a byte-identical log"
