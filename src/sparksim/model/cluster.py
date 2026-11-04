@@ -15,7 +15,7 @@ Container sizes follow Spark's YARN rules: `spark.executor.memory` +
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ..cost import calibration as cal
 from ..rng import substream
@@ -30,10 +30,33 @@ class Host:
     speed: float  # relative throughput of CPU and disks (1.0 = nominal)
     vcores: int
     memory_mb: int
+    # A degraded node (fault injection): factors on top of `speed` (1.0 = healthy).
+    cpu_factor: float = 1.0  # thermal throttling, a runaway co-tenant process
+    disk_factor: float = 1.0  # a failing disk in the JBOD, a full / slow local dir
+    net_factor: float = 1.0  # a NIC negotiated down, a flapping link
 
     @property
     def nm(self) -> NodeManager:
         return NodeManager(self.name, self.ip)
+
+    @property
+    def cpu_speed(self) -> float:
+        return self.speed * self.cpu_factor
+
+    @property
+    def disk_speed(self) -> float:
+        """Local disk throughput relative to nominal (disks scale with the square root of host speed)."""
+        return math.sqrt(self.speed) * self.disk_factor
+
+
+@dataclass(frozen=True)
+class HostFault:
+    """A NodeManager host that is degraded for the whole run (`slow_node` fault)."""
+
+    host: str
+    cpu: float = 1.0
+    disk: float = 1.0
+    network: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -58,6 +81,7 @@ class ClusterSpec:
     # Share of each NodeManager's memory used by other tenants' containers when our app starts.
     occupancy: tuple[float, float] = (0.55, 0.97)
     host_speed_sigma: float = cal.HOST_SPEED_SIGMA
+    host_faults: tuple[HostFault, ...] = ()
 
 
 @dataclass
@@ -102,6 +126,12 @@ def build_cluster(spec: ClusterSpec, seed: int) -> Cluster:
             ))
     lo, hi = spec.occupancy
     free = {h.name: int(h.memory_mb * (1.0 - rng.uniform(lo, hi))) for h in hosts}
+    by_name = {h.name: i for i, h in enumerate(hosts)}
+    for f in spec.host_faults:
+        if f.host not in by_name:
+            raise ValueError(f"host fault on {f.host!r}: no such NodeManager in the cluster")
+        i = by_name[f.host]
+        hosts[i] = replace(hosts[i], cpu_factor=f.cpu, disk_factor=f.disk, net_factor=f.network)
     return Cluster(spec, tuple(hosts), free)
 
 

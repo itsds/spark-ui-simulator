@@ -3,10 +3,10 @@
 ## Pipeline
 
 ```
-scenarios/<id>/scenario.yaml
+scenarios/<id>/scenario.yaml + apps/<workload>.py
    cluster (YARN nodes, executors, cores, memory), Spark configs,
-   tables (rows, row width, partitioning, file layout, key distributions),
-   the query/job shape, fault injections, seed
+   tables (schemas, file layout, key distributions), the DataFrame queries,
+   per run: date, data changes, fault injections, seed
         │
         ▼
  planner     DataFrame code → physical plan (Spark 3.5 operators, AQE query stages,
@@ -167,19 +167,42 @@ what upstream wrote.
 - Not yet: lost shuffle files without the shuffle service (FetchFailed, stage
   retry), node-local container requests, preemption, queue limits, app attempt 2.
 
-## Scenario packaging
+## Scenario packaging (built in Phase 6)
 
 Each incident scenario generates **two applications**: the last good run of
-the job and the bad run. On-call reality is "it took 40 min yesterday and
-3 h today", and comparing the two is part of the skill.
+the job and the bad run. On-call reality is "it took 6 min yesterday and
+1.6 h today", and comparing the two is part of the skill (ADR-006).
 
 ```
 scenarios/01-join-skew/
-  scenario.yaml   workload + fault + seed
+  scenario.yaml   job (workload, cluster, executors, --conf) + runs (last_good, incident: params, data, faults)
   ticket.md       what the on-call engineer is told (symptom only)
   hints.md        progressive hints (where to look, not the answer)
   solution.md     root cause, click path, evidence numbers, fix, 60-second interview answer
 ```
+
+```
+scenario.yaml ──► sparksim.scenario.schema   pydantic models: units (16g, 6m30s), run roles, fault types
+      │
+      ▼
+apps/<workload>.py   WORKLOAD: params (dt), datasets(params) = the usual input data (files, sizes,
+      │              key distributions per column), queries(params, datasets) = DataFrame code
+      ▼
+sparksim.scenario    the run's data overrides, then its faults (faults.py) → engine.runtime.AppSpec
+      │              key_skew → KeySpace.hot / .zipf of a dataset column   (shuffle partition sizes)
+      │              config → --conf / executor sizing                     (whatever Spark reads)
+      │              slow_node → Host.cpu/disk/net factors                 (every task on that host)
+      │              memory_pressure → native memory per running task      (container RSS → pmem kills)
+      │              executor_killed → SIGKILL at a time                   (exit 137 → ExecutorLostFailure)
+      ▼
+engine → event log (+ container logs) per run: `sparksim generate <id>` writes all of them
+```
+
+Hot keys go to the partition Spark's hash partitioning picks
+(`model/murmur3.py`: `pmod(Murmur3Hash(key, 42), n)`, checked against PySpark), Zipf
+heads rank by rank, the tail by its second moment. A partition's size decides its
+task's work and, against the task's execution memory, its spill (each sorter or
+aggregation map spills its own share, `cost.model._spill_group`).
 
 ## Testing strategy
 

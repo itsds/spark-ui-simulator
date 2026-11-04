@@ -1,0 +1,56 @@
+# Scenario 01: the nightly enrichment runs for ages after an upstream change. The cause is in the data only:
+# from 2026-11-03 the events carry the CRM's guest placeholder customer_id = -1 on every logged-out event.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 01-join-skew
+id: 01-join-skew
+title: "The nightly enrichment blew its SLA, and nobody changed the code"
+difficulty: medium
+topics: [data skew, sort-merge join, spill, AQE skew join, stragglers]
+summary: >-
+  clickstream-daily-enrichment normally finishes in about six minutes. Last night it ran for well over
+  an hour and the 03:00 dashboards were late. The job's code and config haven't changed for weeks.
+  Find out why, using the last good run as your reference.
+
+job:                                          # identical to 00-healthy-baseline: the same job, the same cluster
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false   # in the job's spark-submit since its Spark 3.0 migration
+
+runs:
+  last_good:                                  # = Scenario 00's run, byte for byte
+    label: "Last good run: 2026-11-03 (dt=2026-11-02)"
+    app_seq: 48213
+    seed: 20261102
+    started_at: "2026-11-03T02:10:07.318Z"
+    params: {dt: "2026-11-02"}
+  incident:
+    label: "Incident run: 2026-11-04 (dt=2026-11-03)"
+    app_seq: 48391
+    seed: 20261103
+    started_at: "2026-11-04T02:10:06.871Z"
+    params: {dt: "2026-11-03"}
+    data:
+      # The web SDK 5.0 rollout (2026-11-03) also tracks logged-out sessions now: +15 % events.
+      events: {files: 4945}
+    faults:
+      - type: key_skew
+        dataset: events
+        column: customer_id
+        # Logged-out events are stamped with the CRM's guest placeholder (it exists in customers_snapshot),
+        # so they survive the inner join: 0.15 / 1.15 = 13 % of the events share one customer_id.
+        hot_keys: [{value: -1, share: 0.13}]
+        note: upstream change, not ours; AQE skew join is off in the job's conf

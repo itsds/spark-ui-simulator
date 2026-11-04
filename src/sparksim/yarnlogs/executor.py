@@ -278,16 +278,53 @@ def _task_body(log: ContainerLog, run: AppRun, ex: Executor, w: _Work, st: _Stat
             t = _read_broadcast(log, run, ex, st, bid, t + 1, rng)
     m = res.metrics
     if m.memory_bytes_spilled > 0:
-        spills = max(1, math.ceil(m.memory_bytes_spilled / max(1, res.exec_memory)))
-        for i in range(spills):
-            ts_ = t + int((run_end - t) * (0.35 + 0.5 * (i + 1) / (spills + 1)))
-            log.info(ts_, "UnsafeExternalSorter", f"Thread {_thread_id(tk, ex)} spilling sort data of "
-                     f"{bytes_to_string(m.memory_bytes_spilled // spills)} to disk ({i + 1} "
-                     f"{' times' if i + 1 > 1 else ' time'} so far)")
+        _spill_lines(log, tk, ex, res, t, run_end)
     if isinstance(spec.sink, WriteSink) and res.output_file:
         _write(log, run, ex, stage, tk, st, t + int((run_end - t) * 0.5), run_end, rng)
     log.info(run_end + res.serialize_ms, "Executor", f"Finished {_name(tk)}. {m.result_size} bytes result sent to "
              "driver")
+
+
+def _spill_lines(log: ContainerLog, tk, ex: Executor, res, t0: int, run_end: int) -> None:
+    """`UnsafeExternalSorter.spill`: one line per spill file, each about the task's execution memory.
+
+    Every spilling operator has its own sorter (its own "times so far" count). A sorter spills while it
+    fills: the sorts below a join fill while the task reads its shuffle input, an operator after the join
+    while the rows of the operators before it stream in. The windows come from the task's cost breakdown.
+    """
+    scale = res.wall_per_cpu_ms
+    read_ms = sum(s.cpu_ns / 1e6 * scale + s.io_ms + s.fetch_wait_ms for s in res.sources)
+    joined = any(op.kind == "smj" for op in res.trace)
+    windows = []
+    side_end = read_ms
+    seen_join = not joined
+    clock = 0.0
+    for op in res.trace:
+        dur = (op.cpu_ns + op.spill_cpu_ns) / 1e6 * scale + op.spill_ms
+        if not seen_join:  # below the join: fills together with the shuffle read
+            side_end += dur
+            windows.append((op, 0.0, None))
+            if op.kind == "smj":
+                seen_join = True
+            continue
+        if op.kind == "smj":
+            seen_join = True
+        if clock == 0.0:
+            clock = side_end if joined else read_ms
+        windows.append((op, clock, clock + dur))
+        clock += dur
+    span = max(1.0, float(res.run_ms))
+    for op, a, b in windows:
+        if op.spill <= 0:
+            continue
+        b = side_end if b is None else b
+        lo, hi = min(a, span) / span, min(b, span) / span
+        spills = max(1, math.ceil(op.spill / max(1, res.exec_memory)))
+        for i in range(spills):
+            ts_ = t0 + int((run_end - t0) * (lo + (hi - lo) * (i + 1) / (spills + 1)))
+            log.info(ts_, "UnsafeExternalSorter", f"Thread {_thread_id(tk, ex)} spilling sort data of "
+                     f"{bytes_to_string(int(op.spill) // spills)} to disk ({i + 1} "
+                     f"{' times' if i + 1 > 1 else ' time'} so far)")
 
 
 def _codegen_classes(stage: StageRecord) -> int:
@@ -452,8 +489,8 @@ def executor_stderr(run: AppRun, ex: Executor, echo: list | None = None) -> str:
     _startup(log, run, ex, rng)
     tasks = sorted((t for t in run.task_records.values() if t.executor is ex), key=lambda t: (t.launch, t.task_id))
     st = _State(echo=echo)
-    if ex.exit_at is not None:
-        log.cutoff = ex.nm_kill_at  # the JVM stops logging task work once SIGTERM arrives
+    if ex.exit_at is not None:  # the JVM stops logging task work once SIGTERM arrives, or dies with SIGKILL
+        log.cutoff = ex.nm_kill_at if ex.nm_kill_at is not None else ex.exit_at
     barrier: dict[int, int] = {}
     work = [_task_header(log, run, ex, run.stages[tk.stage_id], tk, st, barrier, rng) for tk in tasks]
     for w in sorted(work, key=lambda w: (w.work_start, w.tk.task_id)):
@@ -464,6 +501,8 @@ def executor_stderr(run: AppRun, ex: Executor, echo: list | None = None) -> str:
         log.error(t, "CoarseGrainedExecutorBackend", "RECEIVED SIGNAL TERM")
         log.info(t + rng.randint(2, 30), "DiskBlockManager", "Shutdown hook called")
         log.info(t + rng.randint(30, 80), "ShutdownHookManager", "Shutdown hook called")
+    elif ex.exit_at is not None:
+        pass  # SIGKILL: no signal handler, no shutdown hooks; the log just stops
     else:
         t = run.app_end + rng.randint(40, 400)
         log.info(t, "YarnCoarseGrainedExecutorBackend", "Driver commanded a shutdown")

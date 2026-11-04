@@ -15,6 +15,7 @@ The resident set of an executor JVM is
   + netty direct buffers                    the DirectPoolMemory metric (shuffle fetches in flight)
   + thread stacks + malloc arenas           per JVM / per task thread
   + Python workers                          PySpark UDF workers (0 for pure DataFrame plans)
+  + native memory per running task          Arrow / JNI buffers, leaks (memory_pressure fault; 0 normally)
 
 so a container whose overhead is smaller than the JVM's own native footprint fits while the heap is
 small, and gets killed once the heap is fully committed: the classic "it worked for the first ten
@@ -47,6 +48,7 @@ class ContainerMemory:
     cores: int
     limit: int  # container size in bytes (what YARN enforces)
     python_rss: int = 0  # resident Python workers (PySpark UDFs)
+    native_per_task: int = 0  # native memory each running task holds (memory_pressure fault)
     growth_core_s: float = cal.G1_HEAP_GROWTH_CORE_S  # this JVM's heap growth constant (per-container spread)
     native_factor: float = 1.0  # spread of the native footprint between JVMs
     committed: float = 0.0
@@ -74,7 +76,7 @@ class ContainerMemory:
             + cal.JVM_OFF_HEAP_BASE + stages_seen * cal.JVM_OFF_HEAP_PER_STAGE
             + cal.DIRECT_POOL_BASE + fetching * cal.DIRECT_POOL_PER_FETCH
             + cal.THREAD_STACKS_RSS + self.cores * cal.MALLOC_ARENA_RSS_PER_CORE)
-        return int(self.committed + native + self.python_rss)
+        return int(self.committed + native + self.python_rss + running * self.native_per_task)
 
 
 def long2string(n: int) -> str:
