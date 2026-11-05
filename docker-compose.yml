@@ -1,10 +1,66 @@
-# One-command local stack: History Server + mock YARN NodeManager log server. Phase 7 adds the portal.
-# Not yet verified (no Docker daemon in the cloud dev container).
+# One command, nothing but Docker: generate → History Server → container logs → portal.
 #
-#   docker compose up                                        # browse generated scenarios (./event-logs)
-#   EVENT_LOG_DIR=./reference/event-logs docker compose up   # browse real reference captures
+#   docker compose up              then open http://localhost:8000 (the portal links into the History Server)
+#   docker compose down            stop (the generated logs stay in the named volumes; `down -v` deletes them)
+#
+# The first start generates every scenario's event logs (~1 min); later starts only regenerate what changed
+# (`sparksim prepare` keeps a manifest of fingerprints). Host ports can be moved: PORTAL_PORT, HS_PORT, NM_PORT.
+# `docker compose --profile reference up` also serves the real reference captures on http://localhost:18081.
+
+x-sparksim: &sparksim
+  build: .
+  image: spark-ui-simulator:local
+  pull_policy: build              # rebuild (from cache: seconds) on every `up`, so a `git pull` takes effect
+
 services:
-  history-server:
+  generate:                       # runs once, then exits: writes what is missing or out of date
+    <<: *sparksim
+    command: ["sparksim", "prepare", "--out", "/data/event-logs", "--logs-out", "/data/yarn-logs"]
+    volumes:
+      - event-logs:/data/event-logs
+      - yarn-logs:/data/yarn-logs
+
+  history-server:                 # the real Apache Spark 3.5.9 History Server
+    image: apache/spark:3.5.9-java17
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
+    environment:
+      SPARK_CONF_DIR: /opt/hs-conf
+      # executor stdout/stderr links → the container log server, as the browser reaches it
+      SPARK_HISTORY_OPTS: >-
+        -Dspark.history.fs.logDirectory=file:///event-logs
+        -Dspark.history.custom.executor.log.url=http://localhost:${NM_PORT:-8042}/node/containerlogs/{{CONTAINER_ID}}/{{USER}}/{{FILE_NAME}}?start=-4096
+    volumes:
+      - ./services/history-server/spark-defaults.conf:/opt/hs-conf/spark-defaults.conf:ro
+      - event-logs:/event-logs:ro
+    ports:
+      - "${HS_PORT:-18080}:18080"
+
+  nm-logs:                        # mock YARN NodeManager log server for the generated container logs
+    <<: *sparksim
+    command: ["python", "/app/services/nm-logs/server.py", "--dir", "/data/yarn-logs", "--port", "8042"]
+    volumes:
+      - yarn-logs:/data/yarn-logs:ro
+    ports:
+      - "${NM_PORT:-8042}:8042"
+
+  portal:                         # scenario cards, tickets, hints, solutions, links into the History Server
+    <<: *sparksim
+    command:
+      - sparksim
+      - portal
+      - --host=0.0.0.0
+      - --port=8000
+      - --event-logs=/data/event-logs
+      - --hs-url=http://localhost:${HS_PORT:-18080}
+      - --hs-api=http://history-server:18080
+      - --nm-api=http://nm-logs:8042
+    volumes:
+      - event-logs:/data/event-logs:ro
+    ports:
+      - "${PORTAL_PORT:-8000}:8000"
+
+  history-server-reference:       # optional: the nine real reference apps captured on YARN (Phase 1)
+    profiles: [reference]
     image: apache/spark:3.5.9-java17
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
     environment:
@@ -12,14 +68,10 @@ services:
       SPARK_HISTORY_OPTS: "-Dspark.history.fs.logDirectory=file:///event-logs"
     volumes:
       - ./services/history-server/spark-defaults.conf:/opt/hs-conf/spark-defaults.conf:ro
-      - ${EVENT_LOG_DIR:-./event-logs}:/event-logs:ro
+      - ./reference/event-logs:/event-logs:ro
     ports:
-      - "18080:18080"
-  nm-logs:
-    image: python:3.11-slim
-    command: ["python3", "/srv/nm-logs/server.py", "--dir", "/yarn-logs", "--port", "8042"]
-    volumes:
-      - ./services/nm-logs:/srv/nm-logs:ro
-      - ${YARN_LOG_DIR:-./yarn-logs}:/yarn-logs:ro
-    ports:
-      - "8042:8042"
+      - "18081:18080"
+
+volumes:
+  event-logs:
+  yarn-logs:

@@ -18,8 +18,8 @@
 **From the #data-platform channel (03:46):** "fyi the NodeManager on `wn007.hadoop.prod.internal`
 had its YARN local dirs grow by ~125 GB between 02:16 and 03:36, freed again at 03:44. Bad node?"
 
-Both runs are in the History Server: `http://localhost:18080` (the executor `stdout`/`stderr` links
-need `services/nm-logs/run.sh`).
+Both runs are in the History Server: `http://localhost:18080` (`uv run sparksim up` or
+`docker compose up` starts it, and the log server behind the executors' `stdout`/`stderr` links).
 
 Your job:
 

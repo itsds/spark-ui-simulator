@@ -204,6 +204,30 @@ heads rank by rank, the tail by its second moment. A partition's size decides it
 task's work and, against the task's execution memory, its spill (each sorter or
 aggregation map spills its own share, `cost.model._spill_group`).
 
+## The portal and the one-command stack (built in Phase 7)
+
+```
+                        ┌─ sparksim prepare ─ plan_apps: every run of every scenario → one app id (shared runs
+                        │                     once); fingerprint = sha256(job + run in scenario.yaml, simulator
+                        │                     source); generate what is missing/stale → event-logs/ + yarn-logs/
+                        │                     + event-logs/.sparksim-manifest.json (hidden: HS skips it)
+sparksim up  ───────────┼─ services/nm-logs/server.py       :8042   (subprocess, build/logs/nm-logs.log)
+(no Docker)             ├─ services/history-server/run.sh    :18080  (subprocess, build/logs/history-server.log)
+                        └─ sparksim.portal (thread)          :8000
+docker compose up       the same four as services: generate (runs once, exits), history-server
+                        (apache/spark:3.5.9-java17), nm-logs and portal (the simulator image, Dockerfile);
+                        named volumes event-logs + yarn-logs
+```
+
+The portal (`sparksim/portal/`, standard-library HTTP server) renders each scenario's `ticket.md`,
+`hints.md` (one hint per `<details>` block) and `solution.md` with markdown-it-py on every request, so
+edits show without a restart. It links every run into the History Server (`/history/<app>/1/jobs/`, stages,
+SQL, executors, environment) and polls its own `/api/status`, which combines the manifest (generated?
+being generated?), the History Server's application list (listed yet?) and whether the log server answers.
+Hints revealed, the learner's notes and the solution reveal live in the browser's localStorage. The portal
+never shows a metric: every number is read in the History Server (ADR-031). `scripts/stack_check.py`
+checks a running stack the way a learner uses it.
+
 ## Testing strategy
 
 - **Unit:** conservation invariants, scheduler correctness (no core runs two

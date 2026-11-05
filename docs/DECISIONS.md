@@ -486,3 +486,58 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   one task of 1.5 h, 280 GiB spilled), and the ticket adds the realistic red herring of a node whose
   local dirs filled up (the straggler's spill). The solution's 17 evidence values cover both runs, the SQL
   tab and the straggler's container log.
+
+## ADR-031 — The portal is a small server-rendered page set that never shows a metric
+
+- **Date:** 2026-11-05
+- **Status:** accepted
+- **Context:** Phase 7 needs a place for the ticket, the hints and the solution, with links into the History
+  Server (ADR-001: no UI of our own except a small scenario portal). The learner should not be able to read
+  the answer by accident, and the portal must not become a second source of numbers.
+- **Decision:** `sparksim/portal/`: a standard-library HTTP server in the package, pages rendered on the
+  server from the scenario's Markdown (markdown-it-py: CommonMark + tables, inline HTML for `hints.md`'s
+  `<details>` blocks), one CSS and one script file, no CDN. Cards show the number, difficulty, title, summary
+  and run states; **topics are spoilers** (Scenario 01's say "data skew") and sit in a collapsed
+  "Topics (spoiler)" element. Hints are revealed one at a time, the solution behind a button that asks for a
+  second click while the diagnosis box is empty; progress and notes are per scenario in localStorage (no
+  accounts, nothing on the server). Each run gets deep links into the History Server (Jobs, Stages, SQL,
+  Executors, Environment) that open in one named browser tab. `/api/status` reports each app as generating /
+  queued / not generated / loading / ready (and out of date), from the manifest (ADR-032) and the History
+  Server's application list. The portal shows no metric: every number is read in the History Server.
+- **Consequences:** Editing `ticket.md`/`hints.md`/`solution.md` shows on reload. The portal runs anywhere the
+  package runs (no Node build). markdown-it-py is a runtime dependency.
+
+## ADR-032 — One command: `sparksim up` without Docker, `docker compose up` with it; a fingerprint manifest
+
+- **Date:** 2026-11-05
+- **Status:** accepted; supersedes ADR-007's "Docker Compose path not verified"
+- **Context:** "A fresh clone and one command give you Scenario 01 ready to debug." Generating every scenario
+  takes ~30 s per two runs and ~1.4 GB of memory per run, so it must not happen on every start, and a
+  `git pull` that changes a scenario or the simulator must not leave stale logs behind.
+- **Decision:**
+  - `sparksim prepare`: every run of every scenario is one app id; runs that are the same (Scenario 01's last
+    good run = Scenario 00's run) share their app and are generated once, and two *different* runs claiming
+    one app id are an error (`sparksim validate` checks it). An app's fingerprint is sha256 of the job and the
+    run in `scenario.yaml` (the label excluded) and of the simulator's source (the package minus the portal
+    and the CLI). `<event-logs>/.sparksim-manifest.json` records each log's fingerprint and a running
+    prepare's progress; it is a hidden file, which the History Server skips. Apps whose event log, container
+    logs or fingerprint is missing or different are regenerated, in sequence (memory). `sparksim generate`
+    records into the same manifest.
+  - `sparksim up` (needs uv + JDK 17): checks the ports, starts the log server and the History Server
+    (`run.sh`, `JAVA_TOOL_OPTIONS` removed, the executor log URL pointed at the chosen port) as
+    subprocesses with output in `build/logs/`, the portal in a thread, runs `prepare` meanwhile, waits until
+    the History Server lists every app, prints `Ready.` with a link per scenario, and stops everything on
+    Ctrl+C or SIGTERM.
+  - `docker compose up` (needs Docker only): `generate` (runs `prepare` once, exits), `history-server`
+    (`apache/spark:3.5.9-java17`), `nm-logs` and `portal` (the simulator image: `python:3.11-slim`, uv,
+    `uv sync --frozen --no-default-groups`, no PySpark, non-root user). Generated logs live in named volumes,
+    not bind mounts, so a container never leaves root-owned files in the clone. `pull_policy: build` rebuilds
+    the image from cache on every `up`. Host ports move with `PORTAL_PORT`, `HS_PORT`, `NM_PORT`; the
+    reference captures are a `reference` profile.
+- **Evidence:** both paths were run from a fresh clone in the cloud container (which can run `dockerd` after
+  all; images pull from Docker Hub) and pass `scripts/stack_check.py`; the event logs generated in the
+  container are byte-identical to the local ones, and a second `docker compose up` regenerates nothing.
+  `tests/test_up.py` runs `sparksim up` from empty directories to `Ready.` and checks the stack and the stop.
+- **Consequences:** Adding a scenario needs no change to the stack: `prepare` and the portal discover
+  `scenarios/*/scenario.yaml`. The sandbox's TLS-intercepting proxy needs a CA in the image's base and a
+  relay for builds; that set-up is not part of the repo (SESSION_LOG gotchas).
