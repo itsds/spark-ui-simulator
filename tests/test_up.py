@@ -2,7 +2,7 @@
 
 Runs the real command on free ports and fresh directories, waits for its "Ready." line, then checks the stack
 the way a learner uses it (`scripts/stack_check.py`: portal pages, History Server deep links, container logs
-behind the executors' log links), and that SIGTERM stops every server it started."""
+behind the executors' log links), and that Ctrl+C (SIGINT) stops every server it started."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def test_one_command_from_nothing_to_ready(tmp_path):
         portal = f"http://localhost:{ports['--port']}"
         assert stack_check.main(["--portal", portal, "--wait", "60", "--scenario", SCENARIO]) == 0
     finally:
-        proc.send_signal(signal.SIGTERM)
+        proc.send_signal(signal.SIGINT)  # Ctrl+C
         try:
             proc.wait(timeout=60)
         except subprocess.TimeoutExpired:

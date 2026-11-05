@@ -106,7 +106,9 @@ def up(o: UpOptions) -> int:
     def on_term(signum, frame):
         raise Stop()
 
-    old_term = signal.signal(signal.SIGTERM, on_term)
+    # Ctrl+C and SIGTERM stop the stack. SIGINT explicitly too: a shell that starts us in the background
+    # without job control leaves it ignored, and Python then never raises KeyboardInterrupt.
+    old_handlers = {s: signal.signal(s, on_term) for s in (signal.SIGTERM, signal.SIGINT)}
     children: list[tuple[str, subprocess.Popen, Path]] = []
     portal = None
     try:
@@ -171,7 +173,8 @@ def up(o: UpOptions) -> int:
     except (KeyboardInterrupt, Stop):
         print("\nStopping ...", flush=True)
     finally:
-        signal.signal(signal.SIGTERM, old_term)
+        for s in old_handlers:  # a second Ctrl+C must not interrupt the clean-up and orphan a server
+            signal.signal(s, signal.SIG_IGN)
         if portal is not None:
             portal.shutdown()
             portal.server_close()
@@ -183,4 +186,6 @@ def up(o: UpOptions) -> int:
                 proc.wait(timeout=20)
             except subprocess.TimeoutExpired:
                 proc.kill()
+        for s, h in old_handlers.items():
+            signal.signal(s, h)
     return 0
