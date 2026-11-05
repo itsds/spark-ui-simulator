@@ -113,7 +113,8 @@ def test_run_states(tmp_path):
         probe = Probe(hs, None, ttl=0)
         st = status(scs, ev, probe)
         assert st["history_server"]["up"] and not st["nm_logs"]["up"]
-        assert {a: i["state"] for a, i in st["apps"].items()} == {good: "missing", bad: "missing"}
+        assert {good, bad} <= set(st["apps"])  # one entry per app of every scenario
+        assert {i["state"] for i in st["apps"].values()} == {"missing"}
         assert st["apps"][good]["scenarios"] == [S00, S01]
 
         write_log(ev, s01, "last_good")

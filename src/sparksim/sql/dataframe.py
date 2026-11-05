@@ -214,6 +214,10 @@ class LWrite(LNode):
 # --------------------------------------------------------------------------- the DataFrame API
 
 
+def _true(v: str) -> bool:
+    return v.strip().lower() == "true"
+
+
 class SparkSession:
     def __init__(self, ids: ExprIds, conf: dict[str, str] | None = None):
         self.ids = ids
@@ -221,6 +225,12 @@ class SparkSession:
 
     @property
     def shuffle_partitions(self) -> int:
+        """`SQLConf.numShufflePartitions`: with AQE's partition coalescing on, its initial partition number
+        (if set) replaces `spark.sql.shuffle.partitions` for every shuffle the planner inserts."""
+        initial = self.conf.get("spark.sql.adaptive.coalescePartitions.initialPartitionNum")
+        if initial is not None and _true(self.conf.get("spark.sql.adaptive.enabled", "true")) \
+                and _true(self.conf.get("spark.sql.adaptive.coalescePartitions.enabled", "true")):
+            return int(initial)
         return int(self.conf.get("spark.sql.shuffle.partitions", "200"))
 
     def read(self, table: Table, path: str | None = None) -> DataFrame:

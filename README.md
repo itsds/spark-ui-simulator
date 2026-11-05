@@ -42,7 +42,7 @@ Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 |---|---|
 | 00 | Healthy baseline (learn what "normal" looks like) ✅ [`scenarios/00-healthy-baseline`](scenarios/00-healthy-baseline/ticket.md) |
 | 01 | Join-key skew ✅ [`scenarios/01-join-skew`](scenarios/01-join-skew/ticket.md) |
-| 02 | Too few shuffle partitions → spill |
+| 02 | Too few shuffle partitions → spill ✅ [`scenarios/02-shuffle-partitions-spill`](scenarios/02-shuffle-partitions-spill/ticket.md) |
 | 03 | YARN memoryOverhead container kills |
 | 04 | Small files / tiny tasks |
 | 05 | Missed broadcast join |
@@ -174,8 +174,8 @@ uv run scripts/event_inventory.py    # regenerates docs/event-log-schema.md
 ## Status
 
 Phases 0–7 are done (see [`docs/ROADMAP.md`](docs/ROADMAP.md)): the simulator, YARN realism, the
-scenario DSL with fault injection, Scenarios 00 and 01, the portal and the one-command start. Next: the
-scenario library, one or two scenarios per session.
+scenario DSL with fault injection, Scenarios 00 and 01, the portal and the one-command start. Phase 8, the
+scenario library, is under way (one or two scenarios per session): Scenario 02 is in.
 
 ## Docs
 

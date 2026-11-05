@@ -1,0 +1,58 @@
+# Scenario 02: the nightly enrichment after its move to Airflow. The cause is in the submission only: the
+# migration dropped --conf spark.sql.shuffle.partitions=2400 ("AQE sizes the partitions on Spark 3"), so
+# every shuffle has Spark's default 200 partitions, and AQE's coalescing can merge partitions but never split.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 02-shuffle-partitions-spill
+id: 02-shuffle-partitions-spill
+title: "Disk alerts on 40 worker nodes during the nightly enrichment"
+difficulty: easy
+topics: [spill, shuffle partitions, AQE coalescing, task sizing, Environment tab]
+summary: >-
+  Hadoop ops paged data-platform: the local disks of 40 worker nodes were saturated for a few minutes
+  in the middle of the night, and other tenants' jobs on those nodes slowed down. The I/O came from
+  clickstream-daily-enrichment, which also ran noticeably longer than usual. Find out what the job
+  did to the disks and why, using the night before as your reference.
+
+job:                                          # the same job and cluster as 00 and 01, three weeks earlier
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377          # the active RM (rm1) started 2026-10-13 14:35 UTC
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # the cron wrapper's spark-submit (as in 00 and 01)
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false
+
+runs:
+  last_good:
+    label: "Last good run: 2026-10-14 (dt=2026-10-13)"
+    app_seq: 44657
+    seed: 20261013
+    started_at: "2026-10-14T02:10:06.522Z"
+    params: {dt: "2026-10-13"}
+  incident:
+    label: "Incident run: 2026-10-15 (dt=2026-10-14)"
+    app_seq: 44836
+    seed: 20261014
+    started_at: "2026-10-15T02:10:08.104Z"
+    params: {dt: "2026-10-14"}
+    faults:
+      # DATAENG-2207 (merged 2026-10-14): the job moved from the team's cron + spark-submit wrapper to the
+      # platform's Airflow DAG factory. The DAG's conf dict was translated from the wrapper's flags, minus
+      # the shuffle partitions ("legacy tuning: AQE coalesces partitions on Spark 3"), plus the factory's
+      # usual YARN tags and a single app attempt (Airflow retries the task itself).
+      - type: config
+        unset: [spark.sql.shuffle.partitions]
+        set:
+          spark.yarn.maxAppAttempts: 1
+          spark.yarn.tags: "airflow,dag_id=clickstream_daily,task_id=enrich_events"
+        note: the migration's review called it "no functional change"; the platform rolled it back on 2026-10-15

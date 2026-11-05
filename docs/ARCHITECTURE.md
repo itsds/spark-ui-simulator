@@ -95,7 +95,10 @@ yarn-logs/<appId>/<containerId>/{stdout,stderr}  ──►  services/nm-logs (mo
 
 Lines are placed on the simulated clock: a task's lines sit between its launch and finish, tasks of a
 stage that wait for the first one's broadcast fetch and code generation log after it, and a killed
-container writes nothing after its SIGTERM.
+container writes nothing after its SIGTERM. Inside a task the order follows the code path and its cost
+breakdown: shuffle fetch, committer set-up, each sorter's spills while it fills, then the Parquet writer once
+the sort before the write has consumed its input. Each task runs on a thread of the executor's cached task
+launch pool (`task_threads`), so concurrent tasks log different thread ids and idle threads are reused (ADR-034).
 
 ## The SQL layer (built in Phase 4)
 

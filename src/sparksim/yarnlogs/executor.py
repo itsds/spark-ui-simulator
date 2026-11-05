@@ -10,6 +10,7 @@ path (deserialize → broadcast fetch → codegen → read → write → commit 
 
 from __future__ import annotations
 
+import heapq
 import math
 import random
 import uuid
@@ -17,6 +18,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING
 
+from ..cost import calibration as cal
+from ..cost.model import page_size
 from ..model.workload import ScanSource, ShuffleSource, WriteSink
 from ..rng import substream
 from ..sql import nodes as sqln
@@ -47,6 +50,7 @@ class _State:
     compressors: int = 0
     connections: set[str] = field(default_factory=set)
     echo: list | None = None  # what the driver logs in reaction (block updates, map status requests)
+    threads: dict[int, int] = field(default_factory=dict)  # task id → id of the task launch thread running it
 
 
 def _hex(rng: random.Random, n: int = 8) -> str:
@@ -277,19 +281,31 @@ def _task_body(log: ContainerLog, run: AppRun, ex: Executor, w: _Work, st: _Stat
         if bid is not None:
             t = _read_broadcast(log, run, ex, st, bid, t + 1, rng)
     m = res.metrics
+    windows = _fill_windows(res)
+    to_wall = _wall_clock(t, run_end, res.run_ms)
     if m.memory_bytes_spilled > 0:
-        _spill_lines(log, tk, ex, res, t, run_end)
+        _spill_lines(log, st.threads.get(tk.task_id, THREAD_ID_BASE), page_size(ex.heap_bytes, ex.cores),
+                     res.exec_memory, windows, to_wall)
     if isinstance(spec.sink, WriteSink) and res.output_file:
-        _write(log, run, ex, stage, tk, st, t + int((run_end - t) * 0.5), run_end, rng)
+        # FileFormatWriter.executeTask sets the task's committer up first; the first output file opens when the
+        # first row reaches the writer, i.e. once the sort before the write has consumed all of its input.
+        sorts = [b for op, _, b in windows if op.kind == "sort"]
+        opened = to_wall(sorts[-1]) if sorts else t + rng.randint(2, 30)
+        _write(log, run, ex, stage, tk, st, t + rng.randint(1, 6), max(t + 2, opened), run_end, rng)
     log.info(run_end + res.serialize_ms, "Executor", f"Finished {_name(tk)}. {m.result_size} bytes result sent to "
              "driver")
 
 
-def _spill_lines(log: ContainerLog, tk, ex: Executor, res, t0: int, run_end: int) -> None:
-    """`UnsafeExternalSorter.spill`: one line per spill file, each about the task's execution memory.
+def _wall_clock(t0: int, run_end: int, run_ms: int):
+    """Maps a point of the task's cost breakdown (ms of run time) onto the log's clock between t0 and run_end."""
+    span = max(1.0, float(run_ms))
+    return lambda x: t0 + int((run_end - t0) * min(x, span) / span)
 
-    Every spilling operator has its own sorter (its own "times so far" count). A sorter spills while it
-    fills: the sorts below a join fill while the task reads its shuffle input, an operator after the join
+
+def _fill_windows(res) -> list[tuple[object, float, float]]:
+    """(operator, start, end) in ms of the task's run time: when each operator consumes its input.
+
+    The sorts below a join fill while the task reads its shuffle input; an operator after the join fills
     while the rows of the operators before it stream in. The windows come from the task's cost breakdown.
     """
     scale = res.wall_per_cpu_ms
@@ -303,7 +319,7 @@ def _spill_lines(log: ContainerLog, tk, ex: Executor, res, t0: int, run_end: int
         dur = (op.cpu_ns + op.spill_cpu_ns) / 1e6 * scale + op.spill_ms
         if not seen_join:  # below the join: fills together with the shuffle read
             side_end += dur
-            windows.append((op, 0.0, None))
+            windows.append([op, 0.0, None])
             if op.kind == "smj":
                 seen_join = True
             continue
@@ -311,20 +327,32 @@ def _spill_lines(log: ContainerLog, tk, ex: Executor, res, t0: int, run_end: int
             seen_join = True
         if clock == 0.0:
             clock = side_end if joined else read_ms
-        windows.append((op, clock, clock + dur))
+        windows.append([op, clock, clock + dur])
         clock += dur
-    span = max(1.0, float(res.run_ms))
+    return [(op, a, side_end if b is None else b) for op, a, b in windows]
+
+
+def _spill_lines(log: ContainerLog, thread: int, page: int, cap: int, windows, to_wall) -> None:
+    """`UnsafeExternalSorter.spill`: one line per spill file, spread over the sorter's fill window.
+
+    A sorter spills when it can't get another page within the task's execution memory (`cap`), so each spill
+    file holds about that much. Every spilling operator has its own sorter, so its own count; the count is
+    the number of spill files before this one (`spillWriters.size()`: "0  time", "1  time", "2  times"). The
+    size is the sorter's `getMemoryUsage()`: whole data pages (`spark.buffer.pageSize`) plus its pointer
+    array, a LongArray that starts at 2 x 4096 longs and doubles.
+    """
     for op, a, b in windows:
         if op.spill <= 0:
             continue
-        b = side_end if b is None else b
-        lo, hi = min(a, span) / span, min(b, span) / span
-        spills = max(1, math.ceil(op.spill / max(1, res.exec_memory)))
+        spills = max(1, math.ceil(op.spill / max(1, cap)))
+        each = op.spill / spills
+        pointers = each * min(1.0, op.rows_in * cal.SORT_POINTER_BYTES / op.mem) if op.mem else 0.0
+        array = 1 << max(16, math.ceil(math.log2(max(1.0, pointers))))
+        usage = max(1, int((each - array) // page)) * page + array  # never more than the sorter held
         for i in range(spills):
-            ts_ = t0 + int((run_end - t0) * (lo + (hi - lo) * (i + 1) / (spills + 1)))
-            log.info(ts_, "UnsafeExternalSorter", f"Thread {_thread_id(tk, ex)} spilling sort data of "
-                     f"{bytes_to_string(int(op.spill) // spills)} to disk ({i + 1} "
-                     f"{' times' if i + 1 > 1 else ' time'} so far)")
+            ts_ = to_wall(a + (b - a) * (i + 1) / (spills + 1))
+            log.info(ts_, "UnsafeExternalSorter", f"Thread {thread} spilling sort data of "
+                     f"{bytes_to_string(usage)} to disk ({i} {' times' if i > 1 else ' time'} so far)")
 
 
 def _codegen_classes(stage: StageRecord) -> int:
@@ -335,8 +363,33 @@ def _codegen_classes(stage: StageRecord) -> int:
     return max(2, min(14, 2 * wscg + 1))
 
 
-def _thread_id(tk: TaskRecord, ex: Executor) -> int:
-    return 60 + (tk.task_id % (ex.cores * 4))
+THREAD_ID_BASE = 60  # the JVM's thread ids in use when the first task arrives (main, RPC, netty, block manager)
+THREAD_KEEP_ALIVE_MS = 60_000  # Executor's cached task launch pool: idle workers exit after 60 s
+
+
+def task_threads(tasks: list[TaskRecord], rng: random.Random) -> dict[int, int]:
+    """Which "Executor task launch worker" thread runs each task (task id → thread id).
+
+    The executor's task launch pool is a cached thread pool: a task goes to an idle worker if there is one
+    (a SynchronousQueue hand-off, so the worker that went idle last), else to a new thread with the JVM's
+    next thread id. Other threads (shuffle clients, block transfers) start in between, so ids have gaps.
+    """
+    out: dict[int, int] = {}
+    busy: list[tuple[int, int]] = []  # (finish, thread id)
+    idle: list[tuple[int, int]] = []  # (idle since, thread id)
+    next_id = THREAD_ID_BASE
+    for tk in sorted(tasks, key=lambda t: (t.launch, t.task_id)):
+        while busy and busy[0][0] <= tk.launch:
+            idle.append(heapq.heappop(busy))
+        idle = sorted((s, tid) for s, tid in idle if tk.launch - s < THREAD_KEEP_ALIVE_MS)
+        if idle:
+            tid = idle.pop()[1]
+        else:
+            tid = next_id
+            next_id += rng.choice((1, 1, 1, 2, 3))
+        out[tk.task_id] = tid
+        heapq.heappush(busy, (tk.finish, tid))
+    return out
 
 
 def _scan(log, run, ex, stage, src, part, st: _State, t: int, span: int, rng) -> int:
@@ -402,7 +455,8 @@ def _shuffle_fetch(log, run, ex, src, plan, st: _State, t: int, rng) -> int:
     return t + started
 
 
-def _write(log, run, ex, stage, tk, st: _State, t: int, run_end: int, rng) -> None:
+def _write(log, run, ex, stage, tk, st: _State, t: int, opened: int, run_end: int, rng) -> None:
+    """Committer set-up at `t` (task start), the Parquet writer when its first row arrives (`opened`)."""
     sink = stage.spec.sink
     cmd = _write_command(stage)
     table_root = cmd.output_path if cmd is not None else sink.path.rsplit("/", 1)[0]
@@ -416,7 +470,7 @@ def _write(log, run, ex, stage, tk, st: _State, t: int, run_end: int, rng) -> No
         log.info(t, "SQLHadoopMapReduceCommitProtocol",
                  "Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter"
                  if _ == 0 else "Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter")
-    t += rng.randint(2, 30)
+    t = opened
     log.info(t, "CodecConfig", "Compression: SNAPPY")
     log.info(t, "CodecConfig", "Compression: SNAPPY")
     log.info(t, "ParquetOutputFormat",
@@ -488,7 +542,7 @@ def executor_stderr(run: AppRun, ex: Executor, echo: list | None = None) -> str:
     log = ContainerLog()
     _startup(log, run, ex, rng)
     tasks = sorted((t for t in run.task_records.values() if t.executor is ex), key=lambda t: (t.launch, t.task_id))
-    st = _State(echo=echo)
+    st = _State(echo=echo, threads=task_threads(tasks, substream(run.spec.seed, f"yarnlogs/{ex.container_id}/threads")))
     if ex.exit_at is not None:  # the JVM stops logging task work once SIGTERM arrives, or dies with SIGKILL
         log.cutoff = ex.nm_kill_at if ex.nm_kill_at is not None else ex.exit_at
     barrier: dict[int, int] = {}
