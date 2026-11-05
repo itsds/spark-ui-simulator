@@ -94,11 +94,12 @@ The ~125 GB its YARN local dirs grew by is the 117.9 GiB of spill files that tas
 task on it slow; a skewed partition makes *one* task slow wherever it lands.
 
 **The executor log.** Executor 40's `stderr` shows `Running task 1993.0 in stage 5.0 (TID 8310)` at
-02:15:08, then **120** `UnsafeExternalSorter: Thread 66 spilling sort data of 2.3 GiB to disk (n times so
+02:15:08, then **120** `UnsafeExternalSorter: Thread 62 spilling sort data of 2.3 GiB to disk (n  times so
 far)` lines in two sequences (E16): 53 spills from the sort on the join's input while the task read its
-shuffle blocks (02:15–02:53), then 67 from the sort for the write (02:55–03:35), then ~8 minutes of
-merging the spill files and writing a 19 GiB Parquet file. Two counters because there are two sorters
-in the task, one per `Sort` node of the plan.
+shuffle blocks (02:15–02:53, counting `0  time` … `52  times`), then 67 from the sort for the write
+(02:55–03:35), then the Parquet writer opens (03:36) and ~8 minutes of merging the spill files and
+writing a 19 GiB Parquet file. Two counters because there are two sorters in the task, one per `Sort`
+node of the plan; the count is the number of spill files *before* this one, so it starts at 0.
 
 **What changed, if not the code?** Compare query 0 of both runs. The events scan produced **15.1 % more
 rows** (E12): 5.09 billion instead of 4.43 billion. 15 % more data explains 15 % longer scans (stage 2

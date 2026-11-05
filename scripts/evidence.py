@@ -15,6 +15,7 @@ do the same check in CI.
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 from pathlib import Path
@@ -50,6 +51,17 @@ def fmt_bytes(n: float) -> str:
         if n >= 2 * size:
             return f"{n / size:.1f} {unit}"
     return f"{int(n)} B"
+
+
+def fmt_bytes_js(n: float) -> str:
+    """`formatBytes` in Spark's utils.js: what the stage page's Summary Metrics and task tables show
+    (always the largest unit, one decimal, a trailing ".0" dropped: `1.5 GiB`, `3 GiB`)."""
+    if n <= 0:
+        return "0.0 B"
+    units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+    i = min(len(units) - 1, int(math.floor(math.log(n) / math.log(1024))))
+    v = round(n / 1024 ** i, 1)
+    return f"{v:g} {units[i]}" if v == int(v) else f"{v:.1f} {units[i]}"
 
 
 def secs(ms: float) -> str:
@@ -224,7 +236,7 @@ def _durations(c: Ctx, sid: int) -> str:
 def _shuffle_read_med_max(c: Ctx, sid: int) -> str:
     sr = _summary(c, sid, "0.5,1.0")["shuffleReadMetrics"]
     (b_med, b_max), (r_med, r_max) = sr["readBytes"], sr["readRecords"]
-    return f"{fmt_bytes(b_med)} / {_fmt_rec(r_med)} → {fmt_bytes(b_max)} / {_fmt_rec(r_max)}"
+    return f"{fmt_bytes_js(b_med)} / {_fmt_rec(r_med)} → {fmt_bytes_js(b_max)} / {_fmt_rec(r_max)}"
 
 
 def _straggler(c: Ctx, sid: int) -> dict:
@@ -345,7 +357,7 @@ def _spill_log(c: Ctx) -> str:
             thread = True
         if thread and "UnsafeExternalSorter" in line and "spilling sort data" in line:
             n = int(re.search(r"\((\d+) +times? so far\)", line).group(1))
-            if n == 1:
+            if n == 0:  # a sorter's first spill: "(0  time so far)"
                 counts.append(0)
             counts[-1] += 1
         if f"Finished task {t['index']}.0 in stage 5.0 (TID {t['taskId']})" in line:
@@ -385,7 +397,133 @@ S01 = {
     "E17": _same_host_tasks,
 }
 
-EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01}
+# ---------------------------------------------------------------------------- scenario 02 (too few shuffle partitions)
+
+
+def _job_ms(c: Ctx, job_id: int) -> float:
+    j = c.get(f"jobs/{job_id}")
+    return _ts(j["completionTime"]) - _ts(j["submissionTime"])
+
+
+def _stage_row(c: Ctx, sid: int) -> str:
+    return f"{c.stage(sid)['numTasks']:,} tasks, {fmt_duration(_stage_ms(c.stage(sid)))}"
+
+
+def _uniform_durations(c: Ctx, sid: int) -> str:
+    """Min / median / max as the Summary Metrics table rounds them, then the REST API's seconds."""
+    mn, med, mx = _summary(c, sid, "0.0,0.5,1.0")["duration"]
+    return (f"{fmt_duration(mn)} / {fmt_duration(med)} / {fmt_duration(mx)} "
+            f"(REST: {secs(mn)} / {secs(med)} / {secs(mx)}, max {mx / med:.2f}x the median)")
+
+
+def _shuffle_read_median(c: Ctx, sid: int) -> str:
+    sr = _summary(c, sid, "0.5")["shuffleReadMetrics"]
+    return f"{fmt_bytes_js(sr['readBytes'][0])} / {_fmt_rec(sr['readRecords'][0])}"
+
+
+def _spill_everywhere(c: Ctx) -> str:
+    st = c.stage(5)
+    mn, mx = _summary(c, 5, "0.0,1.0")["memoryBytesSpilled"]
+    every = "every task spilled" if mn > 0 else "not every task spilled"
+    return (f"{fmt_bytes(st['memoryBytesSpilled'])} / {fmt_bytes(st['diskBytesSpilled'])}; {every} "
+            f"({fmt_bytes_js(mn)} to {fmt_bytes_js(mx)} in memory per task)")
+
+
+def _peak_memory(c: Ctx) -> str:
+    med, mx = _summary(c, 5, "0.5,1.0")["peakExecutionMemory"]
+    good = _summary(c.runs["last_good"], 5, "1.0")["peakExecutionMemory"][0]
+    return f"median {fmt_bytes_js(med)}, max {fmt_bytes_js(mx)} (last good: max {fmt_bytes_js(good)})"
+
+
+def _waves(c: Ctx) -> str:
+    """How the 200 tasks used the 160 cores: launch waves, and how long most cores sat idle at the end."""
+    tasks = c.hs.all_tasks(c.app_id, 5)
+    launch = sorted(_ts(t["launchTime"]) for t in tasks)
+    first = [t for t in tasks if _ts(t["launchTime"]) - launch[0] < 1_000]
+    rest = [t for t in tasks if _ts(t["launchTime"]) - launch[0] >= 1_000]
+    cores = sum(e["totalCores"] for e in c.get("allexecutors") if e["id"] != "driver")
+    first_done = max(_ts(t["launchTime"]) + t["duration"] for t in first)
+    end = max(_ts(t["launchTime"]) + t["duration"] for t in tasks)
+    starts = sorted(_ts(t["launchTime"]) for t in rest)
+    return (f"{len(first)} tasks at once, the other {len(rest)} from {fmt_duration(starts[0] - launch[0])} later; "
+            f"at most {len(rest)} of {cores} cores busy for the last {fmt_duration(end - first_done)}")
+
+
+def _same_input(c: Ctx) -> str:
+    def row(run: Ctx) -> str:
+        s = run.stage(2)
+        return f"{fmt_bytes(s['inputBytes'])} in, {fmt_bytes(s['shuffleWriteBytes'])} shuffle write"
+    return f"{row(c.runs['last_good'])} → {row(c)}"
+
+
+def _exchange_partitions(c: Ctx) -> str:
+    def n(run: Ctx) -> str:
+        return " / ".join(sorted({_metric(x, "number of partitions") for x in _nodes(run, 0, "Exchange")}))
+    return f"{n(c.runs['last_good'])} → {n(c)}"
+
+
+PER_RUN_KEYS = {"spark.app.id", "spark.app.startTime", "spark.app.submitTime", "spark.driver.host",
+                "spark.driver.port", "spark.yarn.app.id", "spark.yarn.app.container.log.dir"}
+
+
+def _conf_diff(c: Ctx) -> str:
+    """Spark Properties that differ between the runs, without the ones every run has its own value of."""
+    good = dict(c.runs["last_good"].get("environment")["sparkProperties"])
+    bad = dict(c.get("environment")["sparkProperties"])
+    keys = sorted(k for k in set(good) | set(bad)
+                  if good.get(k) != bad.get(k) and k not in PER_RUN_KEYS and "PROXY_URI_BASES" not in k)
+    return "; ".join(f"{k}: {good.get(k, 'not set')} → {bad.get(k, 'not set')}" for k in keys)
+
+
+def _task_time(c: Ctx) -> str:
+    def total(run: Ctx) -> float:
+        return sum(e["totalDuration"] for e in run.get("allexecutors") if e["id"] != "driver")
+    return f"{fmt_duration(total(c.runs['last_good']))} → {fmt_duration(total(c))}"
+
+
+def _executor_spill_log(c: Ctx) -> str:
+    """The UnsafeExternalSorter lines in the stderr of the executor that ran stage 5's task 0 (through the
+    NodeManager log link). Only stage 5 spills, so every such line in the log belongs to one of its tasks."""
+    import collections
+
+    import requests
+
+    t = next(t for t in c.hs.all_tasks(c.app_id, 5) if t["index"] == 0)
+    ex = next(e for e in c.get("allexecutors") if e["id"] == t["executorId"])
+    html = requests.get(ex["executorLogs"]["stderr"].replace("start=-4096", "start=0"), timeout=60).text
+    tasks = len(re.findall(r"Running task \S+ in stage 5\.0 ", html))
+    sizes = collections.Counter(re.findall(r"spilling sort data of (.+?) to disk", html))
+    lines = sum(sizes.values())
+    by_size = ", ".join(f"{n} x {size}" for size, n in sorted(sizes.items(), key=lambda kv: -kv[1]))
+    return f"executor {t['executorId']}: {tasks} tasks of stage 5, {lines} lines ({by_size})"
+
+
+def _written_files(c: Ctx) -> str:
+    def w(run: Ctx) -> str:
+        (cmd,) = _nodes(run, 0, "Execute InsertIntoHadoopFsRelationCommand")
+        return f"{_metric(cmd, 'number of written files')} files, {_metric(cmd, 'written output')}"
+    return f"{w(c.runs['last_good'])} → {w(c)}"
+
+
+S02 = {
+    "E1": lambda c: f"{_app_duration(c.runs['last_good'])} → {_app_duration(c)}",
+    "E2": lambda c: f"{fmt_duration(_job_ms(c.runs['last_good'], 3))} → {fmt_duration(_job_ms(c, 3))}",
+    "E3": lambda c: f"{_stage_row(c.runs['last_good'], 5)} → {_stage_row(c, 5)}",
+    "E4": lambda c: _uniform_durations(c, 5),
+    "E5": lambda c: f"{_shuffle_read_median(c.runs['last_good'], 5)} → {_shuffle_read_median(c, 5)}",
+    "E6": _spill_everywhere,
+    "E7": _peak_memory,
+    "E8": _waves,
+    "E9": _same_input,
+    "E10": _exchange_partitions,
+    "E11": lambda c: _sql_metric_text(_join_input_sort(c), "spill size"),
+    "E12": _conf_diff,
+    "E13": _task_time,
+    "E14": _executor_spill_log,
+    "E15": _written_files,
+}
+
+EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02}
 
 
 # ---------------------------------------------------------------------------- solution.md

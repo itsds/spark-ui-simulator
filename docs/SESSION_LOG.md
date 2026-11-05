@@ -294,3 +294,42 @@ what was done, what's next, gotchas.
 - **Still open:** links from the solution's evidence rows to the exact HS page; interview mode (backlog);
   native Windows (WSL2 works the same as Linux); HS heap stays at Spark's default 1 GiB (enough for today's
   ~65 MB logs, revisit for bigger scenarios).
+
+## 2026-11-05 — Phase 8: Scenario 02 (too few shuffle partitions → spill)
+
+- **Done:**
+  - `scenarios/02-shuffle-partitions-spill` (ADR-033): the same job three weeks before 00/01. Last good run
+    2026-10-14 (app 44657), incident 2026-10-15 (app 44836). One `config` fault: the move to the Airflow DAG
+    factory unsets `spark.sql.shuffle.partitions` (→ 200) and adds `spark.yarn.maxAppAttempts=1` +
+    `spark.yarn.tags` (Environment noise). AQE stays on: coalescing can't split. Symptoms from the simulation:
+    stage 5 has 200 tasks instead of 2,400, min/med/max 2.0/2.3/2.6 min, every task spills (1451.9 GiB memory /
+    609.8 GiB disk), Peak Execution Memory pinned at 2.4 GiB, 160 + 40 tasks on 160 cores; app 5.6 → 9.1 min.
+    Ticket from Hadoop ops (disk alerts on the 40 executor hosts; HDFS balancer as red herring), 8 hints,
+    solution with 15 evidence values (`scripts/evidence.py` S02, `tests/test_scenario02_hs.py`).
+  - Planner: `SparkSession.shuffle_partitions` follows `SQLConf.numShufflePartitions` (AQE's
+    `coalescePartitions.initialPartitionNum` when coalescing is on). The solution's fixes are verified in
+    `tests/test_scenario02.py`: 2400 → the last good shape; `initialPartitionNum=8000` + advisory 128m → 2,667
+    tasks, no spill; 600 partitions already avoid the spill.
+  - Executor logs (ADR-034): task threads from a cached-pool model (`task_threads`; concurrent tasks shared
+    thread ids before), spill counts from 0 (`(0  time so far)`, as in ref02), spill sizes = whole 64 MiB pages
+    + pointer array, committer set-up at task start and the Parquet writer after the write sort's spills.
+    Scenario 00/01 event logs are byte-identical to Phase 7 (checked); their container logs change. 01's
+    solution now quotes `Thread 62`; `evidence._spill_log` counts sorters from `(0  time so far)`.
+  - `evidence.fmt_bytes_js`: the stage page's Summary Metrics and task tables format bytes in utils.js
+    (`1.5 GiB`, `3 GiB`), not with `Utils.bytesToString` (`1544.4 MiB`); summary values use it now.
+  - `uv run pytest`: 220 passed (~3.3 min); ruff clean; `sparksim up` + `stack_check.py` pass with 3 scenarios.
+- **Next:** 09 (bad-node straggler: `slow_node` exists; speculation off; the evidence is Aggregated Metrics by
+  Executor + the same host slow on every stage), then 05 (missed broadcast: `config`
+  `autoBroadcastJoinThreshold`, the workload's `broadcast=True` hint has to become a parameter), then 03
+  (pmem kills; needs task failure → job abort).
+- **Gotchas:**
+  - Faults apply after the job conf: to try a fix on an incident, append a `config` fault (as
+    `tests/test_scenario02.py::with_fix` does); changing `job.conf` is undone by the incident's `unset`.
+  - AQE coalescing is greedy: with `initialPartitionNum=4800` and a 128 MiB advisory size, 64.4 MiB partitions
+    never pair up (128.8 MiB > 128 MiB) and you get 3,985 tasks, not 2,400.
+  - The local `origin/main` ref was stale (Phase 1) in this container: compare against `HEAD`/`main`, or fetch.
+  - Executor logs have no thread names (log4j pattern): attribute spill lines to an executor's stage, not to a
+    task, in evidence.
+  - The harness required branch `claude/clever-lovelace-n4pa0z` (not `scenario/02-…`).
+- **Still open:** a second scenario this session was not started; disk contention between concurrently
+  spilling tasks (ADR-014) would make Scenario 02's slowdown larger and is still a lower bound.

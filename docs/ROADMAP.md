@@ -15,7 +15,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 5 | YARN realism: IDs, containers, executor logs, Environment tab | ✅ |
 | 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ✅ |
 | 7 | Scenario portal + one-command startup | ✅ |
-| 8+ | Scenario library (one or two scenarios per session) | ⬜ |
+| 8+ | Scenario library (one or two scenarios per session) | 🟨 |
 
 ---
 
@@ -155,9 +155,23 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
   (`docker compose up` from a fresh clone: all runs ready in ~45 s; the portal's Stages link opens the real
   HS page; executor log links open the container logs; `tests/test_up.py` covers `sparksim up`)
 
-## Phase 8+ — Scenario library
+## Phase 8+ — Scenario library 🟨
 
 Work through `docs/SCENARIOS.md` in priority order. One branch per scenario: `scenario/<NN>-<slug>`.
+Each scenario is done when it has `scenario.yaml`, ticket, hints and solution, a test without the History
+Server (cause → symptoms, and the recommended fix verified in the simulation) and its evidence test
+against HS 3.5.9.
+
+- [x] 02 Too few shuffle partitions → spill (`02-shuffle-partitions-spill`, ADR-033): an Airflow migration
+      drops `spark.sql.shuffle.partitions=2400` → 200; every join task spills, a partial second wave; 15
+      evidence values (`tests/test_scenario02_hs.py`). The planner now follows AQE's `initialPartitionNum`
+      (the durable fix, verified). Executor logs fixed along the way (ADR-034): one thread per concurrent
+      task (cached thread pool), spill counts from 0, page-sized spills, Parquet writer opened after the
+      write sort.
+- [ ] 09 Bad-node straggler (`slow_node`)
+- [ ] 05 Missed broadcast join (`config` `autoBroadcastJoinThreshold`; the broadcast hint has to go)
+- [ ] 03 YARN memoryOverhead kills (`memory_pressure`; needs task exceptions / job abort for "failed after 4 attempts")
+- [ ] the rest of `docs/SCENARIOS.md`
 
 ## Backlog (later)
 

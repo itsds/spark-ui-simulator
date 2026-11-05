@@ -9,7 +9,7 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 |---|---|---|---|---|---|
 | 00 ✅ | Healthy baseline | none | (onboarding: record the baseline) | Learn what normal looks like: task max ≈ 1.5–2× median, low GC, no spill, even executors; SQL tab: BHJ + SMJ plan, row counts per operator, pre-clustered partial aggregation (`scenarios/00-healthy-baseline`) | — |
 | 01 ✅ | Join-key skew | hot key `customer_id = -1` (guest placeholder) on 13 % of the events after an upstream SDK change; AQE skew join off in the job's conf (`scenarios/01-join-skew`) | "Nightly enrichment ran 1h35m, usually 6 min, dashboards stale, no code change" | Stage detail: max shuffle read ≫ median; Event Timeline one long bar; 2399/2400 tasks done; one task spills 280 GiB; SQL: SortMergeJoin, Sort spill size max = total; Environment: `spark.sql.adaptive.skewJoin.enabled=false` | AQE skew join, salting, isolate hot key, broadcast small side |
-| 02 | Shuffle partitions too few → spill | 200 shuffle partitions on ~2 TB shuffle | "Job slow, disk-usage alerts on workers" | Every task spills (memory & disk); ~10 GB/partition; Environment: `spark.sql.shuffle.partitions=200`, AQE off | Raise partitions / AQE coalesce with advisory size |
+| 02 ✅ | Shuffle partitions too few → spill | an Airflow migration drops `--conf spark.sql.shuffle.partitions=2400` ("AQE sizes partitions on Spark 3") → default 200 on ~300 GiB of join shuffle; AQE on (coalescing can't split) (`scenarios/02-shuffle-partitions-spill`) | "Disk alerts on 40 worker nodes 02:14–02:19, job 5.6 → 9.1 min" | Stage 5: 200 tasks instead of 2,400, min/med/max all ~2.3 min, every task spills (1.4 TiB memory / 610 GiB disk), Peak Execution Memory pinned at 2.4 GiB, 160 + 40 tasks on 160 cores; SQL: Exchange `number of partitions` 200, no AQEShuffleRead; Environment: `spark.sql.shuffle.partitions` missing (+ two harmless Airflow keys) | Restore the count; better `coalescePartitions.initialPartitionNum` high + advisory size, AQE coalesces down |
 | 03 | YARN memoryOverhead kills | off-heap usage (Arrow/netty/Python) > `memoryOverhead` | "Job failed after 4 attempts" | Failed tasks `ExecutorLostFailure`; Executors tab dead executors; stderr: "Container killed by YARN for exceeding physical memory limits", exit 137 | Raise `spark.executor.memoryOverhead`, fewer cores/executor, smaller partitions |
 | 04 | Small files / tiny tasks | input table of 120k small files | "Simple filter job takes 50 min" | 120k tasks, median task 40 ms, scheduler delay & deserialization dominate; SQL scan: number of files read | Compaction, `maxPartitionBytes`/`openCostInBytes`, coalesce |
 | 05 | Missed broadcast join | stats missing / AQE off → SMJ on 20 MB dim | "Job got slower after table migration" | SQL: SortMergeJoin with tiny side, big Exchange on fact side; Environment broadcast threshold | ANALYZE TABLE, broadcast hint, AQE |
@@ -27,9 +27,10 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 
 Fault mechanisms available in `scenario.yaml` (Phase 6, ADR-029): `key_skew` (hot keys, Zipf), `config`,
 `slow_node` (CPU/disk/NIC), `memory_pressure` (native memory per task), `executor_killed` (SIGKILL, exit 137).
-Still to build for the backlog: task exceptions + job abort (03's "failed after 4 attempts"), lost shuffle
-files without the shuffle service (12), AQE's skew-join split (a "fixed run" for 01), GC pressure (08),
-Python UDF nodes (10), queue capacity (14).
+The planner also follows `spark.sql.adaptive.coalescePartitions.initialPartitionNum` (Scenario 02's durable
+fix). Still to build for the backlog: task exceptions + job abort (03's "failed after 4 attempts"), lost
+shuffle files without the shuffle service (12), AQE's skew-join split (a "fixed run" for 01), GC pressure
+(08), Python UDF nodes (10), queue capacity (14).
 
 Later: Structured Streaming (ADR-005), dynamic-allocation thrash, broadcast timeout / driver OOM, "AQE working as intended" (to recognize success).
 

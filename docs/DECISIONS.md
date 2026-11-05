@@ -541,3 +541,49 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
 - **Consequences:** Adding a scenario needs no change to the stack: `prepare` and the portal discover
   `scenarios/*/scenario.yaml`. The sandbox's TLS-intercepting proxy needs a CA in the image's base and a
   relay for builds; that set-up is not part of the repo (SESSION_LOG gotchas).
+
+## ADR-033 — Scenario 02: a migration drops the shuffle partitions; AQE stays on
+
+- **Context:** The backlog's "too few shuffle partitions" asked for 200 partitions on a big shuffle with AQE
+  off. AQE off isn't modelled (ADR-029), and Spark 3.5 runs with AQE on by default, so "AQE off" would also be
+  the less common production story. The scenario should also not contradict Scenarios 00/01, which run the
+  same job with `spark.sql.shuffle.partitions=2400` and whose ticket says its submit options last changed
+  "three weeks" before 2026-11-04.
+- **Decision:** Same job and cluster, three weeks earlier: last good run 2026-10-14 (app 44657), incident
+  2026-10-15 (app 44836). The only fault is `config`: the job's move to the platform's Airflow DAG factory
+  (DATAENG-2207) *unsets* `spark.sql.shuffle.partitions` ("AQE sizes partitions on Spark 3") and adds two
+  harmless keys (`spark.yarn.maxAppAttempts=1`, `spark.yarn.tags`), so the Environment diff has noise; the
+  migration was rolled back the next day (hence 00/01's conf). Unset rather than set to 200: the Environment
+  tab then doesn't list the property at all, and the learner has to know the default and confirm it in the
+  SQL tab (`number of partitions`, `hashpartitioning(…, 200)`). With AQE on, the scenario teaches why AQE
+  didn't help: `CoalesceShufflePartitions` only merges, its start is `initialPartitionNum` (default: the
+  shuffle partitions), and with every partition equally big none is "skewed". The ticket comes from Hadoop
+  ops (disk alerts on the 40 executor hosts, other tenants degraded), with the HDFS balancer as a red herring;
+  the job "only" went from 5.6 to 9.1 min, which is what 200 partitions cost on this data.
+- **Planner:** `SparkSession.shuffle_partitions` follows `SQLConf.numShufflePartitions`: with AQE and its
+  coalescing on, `spark.sql.adaptive.coalescePartitions.initialPartitionNum` (if set) replaces
+  `spark.sql.shuffle.partitions`. The solution's durable fix (`initialPartitionNum=8000`, advisory 128 MiB →
+  2,667 tasks, no spill) and tonight's fix (2400) are verified in `tests/test_scenario02.py`; 600 partitions
+  would already avoid the spill.
+- **Consequence:** the spill is the existing per-operator model (ADR-028): each of the 200 tasks sorts ~3.5 GiB
+  of rows for the join and again for the write against ~2.35 GiB of execution memory. No disk contention
+  between the 160 concurrent spilling tasks is modelled (ADR-014), so the slowdown is a lower bound.
+
+## ADR-034 — Executor logs: task threads from a cached pool, spill lines as Spark prints them
+
+- **Context:** Scenario 02 is the first with many tasks spilling at once on one executor, and its logs showed
+  four concurrent tasks sharing two thread ids (the id was `60 + task id mod 16`), spill counts off by one
+  (`(1  time so far)` for the first spill; real logs start at `(0  time so far)`, `reference/yarn-logs/ref02`),
+  and the Parquet writer opened in the middle of the task, before the write sort's spills (ref02: committer
+  set-up at the start, `ParquetRecordWriter` after the spills).
+- **Decision:** (1) `yarnlogs.executor.task_threads` models the executor's task launch pool: a task takes the
+  worker that went idle last (SynchronousQueue hand-off), else a new thread with the next JVM thread id (gaps of
+  1–3 for other threads); idle workers exit after 60 s. (2) The count is `spillWriters.size()` before the spill.
+  (3) A spill line's size is `getMemoryUsage()`: whole data pages (`spark.buffer.pageSize`, 64 MiB here) plus
+  the pointer array (a power of two ≥ 64 KiB), never more than the sorter held; the number of spills per sorter
+  is unchanged (spill bytes / the task's execution memory). (4) `FileFormatWriter.executeTask` order: committer
+  set-up when the task starts, the first output file when the sort before the write has consumed its input
+  (the end of that sort's fill window in the task's cost breakdown).
+- **Consequence:** every container log changes (fingerprints regenerate all apps); event logs don't. Scenario
+  01's evidence is unchanged (120 lines, 53 + 67, 2 sorters); its solution now quotes `Thread 62`.
+

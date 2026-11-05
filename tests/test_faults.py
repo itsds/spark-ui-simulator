@@ -135,8 +135,9 @@ def test_key_skew_shows_in_sql_metrics_and_logs(skewed):
     log = executor_stderr(bad, hot.executor)
     lines = [ln for ln in log.splitlines() if "UnsafeExternalSorter: Thread" in ln and "spilling sort data" in ln]
     assert len(lines) > 10
-    assert "(1  time so far)" in lines[0] and "times so far)" in lines[-1]
-    assert sum(1 for ln in lines if "(1  time so far)" in ln) == 2  # two sorters
+    # spillWriters.size() before this spill: "0  time", "1  time", "2  times" (reference/yarn-logs/ref02)
+    assert "(0  time so far)" in lines[0] and "times so far)" in lines[-1]
+    assert sum(1 for ln in lines if "(0  time so far)" in ln) == 2  # two sorters
 
 
 def test_skew_join_on_is_refused_not_faked():
