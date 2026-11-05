@@ -241,3 +241,56 @@ what was done, what's next, gotchas.
 - **Still open:** AQE skew-join split (a "fixed run"), task exceptions / job abort, lost shuffle files without
   the shuffle service, dynamic per-task memory (a straggler's peak execution memory is under-reported,
   ADR-028), GC pressure model; the Docker Compose path is unverified.
+
+## 2026-11-05 — Phase 7: scenario portal + one-command startup
+
+- **Done:**
+  - `sparksim prepare` (`src/sparksim/prepare.py`): every run of every scenario is one app id; Scenario 01's last
+    good run and Scenario 00's run are one app, generated once; two different runs on one app id are refused
+    (also by `sparksim validate`). Fingerprint = sha256(job + run from `scenario.yaml`, label excluded; the
+    package source minus portal/CLI). Manifest `event-logs/.sparksim-manifest.json` (hidden, the HS skips it)
+    holds fingerprints and a running prepare's progress. `sparksim generate` records into it too and clears
+    an app's old container-log dir before writing.
+  - Portal (`src/sparksim/portal/`): stdlib server, markdown-it-py rendering of ticket/hints/solution on every
+    request, cards with topics behind a spoiler, hints one at a time, notes + solution reveal in localStorage,
+    per-run deep links (Jobs, Stages, SQL, Executors, Environment) into one named tab, `/api/status`
+    (generating / queued / not generated / loading / ready / out of date; HS and log server up). ADR-031.
+  - `sparksim up` (`src/sparksim/up.py`): port check, nm-logs + HS subprocesses (output in `build/logs/`),
+    portal thread, prepare, wait until the HS lists every app, `Ready.` + links, Ctrl+C/SIGTERM stop all.
+  - `Dockerfile` (python:3.11-slim + uv, `--no-default-groups`, non-root) + `.dockerignore` (allowlist) +
+    `docker-compose.yml` (generate, history-server, nm-logs, portal; named volumes; `pull_policy: build`;
+    `reference` profile). ADR-032.
+  - `scripts/stack_check.py`: smoke-checks a running stack (portal pages, HS deep links, driver + executor
+    log links through the REST API).
+  - Tickets 00/01 now point at `sparksim up` / `docker compose up` instead of `run.sh` (no evidence changed).
+  - Verified from fresh clones: `uv run sparksim up` (new venv) and `docker compose up` (no image, no build
+    cache) both pass `stack_check.py`; Docker-generated logs are byte-identical to local ones; a second
+    `up` regenerates nothing. Screenshots of the portal (light, dark, 390 px) reviewed.
+  - Tests: new `test_prepare.py` (7), `test_portal.py` (6), `test_up.py` (integration: `sparksim up` from
+    empty dirs to `Ready.`, stack check, Ctrl+C stops every server). `uv run pytest`: 212 passed (~2.8 min);
+    ruff clean.
+- **Next:** Phase 8, the scenario library. Cheapest with today's mechanisms (see the 2026-11-04 entry): 02 (too
+  few shuffle partitions → spill: `config`), 09 (bad node: `slow_node`), 05 (missed broadcast: `config`
+  `autoBroadcastJoinThreshold`), 03 (pmem kills: `memory_pressure`, needs job abort for "failed after 4
+  attempts"). A new scenario needs nothing in the stack: `prepare` and the portal discover
+  `scenarios/*/scenario.yaml`; give each run a new `app_seq`.
+- **Gotchas:**
+  - Docker *does* work in the cloud container: `dockerd > /tmp/dockerd.log 2>&1 &`. Docker Hub pulls work
+    (python:3.11-slim, apache/spark:3.5.9-java17); ghcr.io blobs return 403 (so the Dockerfile installs uv
+    with pip). Image builds need two sandbox-only tweaks, not in the repo: (1) a local `python:3.11-slim`
+    rebuilt with the proxy CA (`/root/.ccr/ca-bundle.crt` appended to `/etc/ssl/certs/ca-certificates.crt`,
+    `ENV PIP_CERT=… SSL_CERT_FILE=… UV_SYSTEM_CERTS=1`; keep the original as `python:3.11-slim-original`);
+    (2) build containers can't reach the proxy on the host's 127.0.0.1: relay `172.17.0.1:42852` →
+    `127.0.0.1:<proxy port>` (a 20-line Python socket relay) and set `~/.docker/config.json`
+    `{"proxies": {"default": {"httpsProxy": "http://172.17.0.1:42852"}}}`. Compose v5 always builds with bake,
+    which refuses `build.network: host` without `--allow`.
+  - JDK 17 is not preinstalled in this container image: `apt-get install -y openjdk-17-jdk-headless`.
+  - A process started in the background by a non-interactive shell (`(cmd &)`) has SIGINT ignored, so Python
+    never raises KeyboardInterrupt: `sparksim up` installs its own SIGINT/SIGTERM handler.
+  - A CSS class rule beats an element rule: `.wrap { padding: 0 16px }` silently zeroed `main`'s vertical
+    padding; use `main.wrap`.
+  - The sandbox exports `UV_NATIVE_TLS` (uv warns it is deprecated); harmless.
+  - The harness required branch `claude/sharp-cray-dn2d2m` (not `phase-7/<slug>`).
+- **Still open:** links from the solution's evidence rows to the exact HS page; interview mode (backlog);
+  native Windows (WSL2 works the same as Linux); HS heap stays at Spark's default 1 GiB (enough for today's
+  ~65 MB logs, revisit for bigger scenarios).

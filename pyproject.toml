@@ -5,6 +5,7 @@ description = "Generate production-scale Spark event logs for practising debuggi
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "markdown-it-py>=3,<5",  # scenario portal: ticket, hints, solution
     "numpy>=1.26,<2",  # shuffle block matrices (also pinned <2 by the PySpark reference group)
     "pydantic>=2.6,<3",  # scenario.yaml schema
     "pyyaml>=6",  # scenario.yaml

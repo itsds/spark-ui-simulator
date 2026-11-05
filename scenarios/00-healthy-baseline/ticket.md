@@ -34,4 +34,4 @@ Something to think about: `customer_daily_activity` groups 4 billion events by
 `customer_id`, which has 61 million values, yet its shuffle is tiny. Why does
 the partial aggregation before the shuffle work so well here?
 
-History Server: `http://localhost:18080` (`services/history-server/run.sh`).
+History Server: `http://localhost:18080` (`uv run sparksim up` or `docker compose up` starts it).

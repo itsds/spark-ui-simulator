@@ -14,7 +14,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 4 | SQL / DataFrame layer (physical plans, SQL metrics, AQE) | ✅ |
 | 5 | YARN realism: IDs, containers, executor logs, Environment tab | ✅ |
 | 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ✅ |
-| 7 | Scenario portal + one-command startup | ⬜ |
+| 7 | Scenario portal + one-command startup | ✅ |
 | 8+ | Scenario library (one or two scenarios per session) | ⬜ |
 
 ---
@@ -139,12 +139,21 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
   (checked in HS 3.5.9: application list, Jobs timeline with the 1.5 h job, stage 5 summary metrics /
   task table / timeline / aggregated by executor, SQL plan metrics, Environment, executor 40's stderr)
 
-## Phase 7 — Portal + one-command startup
+## Phase 7 — Portal + one-command startup ✅
 
-- [ ] `docker compose up`: generate → HS → nm-logs → portal
-- [ ] Portal: scenario cards (difficulty, topics), ticket, progressive hints, solution, deep links into HS
-- [ ] README quickstart verified on a clean machine
-- **Done when:** a fresh clone and one command give you Scenario 01 ready to debug.
+- [x] `docker compose up`: generate → HS → nm-logs → portal (`generate` runs `sparksim prepare` once and exits;
+      HS = `apache/spark:3.5.9-java17`; the simulator image serves nm-logs and the portal; named volumes;
+      host ports via `PORTAL_PORT`/`HS_PORT`/`NM_PORT`; reference captures as a `reference` profile). Without
+      Docker: `uv run sparksim up` (ADR-032)
+- [x] `sparksim prepare`: one app per run, shared runs generated once, fingerprints (job + run + simulator
+      source) in `event-logs/.sparksim-manifest.json`; only missing or stale apps are regenerated
+- [x] Portal: scenario cards (difficulty; topics behind a spoiler), ticket, progressive hints, notes, solution
+      reveal, deep links into HS per run, live run states (generating → loading → ready) (ADR-031)
+- [x] README quickstart verified on a clean machine: fresh clones in the cloud container, `uv run sparksim up`
+      and `docker compose up` (no image or build cache), both pass `scripts/stack_check.py`
+- **Done when:** a fresh clone and one command give you Scenario 01 ready to debug. ✅
+  (`docker compose up` from a fresh clone: all runs ready in ~45 s; the portal's Stages link opens the real
+  HS page; executor log links open the container logs; `tests/test_up.py` covers `sparksim up`)
 
 ## Phase 8+ — Scenario library
 

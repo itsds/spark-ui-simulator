@@ -1,0 +1,10 @@
+# Build context = only what the simulator image copies (see Dockerfile).
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!scenarios/
+!services/nm-logs/
+**/__pycache__
+**/*.pyc

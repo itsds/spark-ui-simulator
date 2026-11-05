@@ -62,38 +62,77 @@ Each scenario has an incident ticket, progressive hints and a solution with the
 click path, the evidence numbers, the fix and a 60-second interview answer.
 Details: [`docs/SCENARIOS.md`](docs/SCENARIOS.md).
 
-## Status
+## Quickstart
 
-🚧 Early development. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the current phase.
+One command after cloning, with Docker or without it. Either way you get three local services:
 
-### Run it on your machine
+| What | URL |
+|---|---|
+| **Scenario portal**: scenario cards, the incident ticket, hints one at a time, your notes, the solution, and links into the History Server for every run | http://localhost:8000 |
+| **Spark History Server 3.5.9**, the real one: the UI you debug in | http://localhost:18080 |
+| Container logs (a mock YARN NodeManager), behind the Executors tab's `stdout`/`stderr` links | http://localhost:8042 |
 
-The "web app" is the **real Apache Spark History Server 3.5.9**, started from
-the Spark distribution that comes inside the project's PySpark install. You
-don't need a Spark or Hadoop install.
+The first start generates every scenario's event logs and container logs (about a minute); later starts
+reuse them and only regenerate what changed (a manifest of fingerprints, `event-logs/.sparksim-manifest.json`).
+
+### With Docker (nothing else to install)
+
+```bash
+git clone https://github.com/itsds/spark-ui-simulator.git && cd spark-ui-simulator
+docker compose up
+```
+
+Then open http://localhost:8000. `Ctrl+C` (or `docker compose down`) stops it; the generated logs stay in
+Docker volumes until `docker compose down -v`. Every `up` rebuilds the simulator image from cache (seconds), so
+a `git pull` takes effect. Ports taken? `PORTAL_PORT=9000 HS_PORT=19080 NM_PORT=9042 docker compose up`.
+
+### Without Docker (uv + JDK 17)
 
 **Prerequisites:** macOS or Linux (on Windows, use WSL2 Ubuntu), `git`,
-[uv](https://docs.astral.sh/uv/getting-started/installation/), and **JDK 17**.
-Don't use JDK 21: Spark 3.5's bundled Arrow breaks on it. `scripts/env.sh` finds
-JDK 17 in the usual places.
+[uv](https://docs.astral.sh/uv/getting-started/installation/), and **JDK 17** for the History Server.
+Don't use JDK 21: Spark 3.5's bundled Arrow breaks on it. `scripts/env.sh` finds JDK 17 in the usual places.
 
 | OS | Install JDK 17 |
 |---|---|
 | macOS (Homebrew) | `brew install openjdk@17` (or Temurin 17: `brew install --cask temurin@17`) |
 | Ubuntu / Debian / WSL2 | `sudo apt-get install -y openjdk-17-jdk-headless` |
 
-If JDK 17 is somewhere else, set `JAVA_HOME` to it before running the commands
-below. On macOS with Homebrew's `openjdk@17`, that's
+If JDK 17 is somewhere else, set `JAVA_HOME` to it. On macOS with Homebrew's `openjdk@17`, that's
 `export JAVA_HOME=$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home`.
 
 ```bash
 git clone https://github.com/itsds/spark-ui-simulator.git && cd spark-ui-simulator
-uv sync                                              # Python 3.11 + PySpark 3.5.9 (contains the History Server)
-uv run sparksim generate 00-healthy-baseline         # Scenario 00: event log + YARN container logs, ~10 s
-uv run sparksim generate 01-join-skew                # Scenario 01: the last good run + the incident run, ~30 s
-services/nm-logs/run.sh &                            # mock NodeManager log server on :8042 (executor stdout/stderr)
-services/history-server/run.sh event-logs            # foreground; Ctrl+C to stop
-# open http://localhost:18080, then read scenarios/00-healthy-baseline/ticket.md
+uv run sparksim up --open
+```
+
+`uv run` installs Python 3.11 and the dependencies on first use (PySpark 3.5.9 is ~320 MB: the History Server
+comes from its bundled Spark, so you don't need a Spark or Hadoop install). `sparksim up` starts the
+container log server, the History Server and the portal, generates what is missing, waits until the History
+Server lists every run, and prints `Ready.` with a link per scenario. `Ctrl+C` stops everything. Server output
+goes to `build/logs/`. `uv run sparksim up 01-join-skew` prepares one scenario only; `--help` lists the ports.
+
+### How to practise
+
+1. Open a scenario in the portal and read its ticket. Hide the topics: they are spoilers.
+2. Investigate in the History Server (the portal's links open it in a tab of its own: Jobs, Stages, SQL /
+   DataFrame, Executors, Environment, for the incident run and the last good run).
+3. Stuck? Open the next hint, one at a time.
+4. Write your diagnosis in the portal (root cause, evidence, fix; kept in your browser), then reveal the
+   solution: the click path, the evidence numbers (checked by tests against the History Server's REST API),
+   the fix and a 60-second interview answer.
+
+`uv run scripts/stack_check.py` checks a running stack (either way of starting it) the way a learner uses it.
+
+### Piece by piece
+
+`sparksim up` is these steps; you can also run them yourself:
+
+```bash
+uv run sparksim prepare                    # every scenario's event logs + container logs, if missing or stale
+uv run sparksim generate 01-join-skew      # or regenerate one scenario's runs unconditionally (~30 s)
+services/nm-logs/run.sh &                  # mock NodeManager log server on :8042 (executor stdout/stderr)
+uv run sparksim portal &                   # scenario portal on :8000
+services/history-server/run.sh event-logs  # foreground; Ctrl+C to stop
 ```
 
 `uv run sparksim scenarios` lists the scenarios and their runs. Each scenario is a
@@ -103,28 +142,26 @@ run and an incident run with the injected faults (hot keys, config, a slow node,
 memory pressure, a killed executor). `uv run sparksim validate` checks them.
 `uv run sparksim generate tiny` writes the 8-task Phase 2 smoke app.
 
-To browse the nine **real** reference apps captured on YARN in Phase 1 (AQE,
-skew, spill, cache, failures and stage retries, Python UDFs, driver-bound jobs,
-RDD API), point the server at that directory, optionally on another port:
-
-```bash
-services/history-server/run.sh reference/event-logs 18081   # http://localhost:18081
-```
-
-The server rescans its directory every 5 s, so newly generated logs appear
+The History Server rescans its directory every 5 s, so newly generated logs appear
 without a restart. The Executors tab's `stdout`/`stderr` links (and the driver's,
 which is the YARN ApplicationMaster container in cluster mode) open the generated
 container logs through the mock NodeManager log server
 (`spark.history.custom.executor.log.url` in `services/history-server/spark-defaults.conf`).
 The logs match the run: every task an executor ran, the files it read, the shuffle
-blocks it fetched, the broadcasts it pulled, and how its container ended. The
-reference apps' links point at the single-node capture cluster and don't open.
+blocks it fetched, the broadcasts it pulled, and how its container ended.
 
-Or with Docker (no local Java needed; not yet verified):
+### The real reference apps
+
+To browse the nine **real** reference apps captured on YARN in Phase 1 (AQE,
+skew, spill, cache, failures and stage retries, Python UDFs, driver-bound jobs,
+RDD API), point a History Server at that directory on another port:
 
 ```bash
-EVENT_LOG_DIR=./event-logs docker compose up
+services/history-server/run.sh reference/event-logs 18081   # http://localhost:18081
+docker compose --profile reference up                       # the same, with Docker
 ```
+
+Their executor log links point at the single-node capture cluster and don't open.
 
 ### Re-capture the reference logs (optional, Linux)
 
@@ -134,13 +171,11 @@ reference/capture.sh                 # runs reference/jobs/*.py with --master ya
 uv run scripts/event_inventory.py    # regenerates docs/event-log-schema.md
 ```
 
-Planned one-command quickstart (Phase 7):
+## Status
 
-```bash
-docker compose up
-# Scenario portal:        http://localhost:8000
-# Spark History Server:   http://localhost:18080
-```
+Phases 0–7 are done (see [`docs/ROADMAP.md`](docs/ROADMAP.md)): the simulator, YARN realism, the
+scenario DSL with fault injection, Scenarios 00 and 01, the portal and the one-command start. Next: the
+scenario library, one or two scenarios per session.
 
 ## Docs
 
