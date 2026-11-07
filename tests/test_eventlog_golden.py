@@ -18,6 +18,8 @@ from sparksim.eventlog import (
     INTERNAL_METRICS_PREFIX,
     AccumulatorDef,
     DriverLedger,
+    JobEnd,
+    JobStart,
     SQLAdaptiveExecutionUpdate,
     SQLExecutionStart,
     StageCompleted,
@@ -48,8 +50,15 @@ def rederive(events):
     ledger = DriverLedger()
     bases = internal_bases(events)
     undeclared: set[int] = set()
+    job_stages: dict[int, set[int]] = {}  # active jobs -> their stage ids
     for i, ev in enumerate(events):
-        if isinstance(ev, (SQLExecutionStart, SQLAdaptiveExecutionUpdate)):
+        if isinstance(ev, JobStart):
+            job_stages[ev.job_id] = set(ev.stage_ids)
+        elif isinstance(ev, JobEnd):  # the job's stages that no other active job uses leave stageIdToStage
+            done = job_stages.pop(ev.job_id, set())
+            for sid in done - set().union(*job_stages.values()):
+                ledger.stage_removed(sid)
+        elif isinstance(ev, (SQLExecutionStart, SQLAdaptiveExecutionUpdate)):
             ledger.define_plan_metrics(ev.spark_plan_info)
         elif isinstance(ev, StageSubmitted):
             si = ev.stage_info

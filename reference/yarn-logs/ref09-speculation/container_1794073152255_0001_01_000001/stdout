@@ -1,0 +1,13 @@
+/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794073152255_0001/container_1794073152255_0001_01_000001/pyspark.zip/pyspark/context.py:354: RuntimeWarning: Failed to add file [file:///home/user/spark-ui-simulator/reference/jobs/common.py] specified in 'spark.submit.pyFiles' to Python path:
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/filecache/10
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794073152255_0001/spark-1a3c0f45-80b7-43f9-8178-767de815edd0/userFiles-d1a3f6ed-267d-4b65-9fb8-d94ce1d012c2
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/filecache/10/spark-libs.zip/spark-core_2.12-3.5.9.jar
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794073152255_0001/container_1794073152255_0001_01_000001/__pyfiles__
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794073152255_0001/container_1794073152255_0001_01_000001/pyspark.zip
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794073152255_0001/container_1794073152255_0001_01_000001/py4j-0.10.9.7-src.zip
+  /usr/lib/python311.zip
+  /usr/lib/python3.11
+  /usr/lib/python3.11/lib-dynload
+  /home/user/spark-ui-simulator/.venv/lib/python3.11/site-packages
+  /home/user/spark-ui-simulator/src
+  warnings.warn(
