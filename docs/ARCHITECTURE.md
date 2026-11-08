@@ -61,7 +61,8 @@ model/   cluster.py   racks, NodeManagers (+ other tenants' load), container siz
          workload.py  StageSpec = sources → operators (rows, bytes, CPU, memory) → sink; KeySpace
          shuffle.py   block matrices records[map, reducer], local/remote reads, AQE coalescing
 cost/    calibration.py ([ref]/[norm] constants), model.py: one task's phases → TaskMetrics
-sched/   sim.py (event heap, signals, generator processes), scheduler.py (TaskSchedulerImpl + TaskSetManager)
+sched/   sim.py (event heap, signals, generator processes), scheduler.py (TaskSchedulerImpl + TaskSetManager:
+         delay scheduling, executor loss, speculative execution with kills that take effect when the executor acts)
 engine/  runtime.py   the driver: executors register, one AdaptiveExecution per query, its query stages → jobs,
                       skipped stages, SQL events and driver metrics, write → new HDFS files; executor loss
                       (disconnect → loss reason → ExecutorLostFailure, re-run), broadcasts, MapOutputTracker epoch
@@ -164,6 +165,9 @@ what upstream wrote.
   node" for other exits, ExecutorLostFailure for the running tasks, a
   replacement container; dynamic allocation with the external shuffle service
   (idle executors: "Executor killed by driver.").
+- `spark.yarn.exclude.nodes`: the AM's excluded node list, so the RM grants no container on those hosts.
+- Speculative execution (`spark.speculation`): copies of slow tasks on other hosts, the losers killed
+  ("another attempt succeeded", "Stage finished"), as in the real two-NodeManager capture `ref09`.
 - Environment tab: the full Hadoop 3.3.6 configuration (~1,000 keys) with the
   production site files, the cluster's spark-defaults, JDK 17 system properties
   and the real Spark 3.5.9 classpath.
@@ -194,7 +198,8 @@ apps/<workload>.py   WORKLOAD: params (dt), datasets(params) = the usual input d
 sparksim.scenario    the run's data overrides, then its faults (faults.py) → engine.runtime.AppSpec
       │              key_skew → KeySpace.hot / .zipf of a dataset column   (shuffle partition sizes)
       │              config → --conf / executor sizing                     (whatever Spark reads)
-      │              slow_node → Host.cpu/disk/net factors                 (every task on that host)
+      │              slow_node → Host.cpu/disk/net factors                 (every task on that host, its JVM
+      │                                                                     start-up, codegen, deserialization)
       │              memory_pressure → native memory per running task      (container RSS → pmem kills)
       │              executor_killed → SIGKILL at a time                   (exit 137 → ExecutorLostFailure)
       ▼

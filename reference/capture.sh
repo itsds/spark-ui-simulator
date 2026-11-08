@@ -6,7 +6,10 @@
 # Usage: reference/capture.sh [job ...]        e.g. reference/capture.sh ref03_skew_join
 #        REF_MODE=local-cluster reference/capture.sh   # fallback without Hadoop
 # Default: all jobs in order (ref00_datagen first — later jobs read its tables).
-# yarn mode needs the cluster from reference/yarn/cluster.sh start.
+# yarn mode needs the cluster from reference/yarn/cluster.sh start. ref09 (speculation) needs the
+# second NodeManager and its throttled executors:
+#   REF_SECOND_NM=1 reference/yarn/cluster.sh start && reference/yarn/slow_node.sh start
+#   reference/capture.sh ref09_speculation && reference/yarn/slow_node.sh stop
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -56,7 +59,7 @@ for job in "${JOBS[@]}"; do
     cp "${files[0]}" "$OUT/$name"; rm -rf "$tmp"
     # Real container logs (driver = first container, the ApplicationMaster).
     dest="$ROOT/reference/yarn-logs/$name"; rm -rf "$dest"; mkdir -p "$dest"
-    for c in "$HADOOP_BUILD/nm-logs/$app_id"/container_*; do
+    for c in "$HADOOP_BUILD"/nm-logs/"$app_id"/container_* "$HADOOP_BUILD"/nm2-logs/"$app_id"/container_*; do
       [[ -d "$c" ]] || continue
       mkdir -p "$dest/$(basename "$c")"
       cp "$c"/stdout "$c"/stderr "$dest/$(basename "$c")/" 2>/dev/null || true

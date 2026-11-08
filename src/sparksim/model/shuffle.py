@@ -144,6 +144,7 @@ class ShuffleExchange:
     map_executor: list[str | None] = field(init=False)
     _cache: dict = field(default_factory=dict, repr=False)
     _hosts: np.ndarray | None = field(default=None, repr=False)
+    _written: set[int] = field(default_factory=set, repr=False)
 
     def __post_init__(self):
         self.records = np.zeros((self.num_maps, self.num_partitions), dtype=np.int64)
@@ -154,7 +155,14 @@ class ShuffleExchange:
     # ------------------------------------------------------------------ map side
 
     def write(self, map_index: int, rows: int, bytes_per_record: float, rng) -> tuple[int, int]:
-        """Split one map task's output rows over the reducers; return (bytes written, records written)."""
+        """Split one map task's output rows over the reducers; return (bytes written, records written).
+
+        Another attempt of the same map task (a speculative copy, a re-run after executor loss) hashes the
+        same rows into the same partitions: it writes the same blocks, so the first attempt's split stands.
+        """
+        if map_index in self._written:
+            return int(self.bytes[map_index].sum()), int(self.records[map_index].sum())
+        self._written.add(map_index)
         rec = rng.multinomial(rows, self.shares) if rows else np.zeros(self.num_partitions, dtype=np.int64)
         byt = np.rint(rec * bytes_per_record).astype(np.int64)
         self.records[map_index] = rec

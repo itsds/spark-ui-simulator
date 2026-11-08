@@ -40,7 +40,7 @@ from datetime import UTC, datetime
 import numpy as np
 
 from ..cost import calibration as cal
-from ..cost.model import StageContext, TaskEnv, TaskPlan, TaskResult, simulate_task
+from ..cost.model import StageContext, TaskEnv, TaskPlan, TaskResult, killed_metrics, simulate_task
 from ..environment import CLUSTER_SPARK_DEFAULTS, PySparkYarnApp, spark_properties
 from ..eventlog import (
     SHUFFLE_READ_ACCUMS,
@@ -48,6 +48,7 @@ from ..eventlog import (
     ExecutorMetrics,
     IdAllocator,
     RDDInfo,
+    TaskMetrics,
 )
 from ..eventlog.ordering import scala_int_hashset_order
 from ..model.cluster import (
@@ -62,8 +63,8 @@ from ..model.files import max_split_bytes, plan_scan
 from ..model.hdfs import Hdfs
 from ..model.shuffle import ShuffleExchange, coalesce_partitions, key_shares, row_shares_split
 from ..model.workload import ScanSource, ShuffleSink, ShuffleSource, StageSpec, WriteSink
-from ..rng import numpy_rng, substream
-from ..sched.scheduler import LOCALITY_NAMES, Launch, TaskScheduler, TaskSet
+from ..rng import lognormal, numpy_rng, substream
+from ..sched.scheduler import LOCALITY_NAMES, Launch, SpeculationConf, TaskScheduler, TaskSet
 from ..sched.sim import Signal, Sim, any_of
 from ..sql import metrics as sqlm
 from ..sql import nodes as sqln
@@ -172,6 +173,11 @@ class TaskRecord:
     sql: list[tuple[int, int]] = field(default_factory=list)  # SQL metric (accumulator id, update)
     task_attempt: int = 0  # TaskInfo.Attempt (retries of the same index)
     failure: ExecutorLostFailure | None = None  # set when its executor was lost while it ran
+    speculative: bool = False  # TaskInfo.Speculative: a copy launched by speculation
+    killed: str | None = None  # TaskKilled reason when the attempt was killed
+    kill_reqs: list[tuple[int, str]] = field(default_factory=list)  # (driver asked at, reason)
+    killed_metrics: TaskMetrics | None = None  # what the killed attempt reported (None: it had finished)
+    interrupted: bool = False  # the kill interrupted its I/O ("Executor interrupted and killed")
 
     @property
     def duration(self) -> int:
@@ -179,7 +185,7 @@ class TaskRecord:
 
     @property
     def ok(self) -> bool:
-        return self.failure is None
+        return self.failure is None and self.killed is None
 
 
 @dataclass
@@ -207,6 +213,7 @@ class StageRecord:
     top_scope: tuple[int, str] | None = None
     done: Signal | None = None
     plan_root: object = None  # the stage's physical plan (SQL metrics)
+    taskset: TaskSet | None = None
     task_binary_bc: int | None = None
     scan_bcs: list[int] = field(default_factory=list)  # Hadoop conf broadcasts of its scans
     epoch: int = 0  # MapOutputTracker epoch its tasks carry
@@ -256,7 +263,9 @@ class AppRun:
         am_mb = spec.sizing.am_container_mb(min_mb)
         self.am_host: Host = yarn_rng.choice([h for h in self.cluster.hosts if self.cluster.free_mb[h.name] >= am_mb])
         self.am_request_time = self.t0 + yarn_rng.randint(*cal.AM_REQUEST_DELAY_MS)
-        self.rm = ResourceManager(self.cluster, yarn_rng, exec_mb)
+        excluded = conf.get("spark.yarn.exclude.nodes", "")
+        self.excluded_nodes = sorted(h.strip() for h in excluded.split(",") if h.strip())
+        self.rm = ResourceManager(self.cluster, yarn_rng, exec_mb, frozenset(self.excluded_nodes))
         self.rm.free[self.am_host.name] -= am_mb
         self.dynalloc_conf = (DynAllocConf.from_conf(conf)
                               if conf.get("spark.dynamicAllocation.enabled", "false") == "true" else None)
@@ -297,7 +306,10 @@ class AppRun:
         self.ready = self.sim.signal()  # enough executors registered to start scheduling
         if self.min_registered == 0:
             self.ready.fire()
-        self.sched = TaskScheduler(self.sim, substream(seed, "scheduler"), self.cluster.rack_of)
+        self.speculation = SpeculationConf.from_conf(conf)
+        self.kill_rng = substream(seed, "task-kills")
+        self.sched = TaskScheduler(self.sim, substream(seed, "scheduler"), self.cluster.rack_of,
+                                   speculation=self.speculation, kill_latency=self._kill_latency)
         self.dynalloc = (ExecutorAllocationManager(self, self.dynalloc_conf, spec.sizing.cores)
                          if self.dynalloc_conf else None)
 
@@ -386,6 +398,7 @@ class AppRun:
     def _driver(self):
         if not self.conf_bool("spark.sql.adaptive.enabled", True):
             raise NotImplementedError("spark.sql.adaptive.enabled=false: only AQE plans are modelled so far")
+        self.sched.start_speculation_thread()  # TaskSchedulerImpl.start, while the SparkContext starts
         driver_ready = self.t0 + 1_500
         yield max(0, driver_ready - self.sim.now)
         if not self.ready.fired:  # YarnClusterSchedulerBackend: 80 % registered, or 30 s
@@ -742,7 +755,10 @@ class AppRun:
             ts = TaskSet(stage.stage_id, 0, job_id, [p.preferred for p in stage.plans],
                          on_launch=lambda a, st=stage: self._on_launch(st, a),
                          on_finish=lambda a, st=stage: self._on_finish(st, a),
-                         on_fail=lambda a, st=stage: self._on_fail(st, a))
+                         on_fail=lambda a, st=stage: self._on_fail(st, a),
+                         on_kill=lambda a, st=stage: self._on_kill(st, a),
+                         records_of=self._records_read)
+            stage.taskset = ts
             ts.done = self.sim.signal()
             ts.done.wait(lambda: self.sim.after(self._jitter(cal.STAGE_COMPLETE_DELAY_MS), stage_completed))
             self.sched.submit(ts)
@@ -756,6 +772,8 @@ class AppRun:
 
         def job_ended():
             job.completed = self.sim.now
+            if stage.task_type == "ResultTask":  # "Cancelling potential speculative or zombie tasks for this job"
+                self.sched.kill_all(stage.taskset, "Stage finished")
             self._record("job_end", job)
             job.done.fire()
             if spec.is_broadcast:
@@ -921,14 +939,14 @@ class AppRun:
         env = TaskEnv(ex, data_loc, cold, first, wait, int(unified / ex.cores))
         res = simulate_task(st.ctx, plan, env, self.stage_rng[st.stage_id], self.stage_nprng[st.stage_id])
         if first:
-            self.compile_end[key] = a.launch_time + res.deserialize_ms + int(cal.CODEGEN_COMPILE_MS)
+            self.compile_end[key] = (a.launch_time + res.deserialize_ms
+                                     + int(cal.CODEGEN_COMPILE_MS / ex.host.cpu_factor))
         touched = SHUFFLE_READ_ACCUMS if st.spec.shuffle_inputs else frozenset()
         rec = TaskRecord(st.stage_id, st.attempt, a.index, a.task_id, ex, LOCALITY_NAMES[a.locality],
                          a.launch_time, a.launch_time + res.duration_ms, st.task_type, res, touched,
-                         task_attempt=a.attempt)
+                         task_attempt=a.attempt, speculative=a.speculative)
         rec.sql = sqlm.task_updates(st.plan_root, res)
         st.tasks.append(rec)
-        st.by_index[a.index] = rec
         self.task_records[a.task_id] = rec
         self.exec_stages[ex.id].add(st.stage_id)
         self._record("task_start", rec, t=a.launch_time)
@@ -945,9 +963,47 @@ class AppRun:
         rec.sql = []
         self._record("task_end", rec)
 
+    def _kill_latency(self, a: Launch, interrupt: bool) -> int:
+        """KillTask RPC to the executor, then the task thread notices the kill, cleans up and reports KILLED
+        (CPU work on that host)."""
+        r = self.kill_rng
+        handling = lognormal(r, cal.KILL_HANDLING_SIGMA, cal.KILL_HANDLING_MEDIAN_MS) / a.executor.host.cpu_factor
+        return r.randint(*cal.KILL_RPC_MS) + int(handling) + r.randint(1, 4)
+
+    def _records_read(self, a: Launch) -> tuple[int, int]:
+        """(records read, executor run time) of a successful attempt, for TaskProcessRateCalculator."""
+        m = self.task_records[a.task_id].result.metrics
+        return m.input.records_read + m.shuffle_read.records_read, m.executor_run_time
+
+    def _on_kill(self, st: StageRecord, a: Launch) -> None:
+        """A killed attempt reported KILLED: TaskKilled with the metrics it had so far (none if it had
+        finished: "Finish but did not commit due to another attempt succeeded")."""
+        rec = self.task_records[a.task_id]
+        res = rec.result
+        natural_end = rec.finish
+        rec.finish = self.sim.now
+        rec.killed = a.kill_reason
+        rec.kill_reqs = list(a.kill_reqs)
+        rec.sql = []  # SQL metrics don't count failed values
+        if a.kill_reason.startswith("Finish but did not commit"):
+            rec.killed_metrics = None
+            return self._record("task_end", rec)
+        run_start = rec.launch + max(1, int(res.scheduler_delay_ms * 0.3)) + res.deserialize_ms
+        elapsed = max(0, min(res.run_ms, self.sim.now - 2 - run_start))
+        rec.killed_metrics = killed_metrics(res, elapsed)
+        # An interrupt (speculation's kill) lands in the task's I/O if that is what it was doing; a kill without
+        # interrupt ("Stage finished") is noticed at the next record. The share of I/O in its run decides.
+        m = res.metrics
+        io = res.run_ms - (m.executor_cpu_time / 1e6) if res.run_ms else 0
+        interrupt = any(r == "another attempt succeeded" for _, r in a.kill_reqs)
+        rec.interrupted = interrupt and self.kill_rng.random() < max(0.0, io) / max(1, res.run_ms)
+        assert self.sim.now <= natural_end or a.killed_by_other
+        self._record("task_end", rec)
+
     def _on_finish(self, st: StageRecord, a: Launch) -> None:
         rec = self.task_records[a.task_id]
         assert rec.finish == a.finish_time
+        st.by_index[a.index] = rec
         if self.dynalloc is not None:
             self.dynalloc.task_ended(a.executor.id)
         ex = a.executor

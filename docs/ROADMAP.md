@@ -15,7 +15,9 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 5 | YARN realism: IDs, containers, executor logs, Environment tab | ✅ |
 | 6 | Scenario DSL + fault injection → Scenario 01 (join skew) | ✅ |
 | 7 | Scenario portal + one-command startup | ✅ |
-| 8+ | Scenario library (one or two scenarios per session) | 🟨 |
+| 8 | Scenario 02 (too few shuffle partitions → spill) | ✅ |
+| 9 | Speculative execution + Scenario 09 (bad-node straggler) | ✅ |
+| 10+ | Scenario library (one or two scenarios per session) | 🟨 |
 
 ---
 
@@ -155,12 +157,7 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
   (`docker compose up` from a fresh clone: all runs ready in ~45 s; the portal's Stages link opens the real
   HS page; executor log links open the container logs; `tests/test_up.py` covers `sparksim up`)
 
-## Phase 8+ — Scenario library 🟨
-
-Work through `docs/SCENARIOS.md` in priority order. One branch per scenario: `scenario/<NN>-<slug>`.
-Each scenario is done when it has `scenario.yaml`, ticket, hints and solution, a test without the History
-Server (cause → symptoms, and the recommended fix verified in the simulation) and its evidence test
-against HS 3.5.9.
+## Phase 8 — Scenario 02 (too few shuffle partitions → spill) ✅
 
 - [x] 02 Too few shuffle partitions → spill (`02-shuffle-partitions-spill`, ADR-033): an Airflow migration
       drops `spark.sql.shuffle.partitions=2400` → 200; every join task spills, a partial second wave; 15
@@ -168,7 +165,36 @@ against HS 3.5.9.
       (the durable fix, verified). Executor logs fixed along the way (ADR-034): one thread per concurrent
       task (cached thread pool), spill counts from 0, page-sized spills, Parquet writer opened after the
       write sort.
-- [ ] 09 Bad-node straggler (`slow_node`)
+
+## Phase 9 — Speculative execution + Scenario 09 (bad-node straggler) ✅
+
+- [x] Real reference: `ref09-speculation` on a two-NodeManager YARN whose second node's executors are
+      CPU-throttled by a cgroup (`REF_SECOND_NM=1 reference/yarn/cluster.sh start`,
+      `reference/yarn/slow_node.sh`); golden test re-derives its accumulables and every killed task's
+      `Accumulator Updates`; a TaskEnd after its stage left the DAGScheduler merges nothing (ADR-035)
+- [x] Speculation in the scheduler (port of TaskSetManager/TaskSchedulerImpl: 100 ms check, quantile,
+      multiplier, efficiency rule, speculatable lists, never the same host, kill latency, "another attempt
+      succeeded" / "Stage finished" / "Finish but did not commit"), killed attempts' metrics, events,
+      driver + executor log lines; `spark.yarn.exclude.nodes` in the RM model (ADR-036)
+- [x] `slow_node` CPU factor also stretches fixed CPU costs (deserialization, codegen, result
+      serialization, JVM start-up, kill handling); Scenarios 00/01/02 byte-identical
+- [x] Scenario 09 (`09-bad-node-straggler`, ADR-037): a power-capped node (CPU ~1/20) that YARN only puts an
+      executor on some nights; 5.5 → 9.3 min; ticket with red herrings, 8 hints, solution with 14 evidence
+      values (`tests/test_scenario09_hs.py`); both fixes verified in `tests/test_scenario09.py`
+      (`spark.yarn.exclude.nodes` 5.5 min, `spark.speculation=true` 5.7 min)
+- **Done when:** Scenario 09 can be investigated end to end in HS 3.5.9, its evidence test passes, and a
+  speculation-on run renders (Speculation Summary, killed attempts) with no replay errors. ✅
+  (screenshots reviewed: the incident's Stages and Executors (with Add Time) pages, a speculation-on run's
+  stage page with its Speculation Summary and killed attempts; every evidence value, executor 19's stderr
+  included, through the REST API and its log link)
+
+## Phase 10+ — Scenario library 🟨
+
+Work through `docs/SCENARIOS.md` in priority order. One branch per scenario: `scenario/<NN>-<slug>`.
+Each scenario is done when it has `scenario.yaml`, ticket, hints and solution, a test without the History
+Server (cause → symptoms, and the recommended fix verified in the simulation) and its evidence test
+against HS 3.5.9.
+
 - [ ] 05 Missed broadcast join (`config` `autoBroadcastJoinThreshold`; the broadcast hint has to go)
 - [ ] 03 YARN memoryOverhead kills (`memory_pressure`; needs task exceptions / job abort for "failed after 4 attempts")
 - [ ] the rest of `docs/SCENARIOS.md`

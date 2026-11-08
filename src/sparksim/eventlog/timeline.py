@@ -8,7 +8,8 @@ accumulator `Value` is the running total over the TaskEnds already logged.
 A real log isn't strictly time-sorted. Its preamble (LogStart,
 ResourceProfileAdded, driver BlockManagerAdded, EnvironmentUpdate,
 ApplicationStart) is written in a fixed order even though ApplicationStart
-carries the earliest timestamp. Pass such events as `preamble`.
+carries the earliest timestamp. Pass such events as `preamble`. A factory that returns None
+writes nothing: it only updates the driver's state at that point (a stage leaving the DAGScheduler).
 """
 
 from __future__ import annotations
@@ -30,5 +31,7 @@ class Timeline:
     def events(self, preamble: Iterable[Event] = ()) -> list[Event]:
         out = list(preamble)
         for _, _, ev in sorted(self._items, key=lambda x: (x[0], x[1])):
-            out.append(ev() if callable(ev) else ev)
+            e = ev() if callable(ev) else ev
+            if e is not None:  # a factory may only update state at its place in the log (no event)
+                out.append(e)
         return out

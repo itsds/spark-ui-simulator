@@ -18,13 +18,18 @@ from sparksim.eventlog import (
     INTERNAL_METRICS_PREFIX,
     AccumulatorDef,
     DriverLedger,
+    JobEnd,
+    JobStart,
     SQLAdaptiveExecutionUpdate,
     SQLExecutionStart,
     StageCompleted,
     StageSubmitted,
     TaskEnd,
+    TaskKilled,
     read_event_log,
 )
+
+INTERNAL_ACCUM_NAMES = {off: name for name, off in INTERNAL_ACCUM_OFFSETS.items()}
 
 ROOT = Path(__file__).resolve().parents[1]
 LOGS = sorted(p for p in (ROOT / "reference" / "event-logs").iterdir() if p.is_file())
@@ -48,8 +53,15 @@ def rederive(events):
     ledger = DriverLedger()
     bases = internal_bases(events)
     undeclared: set[int] = set()
+    job_stages: dict[int, set[int]] = {}  # active jobs -> their stage ids
     for i, ev in enumerate(events):
-        if isinstance(ev, (SQLExecutionStart, SQLAdaptiveExecutionUpdate)):
+        if isinstance(ev, JobStart):
+            job_stages[ev.job_id] = set(ev.stage_ids)
+        elif isinstance(ev, JobEnd):  # the job's stages that no other active job uses leave stageIdToStage
+            done = job_stages.pop(ev.job_id, set())
+            for sid in done - set().union(*job_stages.values()):
+                ledger.stage_removed(sid)
+        elif isinstance(ev, (SQLExecutionStart, SQLAdaptiveExecutionUpdate)):
             ledger.define_plan_metrics(ev.spark_plan_info)
         elif isinstance(ev, StageSubmitted):
             si = ev.stage_info
@@ -65,6 +77,12 @@ def rederive(events):
                     undeclared.add(a.id)
                     ledger.define(AccumulatorDef(a.id, a.name, a.metadata, a.internal, a.count_failed_values))
                 external.append((a.id, int(a.update)))
+            if isinstance(ev.reason, TaskKilled) and ev.task_metrics is not None:
+                upd = ev.reason.accum_updates
+                tried = {INTERNAL_ACCUM_NAMES[a.id - bases[(ev.stage_id, ev.stage_attempt_id)]] for a in upd
+                         if a.update == "0"}
+                yield (f"line {i + 1} TaskKilled TID {ev.task_info.task_id} accumulator updates",
+                       ledger.failure_updates(ev.stage_id, ev.stage_attempt_id, ev.task_metrics, tried), upd)
             derived = ledger.task_end(ev.stage_id, ev.stage_attempt_id, ev.reason, ev.task_metrics,
                                       touched=touched, external=external)
             yield f"line {i + 1} TaskEnd TID {ev.task_info.task_id}", derived, real

@@ -49,7 +49,7 @@ Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 | 06 | Partition pruning failure |
 | 07 | Exploding join (duplicate keys) |
 | 08 | GC pressure |
-| 09 | Bad-node straggler |
+| 09 | Bad-node straggler ✅ [`scenarios/09-bad-node-straggler`](scenarios/09-bad-node-straggler/ticket.md) |
 | 10 | Python UDF bottleneck |
 | 11 | Driver bottleneck |
 | 12 | Fetch failure / stage retry |
@@ -173,9 +173,10 @@ uv run scripts/event_inventory.py    # regenerates docs/event-log-schema.md
 
 ## Status
 
-Phases 0–7 are done (see [`docs/ROADMAP.md`](docs/ROADMAP.md)): the simulator, YARN realism, the
-scenario DSL with fault injection, Scenarios 00 and 01, the portal and the one-command start. Phase 8, the
-scenario library, is under way (one or two scenarios per session): Scenario 02 is in.
+Phases 0–9 are done (see [`docs/ROADMAP.md`](docs/ROADMAP.md)): the simulator, YARN realism, the
+scenario DSL with fault injection, Scenarios 00 and 01, the portal and the one-command start, Scenario 02,
+and speculative execution with Scenario 09. The rest of the scenario library is under way (one or two
+scenarios per session).
 
 ## Docs
 

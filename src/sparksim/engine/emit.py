@@ -47,6 +47,7 @@ from ..eventlog import (
     Success,
     TaskEnd,
     TaskInfo,
+    TaskKilled,
     TaskResourceRequest,
     TaskStart,
 )
@@ -170,6 +171,7 @@ def build_events(run: AppRun) -> list[Event]:
 
     ledger = DriverLedger()
     tl = Timeline()
+    active_jobs: dict[int, set[int]] = {}  # job id -> its stages (DAGScheduler.jobIdToStageIds)
     for t, kind, obj in run.log:
         if kind == "executor_added":
             ex = obj
@@ -193,6 +195,7 @@ def build_events(run: AppRun) -> list[Event]:
             job = obj
             infos = [stage_info(run.stages[s]) for s in job.stage_ids]
             tl.add(t, JobStart(job.job_id, job.submitted, infos, list(job.stage_ids), java_properties(job.props)))
+            active_jobs[job.job_id] = set(job.stage_ids)
         elif kind == "stage_submitted":
             tl.add(t, _submitted(ledger, obj))
         elif kind == "task_start":
@@ -204,6 +207,9 @@ def build_events(run: AppRun) -> list[Event]:
             tl.add(t, _completed(ledger, obj))
         elif kind == "job_end":
             tl.add(t, JobEnd(obj.job_id, obj.completed, JobSucceeded()))
+            done = active_jobs.pop(obj.job_id, set())
+            gone = done - set().union(*active_jobs.values())  # cleanupStateForJobAndIndependentStages
+            tl.add(t, _stages_removed(ledger, gone))
         elif kind in ("sql_start", "sql_update"):
             tl.add(t, _plan_event(ledger, kind, t, *obj))
         elif kind == "driver_accum":
@@ -228,9 +234,20 @@ def _executor_resources(run: AppRun) -> dict[str, ExecutorResourceRequest]:
 
 
 def _task_info(tk: TaskRecord, finish: int = 0, accums=None) -> TaskInfo:
+    ended = bool(finish)
     return TaskInfo(tk.task_id, tk.index, tk.task_attempt, tk.index, tk.launch, tk.executor.id,
-                    tk.executor.host.name, tk.locality, finish_time=finish, failed=bool(finish) and not tk.ok,
+                    tk.executor.host.name, tk.locality, speculative=tk.speculative, finish_time=finish,
+                    failed=ended and tk.failure is not None, killed=ended and tk.killed is not None,
                     accumulables=accums or [])
+
+
+def _stages_removed(ledger: DriverLedger, stage_ids: set[int]):
+    """Not an event: the ledger learns, in log order, which stages left the DAGScheduler with their job."""
+    def make():
+        for sid in stage_ids:
+            ledger.stage_removed(sid)
+        return None
+    return make
 
 
 def _submitted(ledger: DriverLedger, st: StageRecord):
@@ -250,6 +267,20 @@ def _plan_event(ledger: DriverLedger, kind: str, t: int, qrec, text: str, info, 
 
 
 def _task_end(ledger: DriverLedger, tk: TaskRecord):
+    if tk.killed is not None:  # TaskKilled: the metrics so far, merged unless the stage is gone (ref09)
+        def make_killed():
+            m = tk.killed_metrics
+            if m is None:  # it had finished; its copy won: no metrics, no updates
+                reason = TaskKilled(tk.killed, [])
+                ledger.task_end(tk.stage_id, tk.attempt, reason, None)
+                return TaskEnd(tk.stage_id, tk.attempt, tk.task_type, reason, _task_info(tk, tk.finish),
+                               ExecutorMetrics(), None)
+            reason = TaskKilled(tk.killed, ledger.failure_updates(tk.stage_id, tk.attempt, m, touched=tk.touched))
+            accums = ledger.task_end(tk.stage_id, tk.attempt, reason, m, touched=tk.touched)
+            return TaskEnd(tk.stage_id, tk.attempt, tk.task_type, reason, _task_info(tk, tk.finish, accums),
+                           tk.exec_metrics, m)
+        return make_killed
+
     if not tk.ok:  # ExecutorLostFailure: no metrics, no accumulables, unset executor metric peaks
         def make_failed():
             ledger.task_end(tk.stage_id, tk.attempt, tk.failure, None)

@@ -305,9 +305,10 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
 
     # ---------------------------------------------------------------- time
     cpu_ms = cpu_ns / 1e6 / host.cpu_speed * noise
+    slow_cpu = host.cpu_factor  # a degraded host's CPU also stretches the fixed CPU costs below
     compile_ms = 0.0
     if env.first_on_executor:
-        compile_ms = cal.CODEGEN_COMPILE_MS * lognormal(rng, 0.3)
+        compile_ms = cal.CODEGEN_COMPILE_MS * lognormal(rng, 0.3) / slow_cpu
     elif env.compile_wait_ms > 0:
         compile_ms = env.compile_wait_ms
     alloc_intensity = 1.25 if (fetching or mem_need > 0) else 1.0
@@ -328,8 +329,8 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
         deser, share = cal.DESERIALIZE_NEW_STAGE_MS, cal.DESERIALIZE_CPU_SHARE["stage"]
     else:
         deser, share = cal.DESERIALIZE_WARM_MS, cal.DESERIALIZE_CPU_SHARE["warm"]
-    deser_ms = max(1, round(deser * lognormal(rng, cal.DESERIALIZE_SIGMA)))
-    ser_ms = rng.randint(*cal.RESULT_SERIALIZATION_MS)
+    deser_ms = max(1, round(deser * lognormal(rng, cal.DESERIALIZE_SIGMA) / slow_cpu))
+    ser_ms = round(rng.randint(*cal.RESULT_SERIALIZATION_MS) / slow_cpu)
     sched_ms = max(2, round(lognormal(rng, cal.SCHEDULER_DELAY_SIGMA, cal.SCHEDULER_DELAY_MEDIAN_MS)
                             + result_bytes / (40 * MiB) * 1e3))
 
@@ -351,6 +352,42 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
                 sr.fetch_wait_ms = round(rd.fetch_wait_time * sr.stats.remote_bytes / rd.remote_bytes_read)
     return TaskResult(m, deser_ms, run, ser_ms, sched_ms, round(exec_mem), fetching, output_file,
                       rows, trace, sources, wall_per_cpu, sink_rows, sink_rb, sink_cpu, commit_ms, spill_op, spill_ms)
+
+
+def killed_metrics(res: TaskResult, run_elapsed_ms: int) -> TaskMetrics:
+    """What a task attempt killed after `run_elapsed_ms` of its run reports (`TaskKilled`'s accumulators).
+
+    `collectAccumulatorsAndResetStatusOnFailure` sets the run time and the GC time; deserialization time, CPU
+    time, result size and serialization time are only set on success and stay 0 (ref09). Records read so
+    far, the shuffle blocks fetched so far (a fetch runs ahead of the records it delivers), the memory held
+    and the spills so far are the finished task's, scaled to how far it got; nothing is written: an
+    UnsafeShuffleWriter counts records when it writes its sorted file, a Parquet writer's output metrics
+    only when it commits.
+    """
+    m = res.metrics
+    f = min(1.0, max(0.0, run_elapsed_ms / max(1, res.run_ms)))
+    g = min(1.0, f + 0.15) if f > 0 else 0.0
+    out = TaskMetrics()
+    out.executor_run_time = int(run_elapsed_ms)
+    out.jvm_gc_time = round(m.jvm_gc_time * f)
+    out.peak_execution_memory = round(res.exec_memory * min(1.0, f / 0.7))
+    out.memory_bytes_spilled = round(m.memory_bytes_spilled * f)
+    out.disk_bytes_spilled = round(m.disk_bytes_spilled * f)
+    if m.input is not None:
+        out.input = InputMetrics(round(m.input.bytes_read * f), round(m.input.records_read * f))
+    if m.shuffle_read is not None:
+        r = m.shuffle_read
+        out.shuffle_read = ShuffleReadMetrics(
+            remote_blocks_fetched=round(r.remote_blocks_fetched * g),
+            local_blocks_fetched=round(r.local_blocks_fetched * g),
+            fetch_wait_time=round(r.fetch_wait_time * f), remote_bytes_read=round(r.remote_bytes_read * g),
+            local_bytes_read=round(r.local_bytes_read * g), records_read=round(r.records_read * f),
+            remote_reqs_duration=round(r.remote_reqs_duration * g))
+    if m.shuffle_write is not None:
+        out.shuffle_write = ShuffleWriteMetrics()
+    if m.output is not None:
+        out.output = OutputMetrics()
+    return out
 
 
 def _spill_group(trace: list[OpTrace], ix: list[int], available: float) -> None:

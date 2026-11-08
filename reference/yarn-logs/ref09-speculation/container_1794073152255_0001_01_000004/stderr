@@ -1,0 +1,174 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/07 17:40:26 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 3740@vm
+26/11/07 17:40:26 INFO SignalUtils: Registering signal handler for TERM
+26/11/07 17:40:26 INFO SignalUtils: Registering signal handler for HUP
+26/11/07 17:40:26 INFO SignalUtils: Registering signal handler for INT
+26/11/07 17:40:27 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/07 17:40:27 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/07 17:40:29 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/07 17:40:31 INFO SecurityManager: Changing view acls to: root
+26/11/07 17:40:31 INFO SecurityManager: Changing modify acls to: root
+26/11/07 17:40:31 INFO SecurityManager: Changing view acls groups to: 
+26/11/07 17:40:31 INFO SecurityManager: Changing modify acls groups to: 
+26/11/07 17:40:31 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/07 17:40:34 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:36827 after 497 ms (0 ms spent in bootstraps)
+26/11/07 17:40:35 INFO SecurityManager: Changing view acls to: root
+26/11/07 17:40:35 INFO SecurityManager: Changing modify acls to: root
+26/11/07 17:40:35 INFO SecurityManager: Changing view acls groups to: 
+26/11/07 17:40:35 INFO SecurityManager: Changing modify acls groups to: 
+26/11/07 17:40:35 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/07 17:40:36 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:36827 after 2 ms (0 ms spent in bootstraps)
+26/11/07 17:40:37 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm2-local/usercache/root/appcache/application_1794073152255_0001/blockmgr-61642024-dca1-4cc7-a304-841907dc3393
+26/11/07 17:40:37 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/07 17:40:39 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:36827
+26/11/07 17:40:40 INFO ResourceUtils: ==============================================================
+26/11/07 17:40:40 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/07 17:40:40 INFO ResourceUtils: ==============================================================
+26/11/07 17:40:40 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/07 17:40:40 INFO Executor: Starting executor ID 3 on host slownode
+26/11/07 17:40:40 INFO Executor: OS info Linux, 6.18.44-fc-v310, amd64
+26/11/07 17:40:40 INFO Executor: Java version 17.0.20.1
+26/11/07 17:40:40 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 35895.
+26/11/07 17:40:40 INFO NettyBlockTransferService: Server created on slownode:35895
+26/11/07 17:40:40 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/07 17:40:40 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(3, slownode, 35895, None)
+26/11/07 17:40:40 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(3, slownode, 35895, None)
+26/11/07 17:40:40 INFO BlockManager: Initialized BlockManager: BlockManagerId(3, slownode, 35895, None)
+26/11/07 17:40:40 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm2-local/usercache/root/appcache/application_1794073152255_0001/container_1794073152255_0001_01_000004/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm2-local/usercache/root/appcache/application_1794073152255_0001/container_1794073152255_0001_01_000004/__app__.jar'
+26/11/07 17:40:40 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@7d4b3945 for default.
+26/11/07 17:40:43 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 1
+26/11/07 17:40:43 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 4
+26/11/07 17:40:43 INFO Executor: Running task 1.0 in stage 0.0 (TID 1)
+26/11/07 17:40:43 INFO Executor: Running task 4.0 in stage 0.0 (TID 4)
+26/11/07 17:40:45 INFO TorrentBroadcast: Started reading broadcast variable 0 with 1 pieces (estimated total size 4.0 MiB)
+26/11/07 17:40:45 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:37257 after 85 ms (0 ms spent in bootstraps)
+26/11/07 17:40:45 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 8.6 KiB, free 741.6 MiB)
+26/11/07 17:40:46 INFO TorrentBroadcast: Reading broadcast variable 0 took 804 ms
+26/11/07 17:40:46 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 23.2 KiB, free 741.6 MiB)
+26/11/07 17:40:51 INFO CodeGenerator: Code generated in 1617.29012 ms
+26/11/07 17:40:52 INFO CodeGenerator: Code generated in 297.256905 ms
+26/11/07 17:41:13 INFO Executor: Finished task 4.0 in stage 0.0 (TID 4). 1844 bytes result sent to driver
+26/11/07 17:41:15 INFO Executor: Finished task 1.0 in stage 0.0 (TID 1). 1801 bytes result sent to driver
+26/11/07 17:41:20 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 55
+26/11/07 17:41:20 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 56
+26/11/07 17:41:20 INFO Executor: Running task 5.0 in stage 2.0 (TID 56)
+26/11/07 17:41:20 INFO Executor: Running task 4.0 in stage 2.0 (TID 55)
+26/11/07 17:41:20 INFO MapOutputTrackerWorker: Updating epoch to 1 and clearing cache
+26/11/07 17:41:20 INFO TorrentBroadcast: Started reading broadcast variable 1 with 1 pieces (estimated total size 4.0 MiB)
+26/11/07 17:41:20 INFO TransportClientFactory: Successfully created connection to slownode/127.0.0.2:33293 after 75 ms (0 ms spent in bootstraps)
+26/11/07 17:41:21 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 94.0 KiB, free 741.5 MiB)
+26/11/07 17:41:21 INFO TorrentBroadcast: Reading broadcast variable 1 took 509 ms
+26/11/07 17:41:21 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 331.9 KiB, free 741.2 MiB)
+26/11/07 17:41:23 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/07 17:41:23 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:36827)
+26/11/07 17:41:23 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/07 17:41:23 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/07 17:41:24 INFO ShuffleBlockFetcherIterator: Getting 48 (21.5 MiB) non-empty blocks including 2 (915.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 46 (20.6 MiB) remote blocks
+26/11/07 17:41:24 INFO ShuffleBlockFetcherIterator: Getting 48 (21.5 MiB) non-empty blocks including 2 (915.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 46 (20.6 MiB) remote blocks
+26/11/07 17:41:24 INFO ShuffleBlockFetcherIterator: Started 3 remote fetches in 398 ms
+26/11/07 17:41:24 INFO ShuffleBlockFetcherIterator: Started 3 remote fetches in 405 ms
+26/11/07 17:41:24 INFO CodeGenerator: Code generated in 294.564344 ms
+26/11/07 17:41:25 INFO CodeGenerator: Code generated in 175.808582 ms
+26/11/07 17:41:25 INFO CodeGenerator: Code generated in 122.287664 ms
+26/11/07 17:41:26 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/07 17:41:26 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/07 17:41:26 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/07 17:41:26 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/07 17:41:30 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/07 17:41:30 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/07 17:41:30 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/07 17:41:30 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/07 17:41:30 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/07 17:41:30 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/07 17:41:30 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/07 17:41:30 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/07 17:41:39 INFO Executor: Executor is trying to kill task 4.0 in stage 2.0 (TID 55), reason: another attempt succeeded
+26/11/07 17:41:43 INFO Executor: Executor is trying to kill task 5.0 in stage 2.0 (TID 56), reason: another attempt succeeded
+26/11/07 17:41:43 INFO Executor: Executor is trying to kill task 5.0 in stage 2.0 (TID 56), reason: Stage finished
+26/11/07 17:41:43 INFO Executor: Executor is trying to kill task 4.0 in stage 2.0 (TID 55), reason: Stage finished
+26/11/07 17:41:43 INFO CodecConfig: Compression: SNAPPY
+26/11/07 17:41:43 INFO CodecConfig: Compression: SNAPPY
+26/11/07 17:41:43 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/07 17:41:44 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  optional binary digest (STRING);
+}
+
+       
+26/11/07 17:41:44 INFO Executor: Executor killed task 4.0 in stage 2.0 (TID 55), reason: Stage finished
+26/11/07 17:41:44 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 84
+26/11/07 17:41:44 INFO Executor: Running task 4.0 in stage 4.0 (TID 84)
+26/11/07 17:41:45 INFO TorrentBroadcast: Started reading broadcast variable 4 with 1 pieces (estimated total size 4.0 MiB)
+26/11/07 17:41:45 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 13.1 KiB, free 661.2 MiB)
+26/11/07 17:41:45 INFO TorrentBroadcast: Reading broadcast variable 4 took 94 ms
+26/11/07 17:41:45 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 30.8 KiB, free 661.1 MiB)
+26/11/07 17:41:46 INFO Executor: Executor interrupted and killed task 5.0 in stage 2.0 (TID 56), reason: Stage finished
+26/11/07 17:41:46 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 85
+26/11/07 17:41:46 INFO Executor: Running task 5.0 in stage 4.0 (TID 85)
+26/11/07 17:41:47 INFO CodeGenerator: Code generated in 901.487316 ms
+26/11/07 17:41:47 INFO CodeGenerator: Code generated in 101.904547 ms
+26/11/07 17:41:48 INFO CodeGenerator: Code generated in 95.957436 ms
+26/11/07 17:41:48 INFO CodeGenerator: Code generated in 94.836906 ms
+26/11/07 17:41:48 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00005-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16881715, partition values: [empty row]
+26/11/07 17:41:48 INFO TorrentBroadcast: Started reading broadcast variable 3 with 1 pieces (estimated total size 4.0 MiB)
+26/11/07 17:41:48 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00000-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16735254, partition values: [empty row]
+26/11/07 17:41:48 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 39.5 KiB, free 708.6 MiB)
+26/11/07 17:41:48 INFO TorrentBroadcast: Reading broadcast variable 3 took 207 ms
+26/11/07 17:41:48 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 462.9 KiB, free 708.2 MiB)
+26/11/07 17:41:52 INFO CodecPool: Got brand-new decompressor [.snappy]
+26/11/07 17:41:52 INFO CodecPool: Got brand-new decompressor [.snappy]
+26/11/07 17:42:03 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00014-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16733233, partition values: [empty row]
+26/11/07 17:42:04 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00021-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16843455, partition values: [empty row]
+26/11/07 17:42:16 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00012-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16646871, partition values: [empty row]
+26/11/07 17:42:16 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00006-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16816083, partition values: [empty row]
+26/11/07 17:42:28 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00004-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16646682, partition values: [empty row]
+26/11/07 17:42:32 INFO FileScanRDD: Reading File path: hdfs://localhost:9000/data/ref/ref09_events/part-00009-d9419dcd-d9b4-439b-b9de-1ddaf671d261-c000.snappy.parquet, range: 0-16739090, partition values: [empty row]
+26/11/07 17:42:56 INFO Executor: Finished task 5.0 in stage 4.0 (TID 85). 2785 bytes result sent to driver
+26/11/07 17:42:58 INFO Executor: Finished task 4.0 in stage 4.0 (TID 84). 2785 bytes result sent to driver
+26/11/07 17:42:59 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 87
+26/11/07 17:42:59 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 90
+26/11/07 17:42:59 INFO Executor: Running task 1.0 in stage 6.0 (TID 87)
+26/11/07 17:42:59 INFO MapOutputTrackerWorker: Updating epoch to 2 and clearing cache
+26/11/07 17:42:59 INFO Executor: Running task 4.0 in stage 6.0 (TID 90)
+26/11/07 17:42:59 INFO TorrentBroadcast: Started reading broadcast variable 5 with 1 pieces (estimated total size 4.0 MiB)
+26/11/07 17:42:59 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:39141 after 4 ms (0 ms spent in bootstraps)
+26/11/07 17:42:59 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 21.3 KiB, free 740.7 MiB)
+26/11/07 17:42:59 INFO TorrentBroadcast: Reading broadcast variable 5 took 182 ms
+26/11/07 17:42:59 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 53.6 KiB, free 740.7 MiB)
+26/11/07 17:42:59 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/07 17:42:59 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:36827)
+26/11/07 17:42:59 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/07 17:42:59 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/07 17:42:59 INFO ShuffleBlockFetcherIterator: Getting 6 (19.8 MiB) non-empty blocks including 2 (6.6 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 4 (13.2 MiB) remote blocks
+26/11/07 17:42:59 INFO ShuffleBlockFetcherIterator: Getting 6 (19.8 MiB) non-empty blocks including 2 (6.6 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 4 (13.2 MiB) remote blocks
+26/11/07 17:42:59 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 19 ms
+26/11/07 17:42:59 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 91 ms
+26/11/07 17:43:01 INFO CodeGenerator: Code generated in 1685.554416 ms
+26/11/07 17:43:01 INFO CodeGenerator: Code generated in 101.020021 ms
+26/11/07 17:43:01 INFO CodeGenerator: Code generated in 290.304935 ms
+26/11/07 17:43:08 INFO Executor: Executor is trying to kill task 1.0 in stage 6.0 (TID 87), reason: another attempt succeeded
+26/11/07 17:43:08 INFO Executor: Executor killed task 1.0 in stage 6.0 (TID 87), reason: another attempt succeeded
+26/11/07 17:43:08 INFO Executor: Executor is trying to kill task 4.0 in stage 6.0 (TID 90), reason: another attempt succeeded
+26/11/07 17:43:08 INFO Executor: Executor killed task 4.0 in stage 6.0 (TID 90), reason: another attempt succeeded
+26/11/07 17:43:09 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/07 17:43:09 INFO YarnCoarseGrainedExecutorBackend: Driver from 192.0.2.2:36827 disconnected during shutdown
+26/11/07 17:43:09 INFO YarnCoarseGrainedExecutorBackend: Driver from 192.0.2.2:36827 disconnected during shutdown
+26/11/07 17:43:09 INFO MemoryStore: MemoryStore cleared
+26/11/07 17:43:09 INFO BlockManager: BlockManager stopped
+26/11/07 17:43:09 INFO ShutdownHookManager: Shutdown hook called

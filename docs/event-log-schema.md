@@ -5,32 +5,32 @@ Interpretation and UI mapping live in `EVENT_LOG_FORMAT.md`.
 
 ## Event counts per reference app
 
-| Event | ref00 | ref01 | ref02 | ref03 | ref04 | ref05 | ref06 | ref07 | ref08 |
-|---|---|---|---|---|---|---|---|---|---|
-| `SparkListenerLogStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerResourceProfileAdded` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerBlockManagerAdded` | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 |
-| `SparkListenerEnvironmentUpdate` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerApplicationStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerExecutorAdded` | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 |
-| `SparkListenerSQLExecutionStart` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  |
-| `SparkListenerSQLAdaptiveExecutionUpdate` | 4 | 6 |  | 6 | 13 | 3 | 8 | 12 |  |
-| `SparkListenerDriverAccumUpdates` | 7 | 14 | 12 | 12 | 11 | 2 | 8 | 15 |  |
-| `SparkListenerJobStart` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 |
-| `SparkListenerStageSubmitted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 |
-| `SparkListenerTaskStart` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 |
-| `SparkListenerTaskEnd` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 |
-| `SparkListenerStageCompleted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 |
-| `SparkListenerJobEnd` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 |
-| `SparkListenerSQLExecutionEnd` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  |
-| `SparkListenerApplicationEnd` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerBlockUpdated` |  |  |  |  | 103 |  |  |  |  |
-| `SparkListenerUnpersistRDD` |  |  |  |  | 1 |  |  |  |  |
-| `SparkListenerBlockManagerRemoved` |  |  |  |  |  | 1 |  |  |  |
-| `SparkListenerExecutorRemoved` |  |  |  |  |  | 2 |  |  |  |
-| `SparkListenerTaskGettingResult` |  |  |  |  |  |  |  | 3 |  |
+| Event | ref00 | ref01 | ref02 | ref03 | ref04 | ref05 | ref06 | ref07 | ref08 | ref09 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `SparkListenerLogStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerResourceProfileAdded` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerBlockManagerAdded` | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 |
+| `SparkListenerEnvironmentUpdate` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerApplicationStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerExecutorAdded` | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 |
+| `SparkListenerSQLExecutionStart` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  | 2 |
+| `SparkListenerSQLAdaptiveExecutionUpdate` | 4 | 6 |  | 6 | 13 | 3 | 8 | 12 |  | 6 |
+| `SparkListenerDriverAccumUpdates` | 7 | 14 | 12 | 12 | 11 | 2 | 8 | 15 |  | 6 |
+| `SparkListenerJobStart` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 | 7 |
+| `SparkListenerStageSubmitted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 | 7 |
+| `SparkListenerTaskStart` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 | 139 |
+| `SparkListenerTaskEnd` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 | 139 |
+| `SparkListenerStageCompleted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 | 7 |
+| `SparkListenerJobEnd` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 | 7 |
+| `SparkListenerSQLExecutionEnd` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  | 2 |
+| `SparkListenerApplicationEnd` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerBlockUpdated` |  |  |  |  | 103 |  |  |  |  |  |
+| `SparkListenerUnpersistRDD` |  |  |  |  | 1 |  |  |  |  |  |
+| `SparkListenerBlockManagerRemoved` |  |  |  |  |  | 1 |  |  |  |  |
+| `SparkListenerExecutorRemoved` |  |  |  |  |  | 2 |  |  |  |  |
+| `SparkListenerTaskGettingResult` |  |  |  |  |  |  |  | 3 |  |  |
 
-Apps: `ref00-datagen`, `ref01-daily-etl-aqe`, `ref02-static-plan-spill`, `ref03-skew-join`, `ref04-cache-reuse`, `ref05-failures`, `ref06-python-udf`, `ref07-driver-bound`, `ref08-rdd-api`
+Apps: `ref00-datagen`, `ref01-daily-etl-aqe`, `ref02-static-plan-spill`, `ref03-skew-join`, `ref04-cache-reuse`, `ref05-failures`, `ref06-python-udf`, `ref07-driver-bound`, `ref08-rdd-api`, `ref09-speculation`
 
 ## Field trees
 
@@ -303,6 +303,7 @@ Apps: `ref00-datagen`, `ref01-daily-etl-aqe`, `ref02-static-plan-spill`, `ref03-
   - **spark.sql.adaptive.skewJoin.skewedPartitionFactor**: string e.g. `"2"`
   - **spark.eventLog.logBlockUpdates.enabled**: string e.g. `"true"`
   - **spark.sql.execution.arrow.pyspark.enabled**: string e.g. `"true"`
+  - **spark.speculation**: string e.g. `"true"`
 
 ### `SparkListenerStageSubmitted`
 
@@ -402,6 +403,7 @@ Apps: `ref00-datagen`, `ref01-daily-etl-aqe`, `ref02-static-plan-spill`, `ref03-
   - **spark.sql.adaptive.skewJoin.skewedPartitionFactor**: string e.g. `"2"`
   - **spark.eventLog.logBlockUpdates.enabled**: string e.g. `"true"`
   - **spark.sql.execution.arrow.pyspark.enabled**: string e.g. `"true"`
+  - **spark.speculation**: string e.g. `"true"`
 
 ### `SparkListenerTaskStart`
 
@@ -459,6 +461,7 @@ Apps: `ref00-datagen`, `ref01-daily-etl-aqe`, `ref02-static-plan-spill`, `ref03-
   - **Map Index**: int e.g. `2`
   - **Reduce ID**: int e.g. `5`
   - **Message**: string e.g. `"org.apache.spark.shuffle.FetchFailedException\n\tat org.apache.spark.…`
+  - **Kill Reason**: string e.g. `"another attempt succeeded"`
 - **Task Info**: object
   - **Task ID**: int e.g. `1`
   - **Index**: int e.g. `1`

@@ -247,7 +247,9 @@ def _task_header(log: ContainerLog, run: AppRun, ex: Executor, stage: StageRecor
     w = _Work(tk, stage, recv, run_start, run_start + res.run_ms, first)
     if first:
         n = _codegen_classes(stage)
-        total = max(n, int(res.run_ms * 0.08 if res.run_ms < 2_000 else 260 * rng.uniform(0.6, 1.4)))
+        # Janino compiles on the task's thread: a throttled host's CPU stretches it like the task's own work
+        total = max(n, int(res.run_ms * 0.08 if res.run_ms < 2_000
+                           else 260 * rng.uniform(0.6, 1.4) / ex.host.cpu_factor))
         t = run_start
         for _ in range(n):
             ms = total / n * rng.uniform(0.3, 1.7)
@@ -260,11 +262,57 @@ def _task_header(log: ContainerLog, run: AppRun, ex: Executor, stage: StageRecor
     return w
 
 
+class _Until:
+    """A killed task's view of the container log: nothing it would have logged after the kill took effect."""
+
+    def __init__(self, log: ContainerLog, until: int):
+        self.log, self.until = log, until
+
+    def info(self, t: int, logger: str, msg: str) -> None:
+        if t <= self.until:
+            self.log.info(t, logger, msg)
+
+    def warn(self, t: int, logger: str, msg: str) -> None:
+        if t <= self.until:
+            self.log.warn(t, logger, msg)
+
+    def error(self, t: int, logger: str, msg: str) -> None:
+        if t <= self.until:
+            self.log.error(t, logger, msg)
+
+    def raw(self, t: int, text: str) -> None:
+        if t <= self.until:
+            self.log.raw(t, text)
+
+
+def _kill_lines(log: ContainerLog, tk: TaskRecord, rng: random.Random) -> int:
+    """`Executor.killTask` per kill request ("trying to kill", the latest reason wins), then the task thread's
+    exit: TaskKilledException ("Executor killed") or an interrupted call ("Executor interrupted and killed")
+    (ref09). Returns when the task stopped logging."""
+    end = tk.finish - rng.randint(1, 3)  # KILLED status update → the driver
+    for t_req, reason in tk.kill_reqs:
+        log.info(min(end - 1, t_req + rng.randint(1, 6)), "Executor", f"Executor is trying to kill {_name(tk)}, "
+                 f"reason: {reason}")
+    how = "Executor interrupted and killed" if tk.interrupted else "Executor killed"
+    log.info(end, "Executor", f"{how} {_name(tk)}, reason: {tk.killed}")
+    return end
+
+
 def _name(tk: TaskRecord) -> str:
     return f"task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}.{tk.attempt} (TID {tk.task_id})"
 
 
 def _task_body(log: ContainerLog, run: AppRun, ex: Executor, w: _Work, st: _State, rng: random.Random) -> None:
+    tk = w.tk
+    if tk.killed is not None and tk.killed_metrics is not None:  # killed while running: cut its work short
+        _task_work(_Until(log, _kill_lines(log, tk, rng) - 1), run, ex, w, st, rng, finished=False)
+        return
+    # Finished normally (also "Finish but did not commit": the kill found no running task, and
+    # Executor.killTask logs nothing for an unknown task id).
+    _task_work(log, run, ex, w, st, rng, finished=True)
+
+
+def _task_work(log, run: AppRun, ex: Executor, w: _Work, st: _State, rng: random.Random, finished: bool) -> None:
     tk, stage = w.tk, w.stage
     res = tk.result
     t, run_end = w.work_start, w.run_end
@@ -292,8 +340,9 @@ def _task_body(log: ContainerLog, run: AppRun, ex: Executor, w: _Work, st: _Stat
         sorts = [b for op, _, b in windows if op.kind == "sort"]
         opened = to_wall(sorts[-1]) if sorts else t + rng.randint(2, 30)
         _write(log, run, ex, stage, tk, st, t + rng.randint(1, 6), max(t + 2, opened), run_end, rng)
-    log.info(run_end + res.serialize_ms, "Executor", f"Finished {_name(tk)}. {m.result_size} bytes result sent to "
-             "driver")
+    if finished:
+        log.info(run_end + res.serialize_ms, "Executor", f"Finished {_name(tk)}. {m.result_size} bytes result sent "
+                 "to driver")
 
 
 def _wall_clock(t0: int, run_end: int, run_ms: int):
