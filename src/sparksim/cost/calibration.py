@@ -33,6 +33,14 @@ RELAUNCH_GAP_MS = (0, 4)
 REVIVE_INTERVAL_MS = 1_000
 # [spark] spark.locality.wait (process/node/rack all default to it)
 LOCALITY_WAIT_MS = 3_000
+# [ref] Killing a task attempt (speculation's "another attempt succeeded", a result stage's "Stage finished"):
+# the driver's KillTask RPC reaches the executor in 1–6 ms; the task thread notices it at its next record
+# (or its I/O is interrupted), closes its resources and reports KILLED. ref09: 7–136 ms on its healthy-ish
+# executors (median ~50 ms), seconds on the CPU-throttled host. The notice-and-report part is CPU work, so
+# it scales with the host's degradation (`Host.cpu_factor`).
+KILL_RPC_MS = (1, 6)
+KILL_HANDLING_MEDIAN_MS = 45.0
+KILL_HANDLING_SIGMA = 0.8
 # [ref] StageSubmitted → first TaskStart for a newly submitted stage: 2–25 ms (task binary broadcast).
 STAGE_LAUNCH_DELAY_MS = (3, 22)
 # Per task launched in one offer round: TaskSetManager serializes each task (~0.2 ms each).

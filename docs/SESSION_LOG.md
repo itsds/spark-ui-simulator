@@ -333,3 +333,54 @@ what was done, what's next, gotchas.
   - The harness required branch `claude/clever-lovelace-n4pa0z` (not `scenario/02-…`).
 - **Still open:** a second scenario this session was not started; disk contention between concurrently
   spilling tasks (ADR-014) would make Scenario 02's slowdown larger and is still a lower bound.
+
+## 2026-11-08 — Phase 9: speculative execution + Scenario 09 (bad-node straggler)
+
+- **Done:**
+  - Real reference `ref09-speculation` (ADR-035): `REF_SECOND_NM=1 reference/yarn/cluster.sh start` runs a second
+    NodeManager on host `slownode` (127.0.0.2), `reference/yarn/slow_node.sh start 50` puts its executors into a
+    cgroup CPU quota, `reference/jobs/ref09_speculation.py` runs with `spark.speculation=true`. What it showed:
+    no `SpeculativeTaskSubmitted` in the log, killed attempts after their stage completed list no accumulables,
+    "Stage finished" overwrites a pending "another attempt succeeded", a killed task's `Accumulator Updates` are
+    nameless with `Internal: false` (+ `resultSize` always). `DriverLedger.stage_removed` / `failure_updates`;
+    the golden test re-derives all of it. EVENT_LOG_FORMAT.md §6.2.
+  - Speculation in `sched/scheduler.py` (ADR-036): port of TaskSetManager/TaskSchedulerImpl (`SpeculationConf`,
+    100 ms check, `PercentileHeap` median, efficiency rule, speculatable lists, `ScalaHashSet` running-set order,
+    kills with `kill_latency`, `kill_all` "Stage finished" at a result stage's job end, "Finish but did not
+    commit"). Engine: `TaskRecord.speculative/killed/killed_metrics`, `cost.model.killed_metrics`, idempotent
+    `ShuffleExchange.write`; emit: speculative TaskStarts, TaskKilled TaskEnds, stage removal at job end
+    (`Timeline` factories may return None). Logs: driver "Starting speculative execution thread", "Marking task
+    … as speculatable", "Killing attempt …", "Lost task … TaskKilled (…)", TaskSet removed after its last killed
+    attempt; executor "Executor is trying to kill …" / "Executor (interrupted and) killed …", work cut at the kill.
+    `spark.yarn.exclude.nodes` in the RM model + the AM's `YarnAllocatorNodeHealthTracker` line.
+  - `slow_node`'s CPU factor also stretches deserialization, codegen (and its log lines), result serialization,
+    JVM start-up (registration), kill handling. Healthy hosts have factor 1.0: Scenarios 00/01/02 regenerate
+    byte for byte, event logs and container logs (checked against `main` in a worktree).
+  - `scenarios/09-bad-node-straggler` (ADR-037): last good 2026-10-27 (app 46958), incident 2026-10-28 (app
+    47131). `wn063` power-capped after a PSU failure (`cpu: 0.05`); executor 19 lands on it in the incident only
+    → 5.5 → 9.3 min, its tasks the longest of every stage (13–24x the median), 28 tasks vs 225–259, registered
+    88 s late. Ticket (BI SLA; change calendar with the PSU alert among red herrings), 8 hints, solution with 14
+    evidence values (`scripts/evidence.py` S09, `tests/test_scenario09_hs.py`). `tests/test_scenario09.py`: the
+    last good run is byte-identical with the fault (the node was already bad), both fixes verified
+    (`spark.yarn.exclude.nodes` 5.5 min, `spark.speculation=true` 5.7 min). `tests/test_speculation.py`: rules,
+    events vs ref09's shapes, logs, excluded nodes.
+  - `uv run pytest`: 240 passed (~4.9 min, integration included); ruff clean.
+- **Next:** 05 (missed broadcast: `config` `autoBroadcastJoinThreshold`, the workload's `broadcast=True` hint has
+  to become a parameter), then 03 (pmem kills; needs task failure → job abort). With speculation in place, a
+  "speculation can't fix skew" variant of 01 is cheap (a test or a capstone red herring).
+- **Gotchas:**
+  - Hadoop isn't in the container image: `downloads.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz`
+    (730 MB, sha512 in the same dir) → `/opt/hadoop`. JDK 17 needs `apt-get update` first.
+  - The second NodeManager needs `127.0.0.2 slownode` in `/etc/hosts`; cgroup v1 `cpu` is writable here, so a
+    quota is a real slow node. A single-node YARN can't run a speculative copy (never on the same host).
+  - The reference harness sets the driver log to WARN: speculation's INFO lines (Marking/Killing) come from the
+    source, the WARN `Lost task … TaskKilled` and every executor line from ref09.
+  - A slow node hardly hurts this job unless it is very slow: Spark's dynamic task assignment absorbs it (3x
+    slower → +5 %). The tail of each stage is where it shows.
+  - The schema forbids faults on a last good run; a "condition that already existed" is shown by building that
+    run with the fault and comparing the event logs.
+  - A Bash heredoc with JavaScript tripped the sandbox's rm safety check; write such scripts with the Write tool.
+  - The harness required branch `claude/phase-9-6f71me` (not `scenario/09-…`).
+- **Still open:** the degraded node's DataNode / shuffle service serving others (write pipelines through it);
+  disk-fault scenarios; speculation with barrier stages or decommissioning; the BypassMergeSortShuffleWriter's
+  exception lines on a killed map task (our map stages use UnsafeShuffleWriter).

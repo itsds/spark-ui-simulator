@@ -587,3 +587,72 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
 - **Consequence:** every container log changes (fingerprints regenerate all apps); event logs don't. Scenario
   01's evidence is unchanged (120 lines, 53 + 67, 2 sorters); its solution now quotes `Thread 62`.
 
+
+## ADR-035 — ref09: speculation captured on a two-NodeManager YARN with a CPU-throttled node
+
+- **Date:** 2026-11-08
+- **Status:** accepted
+- **Context:** Speculative execution is the job-side fix for a bad-node straggler, but no reference log had a
+  speculative or killed task, and a single-node cluster can't produce one: a copy never runs on a host where
+  its task already ran. Event shapes, kill reasons, metrics of killed attempts and the log lines had to come
+  from a real run, not from reading the source alone.
+- **Decision:** `REF_SECOND_NM=1 reference/yarn/cluster.sh start` adds a second NodeManager on host `slownode`
+  (127.0.0.2 in `/etc/hosts`; own conf, local and log dirs, pid dir, localizer and web ports; both NMs offer
+  4.5 GB so the 3 executors split around the AM). `reference/yarn/slow_node.sh` moves every executor JVM on
+  `slownode` (and the Python workers it forks) into a cgroup v1 `cpu` group with a quota: a real throttled
+  host, the cause Scenario 09 injects. `reference/jobs/ref09_speculation.py` runs a CPU-bound map stage, a
+  sort + Parquet write and an aggregation with `spark.speculation=true`. Findings (EVENT_LOG_FORMAT.md §6.2):
+  no `SpeculativeTaskSubmitted` in the log; killed attempts that report after their stage completed list no
+  accumulables; "Stage finished" overwrites a pending "another attempt succeeded"; a 6-task stage the slow
+  host dominates is never speculated. The golden test now re-derives ref09 too, including every killed task's
+  own `Accumulator Updates` (`DriverLedger.failure_updates`, `stage_removed`).
+- **Consequence:** `tests/test_reference_logs.py` still holds (YARN cluster mode); the reference set is 10 logs.
+
+## ADR-036 — Speculative execution is a port of TaskSetManager; kills take effect when the executor acts
+
+- **Date:** 2026-11-08
+- **Status:** accepted
+- **Decision:** `sched/scheduler.py` ports Spark 3.5.9's speculation: the 100 ms check (fixed delay from the
+  SparkContext start), quantile / multiplier / minTaskRuntime / task.duration.threshold, `PercentileHeap`'s
+  median, the 3.4+ efficiency rule (a running task's process rate is always 0 because heartbeats don't carry
+  its run time, so it never vetoes), `runningTasksSet` iterated in Scala `mutable.HashSet` order
+  (`ordering.ScalaHashSet`, with back-shift removal), separate speculatable pending lists, regular tasks
+  first, never a host the task already ran on, revive after a check that marked something. The first
+  attempt to succeed wins; the others get a kill request. A kill takes effect after `kill_latency`: the
+  RPC plus the task thread noticing it and reporting, CPU work that scales with the host's `cpu_factor`
+  (calibration `KILL_*`, ref09). Until then the attempt holds its core. A result stage's job end kills what
+  is left with "Stage finished" (the latest reason wins); an attempt that finishes before its kill arrives
+  ends as "Finish but did not commit due to another attempt succeeded" (no metrics). A killed attempt
+  reports `cost.model.killed_metrics`: run time and GC so far, reads so far, nothing written. Map outputs
+  are idempotent per map index (`ShuffleExchange.write`): a copy or re-run hashes the same rows into the
+  same blocks. `spark.yarn.exclude.nodes` keeps the RM from granting containers on those hosts.
+- **Consequence:** with `spark.speculation` unset nothing changes: Scenarios 00/01/02 regenerate byte for
+  byte (event logs and container logs). Not modelled: speculation for barrier stages, executor
+  decommissioning, `spark.speculation.task.duration.threshold` on multi-wave stages beyond Spark's rule.
+
+## ADR-037 — Scenario 09: a power-capped node that only some nights' placement hits
+
+- **Date:** 2026-11-08
+- **Status:** accepted
+- **Context:** The backlog said "one host with a degraded disk". In this job a slow node hardly shows unless
+  it is very slow: Spark hands tasks to free cores, so a 3x slower executor just takes fewer of 5,000 tasks
+  (5.5 → 5.8 min). The scenario needed a degradation that is real, large and modelled faithfully.
+- **Decision:** the cause is CPU, not disk: `wn063` lost one of its two power supplies (HW-6612, three days
+  earlier) and its BMC caps the power, so its CPUs run at ~1/20 of their speed (`slow_node cpu: 0.05`). A
+  throttled CPU slows everything on the host that is CPU work, so `cpu_factor` now also stretches the fixed
+  CPU costs: task deserialization, code generation, result serialization, JVM start-up (executor
+  registration), kill handling (healthy hosts have factor 1.0: no other scenario changes). A degraded disk
+  would mostly slow *other* hosts' reads and writes through that node's DataNode and shuffle service, which
+  the cost model doesn't express yet; CPU keeps the effect on the node's own executor, where the evidence is.
+  The fault is in the incident run only, but it stands for a node that was already bad the night before:
+  YARN placed none of that night's containers on it, and `test_scenario09.py` proves the last good run is
+  byte-identical with the fault. That is the "randomness": 40 of 120 nodes per night. Incident: executor 19
+  on `wn063` registers 88 s late, runs 28 tasks (others 225–259), every one of them the longest of its stage
+  at 13–24x the median, with normal input, GC share, no spill or failures; 5.5 → 9.3 min. The ticket's
+  change calendar lists the PSU alert among red herrings (rack04 switch work, rack02 patching, a NameNode
+  upgrade). Fixes, verified in the simulation: `spark.yarn.exclude.nodes` (5.5 min) and
+  `spark.speculation=true` (5.7 min, 21 copies, 18 win); the solution explains why `spark.excludeOnFailure`
+  would not help (nothing failed).
+- **Not modelled:** the degraded node's DataNode and shuffle service serving other executors (its CPU
+  throttling would slow HDFS write pipelines through it a little); disk faults remain available as a
+  mechanism but no scenario uses them yet.

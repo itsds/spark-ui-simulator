@@ -9,9 +9,11 @@ Ported from Spark 3.5.9 (`ApplicationMaster.allocationThreadImpl`, `YarnAllocato
   requests or loss-reason queries are pending, doubling up to the 3 s heartbeat, and every 3 s
   otherwise; the driver asking for more executors wakes it at once (`resetAllocatorInterval`).
 * **RM grants.** The CapacityScheduler hands out at most one OFF_SWITCH container per NodeManager
-  heartbeat (1 s), on nodes with room left by other tenants. YARN asks are absolute: the AM re-sends its
-  whole outstanding count whenever its request table changed, *before* it matched the containers in the
-  same response, so the RM can grant a few containers more than needed. Spark releases them ("Received 2
+  heartbeat (1 s), on nodes with room left by other tenants and not on the AM's excluded node list
+  (`spark.yarn.exclude.nodes`, sent by `YarnAllocatorNodeHealthTracker` when the allocator is created).
+  YARN asks are absolute: the AM re-sends its whole outstanding count whenever its request table
+  changed, *before* it matched the containers in the same response, so the RM can grant a few
+  containers more than needed. Spark releases them ("Received 2
   containers from YARN, launching executors on 1 of them."), and they use up container numbers, exactly
   as on our reference cluster (`reference/yarn-logs`, container 000005 of ref01).
 * **Container lifecycle.** A launched container registers its executor after JVM start-up. The
@@ -68,9 +70,11 @@ class Completed:
 class ResourceManager:
     """Our application's view of the RM: free memory per NodeManager, heartbeats, one ask, grants."""
 
-    def __init__(self, cluster: Cluster, rng: random.Random, container_mb: int):
+    def __init__(self, cluster: Cluster, rng: random.Random, container_mb: int,
+                 excluded: frozenset[str] = frozenset()):
         self.cluster = cluster
         self.free = dict(cluster.free_mb)
+        self.excluded = excluded  # the AM's excluded node list (updateBlacklist): never granted to us
         self.phase = {h.name: rng.randrange(cal.NM_HEARTBEAT_MS) for h in cluster.hosts}
         self.mb = container_mb
         self.ask = 0  # outstanding containers the RM still tries to place for us
@@ -93,7 +97,7 @@ class ResourceManager:
             t, i, h = heapq.heappop(heap)
             if t > t_to:
                 break
-            if self.free[h.name] >= self.mb:
+            if self.free[h.name] >= self.mb and h.name not in self.excluded:
                 self.free[h.name] -= self.mb
                 self.ask -= 1
                 out.append((t, h, self.next_n))
@@ -222,7 +226,7 @@ class YarnAllocator:
         eid = str(self.next_exec_id)
         self.next_exec_id += 1
         launch = now + rng.randint(5, 60)
-        registered = launch + int(rng.randint(*cal.EXECUTOR_START_MS) / host.speed)
+        registered = launch + int(rng.randint(*cal.EXECUTOR_START_MS) / host.cpu_speed)  # JVM start-up is CPU
         sz = self.sizing
         ex = Executor(
             id=eid, host=host, container_n=n, container_id=self.app.container_id(n), cores=sz.cores,

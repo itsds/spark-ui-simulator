@@ -523,7 +523,179 @@ S02 = {
     "E15": _written_files,
 }
 
-EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02}
+# ---------------------------------------------------------------------------- scenario 09 (bad-node straggler)
+
+BIG_STAGES = (2, 5, 6, 9)  # events scan, join + write, the two aggregations' map stages
+TASK_STAGES = (2, 5, 6, 8, 9, 11)  # every stage the slow executor ran tasks in
+
+
+def _executors(c: Ctx) -> list[dict]:
+    return [e for e in c.get("allexecutors") if e["id"] != "driver"]
+
+
+def _host(e: dict) -> str:
+    return e["hostPort"].rsplit(":", 1)[0]
+
+
+def _slow_executor(c: Ctx) -> dict:
+    """The executor whose stage-2 tasks are the slowest (the learner's suspect)."""
+    eid = _straggler(c, 2)["executorId"]
+    return next(e for e in _executors(c) if e["id"] == eid)
+
+
+def _stage_durations(c: Ctx) -> str:
+    g = c.runs["last_good"]
+    return ", ".join(f"stage {sid}: {fmt_duration(_stage_ms(g.stage(sid)))} → {fmt_duration(_stage_ms(c.stage(sid)))}"
+                     for sid in BIG_STAGES)
+
+
+def _straggler_durations(c: Ctx) -> str:
+    med, mx = _summary(c, 2, "0.5,1.0")["duration"]
+    return (f"median {fmt_duration(med)}, max {fmt_duration(mx)} (REST: {secs(med)} / {secs(mx)}, "
+            f"{mx / med:.0f}x the median)")
+
+
+def _normal_input(c: Ctx) -> str:
+    med, mx = _summary(c, 2, "0.5,1.0")["inputMetrics"]["bytesRead"]
+    t = _straggler(c, 2)
+    mine = t["taskMetrics"]["inputMetrics"]["bytesRead"]
+    return (f"median {fmt_bytes_js(med)}, max {fmt_bytes_js(mx)}; the longest task (index {t['index']}) read "
+            f"{fmt_bytes_js(mine)}")
+
+
+def _longest_tasks(c: Ctx) -> str:
+    tasks = sorted(c.hs.all_tasks(c.app_id, 2), key=lambda t: -t["duration"])
+    ex = _slow_executor(c)
+    n = next(i for i, t in enumerate(tasks) if t["executorId"] != ex["id"])
+    durs = [t["duration"] for t in tasks[:n]]
+    nxt = tasks[n]
+    return (f"the {n} longest tasks all ran on executor {ex['id']} ({_host(ex)}), {secs(min(durs))} to "
+            f"{secs(max(durs))}; the next one: {secs(nxt['duration'])} (executor {nxt['executorId']})")
+
+
+def _stage2_by_executor(c: Ctx) -> str:
+    st = c.get("stages/2/0")
+    st = st[0] if isinstance(st, list) else st
+    ex = _slow_executor(c)
+    summ = st["executorSummary"]
+    mine = summ[ex["id"]]
+    others = [v for k, v in summ.items() if k != ex["id"]]
+    n = sorted(v["succeededTasks"] for v in others)
+    t = sorted(v["taskTime"] for v in others)
+    return (f"executor {ex['id']}: {mine['succeededTasks']} tasks, {fmt_duration(mine['taskTime'])}; the other "
+            f"{len(others)}: {n[0]}–{n[-1]} tasks, {fmt_duration(t[0])}–{fmt_duration(t[-1])}")
+
+
+def _every_stage(c: Ctx) -> str:
+    """In each stage it ran tasks in, the slow executor's tasks are the longest ones (medians compared)."""
+    import statistics
+
+    ex = _slow_executor(c)
+    parts = []
+    for sid in TASK_STAGES:
+        tasks = sorted(c.hs.all_tasks(c.app_id, sid), key=lambda t: -t["duration"])
+        mine = [t["duration"] for t in tasks if t["executorId"] == ex["id"]]
+        rest = [t["duration"] for t in tasks if t["executorId"] != ex["id"]]
+        top = all(t["executorId"] == ex["id"] for t in tasks[:len(mine)])
+        parts.append(f"stage {sid}: {len(mine)}{'' if top else ' (not all longest)'}, median "
+                     f"{secs(statistics.median(mine))} vs {secs(statistics.median(rest))}")
+    return "; ".join(parts)
+
+
+def _executors_tab(c: Ctx) -> str:
+    ex = _slow_executor(c)
+    others = [e for e in _executors(c) if e["id"] != ex["id"]]
+    n = sorted(e["completedTasks"] for e in others)
+    return (f"executor {ex['id']}: {ex['completedTasks']} tasks, {fmt_duration(ex['totalDuration'])} task time, "
+            f"{fmt_bytes(ex['totalInputBytes'])} input; the other {len(others)}: {n[0]}–{n[-1]} tasks, "
+            f"{fmt_duration(min(e['totalDuration'] for e in others))}–"
+            f"{fmt_duration(max(e['totalDuration'] for e in others))}")
+
+
+def _late_registration(c: Ctx) -> str:
+    from datetime import UTC, datetime
+
+    ex = _slow_executor(c)
+    adds = sorted(_ts(e["addTime"]) for e in _executors(c) if e["id"] != ex["id"])
+
+    def hms(ms: float) -> str:
+        return datetime.fromtimestamp(ms / 1000, UTC).strftime("%H:%M:%S")
+    mine = _ts(ex["addTime"])
+    return (f"executor {ex['id']} at {hms(mine)} UTC, the other 39 between {hms(adds[0])} and {hms(adds[-1])} "
+            f"({(mine - adds[-1]) / 1000:.0f} s later)")
+
+
+def _gc_slow(c: Ctx) -> str:
+    ex = _slow_executor(c)
+    others = [e["totalGCTime"] / e["totalDuration"] for e in _executors(c) if e["id"] != ex["id"]]
+    return (f"executor {ex['id']}: {100 * ex['totalGCTime'] / ex['totalDuration']:.1f} %; the others "
+            f"{100 * min(others):.1f} % – {100 * max(others):.1f} %")
+
+
+def _rack_neighbours(c: Ctx) -> str:
+    """The ticket's switch work was on rack04 = wn061–wn080: the slow executor's neighbours there are fine."""
+    ex = _slow_executor(c)
+    rack = sorted((e for e in _executors(c) if e["id"] != ex["id"] and 61 <= int(_host(e)[2:5]) <= 80),
+                  key=lambda e: int(e["id"]))
+    n = sorted(e["completedTasks"] for e in rack)
+    return f"{len(rack)} executors on wn061–wn080 besides executor {ex['id']}: {n[0]}–{n[-1]} tasks each"
+
+
+def _last_good_hosts(c: Ctx) -> str:
+    ex = _slow_executor(c)
+    host = _host(ex)
+    g = _executors(c.runs["last_good"])
+    on = [e["id"] for e in g if _host(e) == host]
+    return (f"{len(g)} executors on {len({_host(e) for e in g})} hosts, "
+            f"{'executor ' + ', '.join(on) if on else 'none'} on {host.split('.')[0]}")
+
+
+def _same_conf(c: Ctx) -> str:
+    diff = _conf_diff(c)
+    props = dict(c.get("environment")["sparkProperties"])
+    spec = props.get("spark.speculation", "not set")
+    return f"{'no property differs' if not diff else diff}; spark.speculation: {spec}"
+
+
+def _slow_startup_log(c: Ctx) -> str:
+    """The slow executor's stderr against a healthy one's (executor 1): JVM start to registration, and the
+    CodeGenerator times of its first tasks."""
+    import requests
+
+    def stats(e: dict) -> tuple[float, float]:
+        html = requests.get(e["executorLogs"]["stderr"].replace("start=-4096", "start=0"), timeout=60).text
+        start = re.search(r"(\d\d:\d\d:\d\d) INFO CoarseGrainedExecutorBackend: Started daemon", html).group(1)
+        reg = re.search(r"(\d\d:\d\d:\d\d) INFO YarnCoarseGrainedExecutorBackend: Successfully registered", html)
+        h1, m1, s1 = map(int, start.split(":"))
+        h2, m2, s2 = map(int, reg.group(1).split(":"))
+        gen = [float(x) for x in re.findall(r"Code generated in ([0-9.]+) ms", html)]
+        return (h2 * 3600 + m2 * 60 + s2) - (h1 * 3600 + m1 * 60 + s1), max(gen)
+    ex = _slow_executor(c)
+    one = next(e for e in _executors(c) if e["id"] == "1")
+    (a, ga), (b, gb) = stats(ex), stats(one)
+    return (f"executor {ex['id']}: {a:.0f} s from 'Started daemon' to 'Successfully registered with driver', "
+            f"slowest 'Code generated in' {ga:,.0f} ms; executor 1: {b:.0f} s, {gb:,.0f} ms")
+
+
+S09 = {
+    "E1": lambda c: f"{_app_duration(c.runs['last_good'])} → {_app_duration(c)}",
+    "E2": _stage_durations,
+    "E3": _straggler_durations,
+    "E4": _normal_input,
+    "E5": _longest_tasks,
+    "E6": _stage2_by_executor,
+    "E7": _every_stage,
+    "E8": _executors_tab,
+    "E9": _late_registration,
+    "E10": _gc_slow,
+    "E11": _rack_neighbours,
+    "E12": _last_good_hosts,
+    "E13": _same_conf,
+    "E14": _slow_startup_log,
+}
+
+EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02,
+            "09-bad-node-straggler": S09}
 
 
 # ---------------------------------------------------------------------------- solution.md

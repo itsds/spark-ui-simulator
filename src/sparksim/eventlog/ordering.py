@@ -82,6 +82,64 @@ def scala_int_hashset_order(insertion_order: Iterable[int]) -> list[int]:
     return [x for x in table if x is not None]
 
 
+class ScalaHashSet:
+    """A Scala 2.12 `mutable.HashSet[Int]` (or `[Long]` of values below 2^31, which hash the same) with adds
+    and removes, for its iteration order: `TaskSetManager.runningTasksSet` (task ids), which the speculation
+    check walks. Removal back-shifts the probe chain like `FlatHashTable.removeElem`; the table never shrinks.
+    """
+
+    def __init__(self) -> None:
+        self._table: list[int | None] = [None] * 32
+        self._count = 0
+
+    def _add(self, t: list[int | None], x: int) -> bool:
+        h = _flat_index(x, len(t))
+        while t[h] is not None:
+            if t[h] == x:
+                return False
+            h = (h + 1) % len(t)
+        t[h] = x
+        return True
+
+    def add(self, x: int) -> None:
+        if self._add(self._table, x):
+            self._count += 1
+            if self._count >= len(self._table) * 450 // 1000:
+                old = self._table
+                self._table = [None] * (2 * len(old))
+                for y in old:
+                    if y is not None:
+                        self._add(self._table, y)
+
+    def remove(self, x: int) -> None:
+        t, n = self._table, len(self._table)
+        h = _flat_index(x, n)
+        while t[h] is not None:
+            if t[h] == x:
+                h0, h1 = h, (h + 1) % n
+                while t[h1] is not None:
+                    h2 = _flat_index(t[h1], n)
+                    if h2 != h1 and _precedes(h2, h0, n):
+                        t[h0] = t[h1]
+                        h0 = h1
+                    h1 = (h1 + 1) % n
+                t[h0] = None
+                self._count -= 1
+                return
+            h = (h + 1) % n
+
+    def __iter__(self):
+        return iter([x for x in self._table if x is not None])
+
+    def __len__(self) -> int:
+        return self._count
+
+
+def _precedes(i: int, j: int, n: int) -> bool:
+    d = n >> 1
+    return j - i < d if i <= j else i - j > d
+
+
 # --------------------------------------------------------------------------- java.util.Properties (JDK 17)
 
 

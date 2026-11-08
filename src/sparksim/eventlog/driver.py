@@ -165,6 +165,26 @@ class DriverLedger:
         out.sort(key=lambda a: a.id)
         return out
 
+    def failure_updates(self, stage_id: int, attempt: int, metrics: TaskMetrics,
+                        touched: Iterable[str] = ()) -> list[AccumulableInfo]:
+        """The executor's `Accumulator Updates` inside a TaskKilled / ExceptionFailure reason.
+
+        `Task.collectAccumulatorUpdates(taskFailed = true)`: the task's non-zero internal accumulators (an
+        `add(0)` counts as non-zero), always including `resultSize` (it is 0 on the executor), in
+        registration order; external accumulators (SQL metrics) don't count failed values and are left out.
+        The executor sends them without names, so JsonProtocol writes `Internal: false` (ref09).
+        """
+        touched = set(touched) | {"resultSize"}
+        base = self._internal_base[(stage_id, attempt)]
+        out = []
+        for off, (name, path) in enumerate(TASK_METRIC_ACCUMS):
+            if path is None:
+                continue
+            v = metrics.get(path)
+            if v != 0 or name in touched:
+                out.append(AccumulableInfo(base + off, None, str(v), None, False, True, None))
+        return out
+
     def stage_accumulables(self, stage_id: int, attempt: int) -> list[AccumulableInfo]:
         """`Stage Info.Accumulables` for StageCompleted."""
         return sorted(self._stage_accums.get((stage_id, attempt), {}).values(), key=lambda a: a.id)

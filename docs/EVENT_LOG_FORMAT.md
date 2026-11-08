@@ -132,7 +132,7 @@ Optional events and their switches (production defaults **off**):
   must equal the sum of the task updates.
 - Accumulator IDs are unique per app and increase over its lifetime.
 
-### 5.1 The driver's accumulator bookkeeping (verified on all 9 reference logs)
+### 5.1 The driver's accumulator bookkeeping (verified on all 10 reference logs)
 
 `sparksim.eventlog.driver.DriverLedger` implements these rules.
 `tests/test_eventlog_golden.py` re-derives all 26,719 accumulables in
@@ -150,7 +150,7 @@ the reference logs from task metrics alone and matches every one.
 | Stage accumulables | `StageCompleted` lists every accumulator the stage's tasks updated, with its latest `Value` and no `Update`. They are recorded on the stage's *latest* attempt (`stage.latestInfo`). |
 | JSON bytes | Compact, raw UTF-8, `\uXXXX` with upper-case hex for other control characters, `/` not escaped (Jackson defaults). `tests/test_eventlog_roundtrip.py` reproduces all 3,327 reference lines byte for byte. |
 
-### 5.2 Collection orders (verified on all 9 reference logs, `eventlog/ordering.py`)
+### 5.2 Collection orders (verified on all 10 reference logs, `eventlog/ordering.py`)
 
 | Field | Collection Spark iterates | Order |
 |---|---|---|
@@ -237,7 +237,24 @@ memory limit. Current usage: X GB of Y GB physical memory used; … virtual memo
 + process-tree dump, then `Container killed on request. Exit code is 143` and `Container exited with a
 non-zero exit code 143. `. An external `kill -9` (ref05) is exit 137 + `Killed by external signal`.
 
-### 6.2 Container logs (`reference/yarn-logs`, `sparksim/yarnlogs`)
+### 6.2 Speculative execution (verified on ref09 + the Spark 3.5.9 source, `sched/scheduler.py`)
+
+ref09 ran on two NodeManagers, `localhost` and `slownode`, whose executors a cgroup CPU quota slowed down
+(`reference/yarn/slow_node.sh`); `spark.speculation=true`, defaults otherwise.
+
+| Topic | What Spark 3.5.9 does |
+|---|---|
+| Events | **No** `SparkListenerSpeculativeTaskSubmitted` in the log (EventLoggingListener ignores it). A copy is an ordinary `TaskStart` with `"Speculative": true` and the next `Attempt` number of its index. The History Server derives the stage page's *Speculation Summary* (total / active / complete / failed / killed copies) from those flags. |
+| When | every 100 ms (`TaskSchedulerImpl.checkSpeculatableTasks`, fixed delay from SparkContext start); per task set once `floor(0.75 x numTasks)` tasks succeeded: threshold = max(1.5 x `PercentileHeap` median of successful durations, 100 ms); a running task with one copy and run time above it is marked. The 3.4+ efficiency rule never vetoes in practice: heartbeats don't carry a running task's run time, so its process rate is 0. |
+| Where | marked tasks join `pendingSpeculatableTasks` (by host / rack / noPrefs / all); an offer takes a regular task first, then a speculatable one on a host where the task never ran. Copies launch only on free cores, so in a busy stage they start when the regular tasks run out. |
+| Winner / loser | the first attempt to succeed wins; the driver kills the others with "another attempt succeeded" (interrupting the thread). When a result stage's job ends, `killAllTaskAttempts(.., "Stage finished")` (no interrupt) overwrites a reason the executor hasn't acted on yet. The loser's core is busy until its executor reports KILLED: tens of ms on a healthy host, seconds on the throttled one. |
+| Killed `TaskEnd` | `"Reason": "TaskKilled"`, `"Kill Reason"`, `"Accumulator Updates"` = the task's non-zero internal accumulators plus `resultSize` (always), without names, `Internal: false`, `Count Failed Values: true`, no SQL metrics. `Task Info`: `Killed: true`, `Failed: false`. `Task Metrics`: run time and GC so far, records/bytes read so far, peak memory; deserialize time, CPU time, result size and serialization time 0; nothing written. `Task Executor Metrics`: heartbeat peaks as for any task. |
+| After the stage | a killed attempt that reports after its stage completed (and its job ended) gets **no** `Task Info.Accumulables`: the DAGScheduler already removed the stage and posts the TaskEnd without merging (`DriverLedger.stage_removed`). Before that, its updates count (task metrics count failed values). |
+| Driver log | `YarnClusterScheduler: Starting speculative execution thread`; `TaskSetManager: Marking task N in stage S.A (on host) as speculatable because it ran more than T ms(K speculatable tasks in this taskset now)`; the copy's `Starting task N.1 …`; `Killing attempt 0 for task N.0 in stage S.A (TID t) on host as the attempt 1 succeeded on host2` before `Finished task N.1 …`; WARN `Lost task N.0 … (host executor E): TaskKilled (another attempt succeeded)` and INFO `task N.0 … failed, but the task will not be re-executed (…)`. The TaskSet leaves the pool after its last killed attempt. |
+| Executor log | `Executor: Executor is trying to kill task N.0 in stage S.A (TID t), reason: R` per kill request, then `Executor killed …` (TaskKilledException at the next record) or `Executor interrupted and killed …` (an interrupted call), no `Finished task`. A killed BypassMergeSortShuffleWriter also logs `Stream Closed` exceptions while it deletes its files (not modelled: our map stages use the UnsafeShuffleWriter). |
+| YARN | `spark.yarn.exclude.nodes`: the AM's `YarnAllocatorNodeHealthTracker` sends it to the RM as the app's excluded node list when the allocator is created (`adding nodes to YARN application master's excluded node list: List(…)`), so no executor container lands there. |
+
+### 6.3 Container logs (`reference/yarn-logs`, `sparksim/yarnlogs`)
 
 - Layout `%d{yy/MM/dd HH:mm:ss} %p %c{1}: %m`, first line `Using Spark's default log4j profile: …`,
   stderr only (stdout: Python prints). The AM container (000001) holds the driver log.
@@ -281,6 +298,7 @@ non-zero exit code 143. `. An external `kill -9` (ref05) is exit 137 + `Killed b
 | Tiny sizes and durations | small reference data | come from the cost model at production scale |
 | `ref*` app names, `/data/ref` paths, `REF_*` env properties | reference harness | use the scenario's realistic job names, tables and properties |
 | `Locality` mostly `NODE_LOCAL`/`PROCESS_LOCAL` | HDFS blocks on the only node | model locality from block placement |
+| ref09's `slownode` host, seconds-long kills there | a second NodeManager on 127.0.0.2 whose executors share half a CPU (cgroup quota) | degrade hosts through `slow_node` faults; kill latency scales with the host's CPU factor |
 
 ## 9. Reference apps and what each one is for
 
@@ -295,5 +313,7 @@ non-zero exit code 143. `. An external `kill -9` (ref05) is exit 137 + `Killed b
 | `ref06-python-udf` | `BatchEvalPython`, `ArrowEvalPython`, `MapInPandas`, native-expression baseline |
 | `ref07-driver-bound` | big `collect()`/`toPandas()` (result size, getting-result time), driver-side gaps between jobs, small-files scan + listing |
 | `ref08-rdd-api` | pure RDD jobs (no SQL tab), `groupByKey` vs `reduceByKey`, `sortByKey` sampling job, RDD join |
+| `ref09-speculation` | two NodeManagers, one CPU-throttled: speculative copies, `TaskKilled` ("another attempt succeeded", "Stage finished"), killed attempts after their stage completed, a 6-task stage the slow host dominates (no speculation: 75 % never finish), driver + executor kill lines |
 
-Regenerate everything: `reference/yarn/cluster.sh start && reference/capture.sh && uv run scripts/event_inventory.py`.
+Regenerate everything: `reference/yarn/cluster.sh start && reference/capture.sh && uv run scripts/event_inventory.py`
+(ref09 needs `REF_SECOND_NM=1` and `reference/yarn/slow_node.sh start`, see `reference/capture.sh`).

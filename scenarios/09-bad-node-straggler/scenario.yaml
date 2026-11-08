@@ -1,0 +1,60 @@
+# Scenario 09: the nightly enrichment "randomly" slow. The cause is one NodeManager: since a power supply
+# failed on Saturday 2026-10-24, its BMC caps the server's power and its CPUs run at ~1/20 of their speed.
+# Nobody took it out of service ("redundancy lost, no impact"). YARN places this job's 40 executors on 40 of
+# the 120 nodes, differently every night: on nights when one of them lands on wn063, every task it runs
+# takes ~20x as long, and each stage waits for the last of them. Speculation is off (Spark's default).
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 09-bad-node-straggler
+id: 09-bad-node-straggler
+title: "The nightly enrichment is randomly slow"
+difficulty: medium
+topics: [stragglers, slow node, speculative execution, Aggregated Metrics by Executor, YARN placement]
+summary: >-
+  Since the weekend the clickstream enrichment has been late on some nights and on time on others, with
+  no change to the code, the data volume or the submit options. Last night it ran almost ten minutes
+  instead of five and a half. Find out where the time went and why only some nights, using the night
+  before as your reference.
+
+job:                                          # the same job and cluster as 00, a week earlier
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377          # the active RM (rm1) started 2026-10-13 14:35 UTC
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # the cron wrapper's spark-submit (as in 00)
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false
+
+runs:
+  last_good:
+    label: "Last good run: 2026-10-27 (dt=2026-10-26)"
+    app_seq: 46958
+    seed: 20261026
+    started_at: "2026-10-27T02:10:05.947Z"
+    params: {dt: "2026-10-26"}
+    # wn063 was already degraded this night, but YARN put none of the job's containers on it, so it played
+    # no part in the run (tests/test_scenario09.py builds this run with the fault too: the same event log).
+  incident:
+    label: "Incident run: 2026-10-28 (dt=2026-10-27)"
+    app_seq: 47131
+    seed: 20261027
+    started_at: "2026-10-28T02:10:07.093Z"
+    params: {dt: "2026-10-27"}
+    faults:
+      # HW-6612: wn063's PSU 2 failed on 2026-10-24 21:47 UTC. With one supply left, the BMC caps the
+      # server's power: the CPUs sit at their lowest P-state with clock modulation, ~1/20 of their normal
+      # throughput (everything CPU-bound on the host: tasks, GC, JVM start-up, code generation). Its disks
+      # and NIC are fine. The node stayed in service; the replacement PSU was planned for 2026-10-30.
+      - type: slow_node
+        host: wn063.hadoop.prod.internal
+        cpu: 0.05
+        note: executor 19 lands on it tonight; the night before, no container of this job did

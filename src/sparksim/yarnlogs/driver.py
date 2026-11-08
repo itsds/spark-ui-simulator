@@ -156,6 +156,8 @@ class _Driver:
         log.info(t, "Utils", f"Successfully started service 'SparkUI' on port {self.ui_port}.")
         log.info(t, "ServerInfo", f"Adding filter to /: {AMIP}")
         log.info(t, "YarnClusterScheduler", "Created YarnClusterScheduler")
+        if run.speculation.enabled:  # TaskSchedulerImpl.start (ref09)
+            log.info(t, "YarnClusterScheduler", "Starting speculative execution thread")
         bm = run.driver_bm_port
         log.info(t, "Utils", "Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' "
                  f"on port {bm}.")
@@ -184,6 +186,9 @@ class _Driver:
         _security_manager(log, t, s.user)
         log.info(t, "ApplicationMaster", _launch_context(run))
         t = run.am_request_time
+        if run.excluded_nodes:  # YarnAllocatorNodeHealthTracker, created with the allocator: spark.yarn.exclude.nodes
+            log.info(t, "YarnAllocatorNodeHealthTracker", "adding nodes to YARN application master's excluded node "
+                     f"list: List({', '.join(run.excluded_nodes)})")
         log.info(t, YA, "Resource profile 0 doesn't exist, adding it")
         log.info(t, "Configuration", "resource-types.xml not found")
         log.info(t, "ResourceUtils", "Unable to find 'resource-types.xml'.")
@@ -323,7 +328,23 @@ class _Driver:
         props_len = sum(len(k) + len(v) + 4 for k, v in run.base_props.items())
         done: dict[tuple[int, int], int] = {}
         running: set[int] = set()
-        for t, kind, obj in run.log:
+        # The TaskSet leaves the pool once it is a zombie (every task succeeded) and its last attempt, maybe a
+        # killed one, has reported: the last task_end of each stage attempt.
+        last_end: dict[tuple[int, int], int] = {}
+        for i, (_t, kind, obj) in enumerate(run.log):
+            if kind == "task_end":
+                last_end[(obj.stage_id, obj.attempt)] = i
+        for t, sid, satt, index, host, threshold, n in run.sched.speculation_log:  # checkSpeculatableTasks
+            log.info(t, "TaskSetManager", f"Marking task {index} in stage {sid}.{satt} (on {host}) as speculatable "
+                     f"because it ran more than {threshold:.0f} ms({n} speculatable tasks in this taskset now)")
+        losers: dict[int, list] = {}  # winner task id -> the attempts its success killed
+        for tk in run.task_records.values():
+            if tk.killed is not None:
+                st = run.stages[tk.stage_id]
+                winner = next((w for w in st.tasks if w.index == tk.index and w.ok), None)
+                if winner is not None and any(rq == "another attempt succeeded" for _, rq in tk.kill_reqs):
+                    losers.setdefault(winner.task_id, []).append(tk)
+        for i, (t, kind, obj) in enumerate(run.log):
             if kind == "job_start":
                 job = obj
                 st = run.stages[job.final_stage]
@@ -358,15 +379,28 @@ class _Driver:
                          f"partition {tk.index}, {tk.locality}, {size} bytes) ")
             elif kind == "task_end":
                 tk = obj
-                if not tk.ok:
-                    continue
                 st = run.stages[tk.stage_id]
                 key = (tk.stage_id, tk.attempt)
-                done[key] = done.get(key, 0) + 1
-                log.info(t, "TaskSetManager", f"Finished task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}."
-                         f"{tk.attempt} (TID {tk.task_id}) in {tk.finish - tk.launch} ms on {tk.executor.host.name} "
-                         f"(executor {tk.executor.id}) ({done[key]}/{st.num_tasks})")
-                if done[key] == st.num_tasks:
+                if tk.killed is not None:  # handleFailedTask(TaskKilled): the task's index already succeeded
+                    name = f"task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}.{tk.attempt} (TID {tk.task_id})"
+                    log.warn(t, "TaskSetManager", f"Lost {name} ({tk.executor.host.name} executor {tk.executor.id}): "
+                             f"TaskKilled ({tk.killed})")
+                    log.info(t, "TaskSetManager", f"{name} failed, but the task will not be re-executed (either "
+                             "because the task failed with a shuffle data fetch failure, so the previous stage needs "
+                             "to be re-run, or because a different copy of the task has already succeeded).")
+                elif tk.ok:
+                    for lost in sorted(losers.get(tk.task_id, ()), key=lambda x: x.task_id):
+                        log.info(t, "TaskSetManager", f"Killing attempt {lost.task_attempt} for task {lost.index}."
+                                 f"{lost.task_attempt} in stage {lost.stage_id}.{lost.attempt} (TID {lost.task_id}) on "
+                                 f"{lost.executor.host.name} as the attempt {tk.task_attempt} succeeded on "
+                                 f"{tk.executor.host.name}")
+                    done[key] = done.get(key, 0) + 1
+                    log.info(t, "TaskSetManager", f"Finished task {tk.index}.{tk.task_attempt} in stage "
+                             f"{tk.stage_id}.{tk.attempt} (TID {tk.task_id}) in {tk.finish - tk.launch} ms on "
+                             f"{tk.executor.host.name} (executor {tk.executor.id}) ({done[key]}/{st.num_tasks})")
+                else:
+                    continue  # ExecutorLostFailure: logged with the executor loss (yarn())
+                if last_end.get(key) == i and done.get(key, 0) == st.num_tasks:
                     log.info(t, "YarnClusterScheduler", f"Removed TaskSet {tk.stage_id}.{tk.attempt}, whose tasks have "
                              "all completed, from pool ")
             elif kind == "stage_completed":

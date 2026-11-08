@@ -16,7 +16,7 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 | 06 | Partition pruning failure | filter casts partition column (`cast(dt as date)`) | "Daily job reads whole table" | SQL scan: `PartitionFilters: []`, files/size read = whole table; input size per stage | Fix predicate type, avoid functions on partition column |
 | 07 | Exploding join (duplicate keys) | dimension has duplicate business keys | "Output 50× bigger than expected, job slow" | SQL: join output rows ≫ input rows; shuffle write of downstream stage | Dedupe dimension, fix join key |
 | 08 | GC pressure | huge executor heap + object-heavy rows / cached deserialized | "Job slow, CPU busy" | Executors tab task time red (GC > 10%); stage GC time column; Peak JVM memory | Serialized caching, smaller executors, G1 tuning, avoid object churn |
-| 09 | Bad-node straggler | one NodeManager host with degraded disk | "Random slowness" | Aggregated Metrics by Executor: one host slow on all tasks; speculation off | Speculation, exclude node (`spark.excludeOnFailure`), report node |
+| 09 ✅ | Bad-node straggler | one NodeManager (`wn063`) power-capped after a PSU failure: CPU at ~1/20; YARN puts an executor on it on some nights only; speculation off (`scenarios/09-bad-node-straggler`) | "The nightly enrichment is randomly slow" (5.5 → 9.3 min) | Stage 2: max 22x the median with a normal input split; the longest tasks of every stage on executor 19 (13–24x the median); Aggregated Metrics by Executor / Executors: 28 tasks vs 225–259, Add Time 88 s late; GC, spill, failures normal; rack neighbours fine; last good run had no executor on that host; stderr: 53 s JVM start, slow codegen | `spark.yarn.exclude.nodes` / drain the node; `spark.speculation=true` (verified); NM health check; `excludeOnFailure` would not help (nothing failed) |
 | 10 | Python UDF bottleneck | row-at-a-time Python UDF in hot path | "PySpark job 5× slower than Scala version" | SQL: `BatchEvalPython`; high task duration with low shuffle; stderr Python worker lines | Native functions, pandas UDF (Arrow) |
 | 11 | Driver bottleneck | `collect()`/`toPandas()` + driver-side loop | "Cluster idle but job takes hours" | Jobs Event Timeline: long gaps between jobs; driver result size; many tiny jobs | Push work to executors, avoid collect, write output |
 | 12 | Fetch failure / stage retry | executor lost during shuffle, no ESS | "Flaky job, sometimes 2× slower" | Stages: attempt 1 (retry), `FetchFailedException`; executor removed | External shuffle service, decommissioning, fix root executor loss |
@@ -26,7 +26,9 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 | ★ | Capstone(s) | 2–3 faults combined + red herrings | realistic multi-cause incidents | — | — |
 
 Fault mechanisms available in `scenario.yaml` (Phase 6, ADR-029): `key_skew` (hot keys, Zipf), `config`,
-`slow_node` (CPU/disk/NIC), `memory_pressure` (native memory per task), `executor_killed` (SIGKILL, exit 137).
+`slow_node` (CPU/disk/NIC; the CPU factor also stretches deserialization, codegen, JVM start-up, ADR-037),
+`memory_pressure` (native memory per task), `executor_killed` (SIGKILL, exit 137). The engine also models
+speculative execution (`spark.speculation`, ADR-036) and `spark.yarn.exclude.nodes`.
 The planner also follows `spark.sql.adaptive.coalescePartitions.initialPartitionNum` (Scenario 02's durable
 fix). Still to build for the backlog: task exceptions + job abort (03's "failed after 4 attempts"), lost
 shuffle files without the shuffle service (12), AQE's skew-join split (a "fixed run" for 01), GC pressure
