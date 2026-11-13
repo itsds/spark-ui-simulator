@@ -476,6 +476,8 @@ what was done, what's next, gotchas.
     (`tests/test_scenario03_hs.py`), side-by-side, interview answer; `tests/test_scenario03.py` verifies the
     fixes (`memoryOverhead=10g` 7.3 min; one reader per JVM + `4g` 7.2 min) and the non-fixes (24g: a coin flip;
     2 cores; the fixed UDF alone). The schema accepts a code change (a workload param) as the incident's cause.
+  - `uv run pytest`: 286 passed (~8 min, integration included); ruff clean; `sparksim up` +
+    `scripts/stack_check.py` pass for Scenario 03 (both attempts' pages and log links).
 - **Next:** 12 (fetch failure / stage retry): lost shuffle files without the shuffle service, FetchFailed,
   map-stage resubmission. ref05 has it for real; ref10 attempt 2 adds `Resubmitted` map tasks (the
   executor-lost path without ESS), and the engine's abort/cancel machinery is in place.
