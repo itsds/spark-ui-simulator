@@ -1,0 +1,64 @@
+# Scenario 05: the nightly enrichment before its page-catalog join had a broadcast hint. The script relied on
+# Spark planning that join as a broadcast hash join by itself (the catalog is 3 MB, under the default 10 MB
+# spark.sql.autoBroadcastJoinThreshold). On 2026-09-22 the platform team rolled new Spark client defaults
+# out to the gateways (PLAT-1184), among them spark.sql.autoBroadcastJoinThreshold=-1, after broadcasts of
+# misestimated tables had crashed two other teams' drivers. That night all 4.1 billion of the day's events were
+# shuffled and sorted by page_id to meet 46 thousand catalog rows, and page popularity, which a broadcast join
+# never cared about, put the most visited page's 3.7 % of all events into a single reduce task.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 05-missed-broadcast-join
+id: 05-missed-broadcast-join
+title: "The nightly enrichment got four times slower overnight"
+difficulty: medium
+topics: [broadcast hash join, sort-merge join, autoBroadcastJoinThreshold, join strategy, skew, SQL tab, Environment tab]
+summary: >-
+  The clickstream enrichment usually finishes in under six minutes. Last night it took 22, and the BI
+  team's dashboards went out with the previous day's data. Nothing failed, and neither the job's code nor
+  its spark-submit options changed. Find out where the time went and why, using the night before as your
+  reference.
+
+job:                                          # the same job and cluster as 00, seven weeks earlier
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1787640083508          # the active RM (rm1) started 2026-08-25 06:41 UTC
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 22                              # the RM restart of 2026-10-13 made it 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # the cron wrapper's spark-submit (as in 00)
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false
+
+runs:
+  last_good:
+    label: "Last good run: 2026-09-22 (dt=2026-09-21)"
+    app_seq: 40741
+    seed: 20260921
+    started_at: "2026-09-22T02:10:06.214Z"
+    params: {dt: "2026-09-21", broadcast_hint: false}   # the script has no F.broadcast() yet
+  incident:
+    label: "Incident run: 2026-09-23 (dt=2026-09-22)"
+    app_seq: 40919
+    seed: 20260922
+    started_at: "2026-09-23T02:10:07.660Z"
+    params: {dt: "2026-09-22", broadcast_hint: false}
+    faults:
+      # PLAT-1184 (rolled out 2026-09-22 14:00 UTC): "Spark client defaults 2026.09" in the gateways'
+      # /etc/spark/conf/spark-defaults.conf, after two driver OOMs in other teams' jobs (INC-3317, INC-3342)
+      # caused by broadcasting tables whose size Spark had underestimated. Automatic broadcast joins are off
+      # cluster-wide ("hint the joins you want broadcast"), and the driver's result size is capped. The
+      # announcement said "no action needed for most jobs". Every job submitted from the gateways inherits it.
+      - type: config
+        set:
+          spark.sql.autoBroadcastJoinThreshold: -1
+          spark.driver.maxResultSize: 512m
+        note: >-
+          the platform reverted the broadcast default on 2026-09-24 after three teams' jobs slowed down;
+          data-eng added F.broadcast() around the page catalog the same day (the script as in 00)

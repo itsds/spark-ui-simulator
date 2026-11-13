@@ -656,3 +656,61 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
 - **Not modelled:** the degraded node's DataNode and shuffle service serving other executors (its CPU
   throttling would slow HDFS write pipelines through it a little); disk faults remain available as a
   mechanism but no scenario uses them yet.
+
+## ADR-038 — Scenario 05: an inherited default turns off the broadcast the script relied on
+
+- **Date:** 2026-11-13
+- **Status:** accepted
+- **Context:** The backlog's "missed broadcast join" (stats missing / AQE off → SMJ on a 20 MB dimension) needed
+  a cause this simulator models faithfully and a story that doesn't contradict Scenarios 00/01/02/09, whose
+  script hints `F.broadcast(pages)`. With a hint, no threshold matters. A path-based Parquet read has no catalog
+  statistics to lose (its size comes from the files), and AQE off isn't modelled (ADR-029).
+- **Decision:** Scenario 05 is seven weeks before 00 (last good 2026-09-22, app 40741; incident 2026-09-23, app
+  40919) on the RM that ran until the restart of 2026-10-13 (its own `cluster_timestamp`, epoch 22). The workload
+  gains a parameter `broadcast_hint` (default true: every other scenario is byte-identical): in September the
+  script had no hint and relied on the 3 MB catalog being under the 10 MB `spark.sql.autoBroadcastJoinThreshold`
+  (the last good run is byte-identical to the same run with the hint: same plan). The fault is `config`: the
+  platform's "Spark client defaults 2026.09" (PLAT-1184) in the gateways' `spark-defaults.conf` set the
+  threshold to `-1` (and a harmless `spark.driver.maxResultSize=512m`); AQE's runtime threshold falls back to
+  it, so nothing re-broadcasts. The page join becomes a sort-merge join on `page_id`. The events' page ids get a
+  `KeySpace` with a Zipf law (s = 0.85 over 44,000 visited pages: the top page holds 3.7 % of the events), a
+  property of the data in every run that only matters once the events are hash-partitioned on it. Symptoms
+  from the simulation: query 0 4.7 → 22 min, a new stage of 2,372 tasks with a 17-minute straggler (9.1 GiB,
+  153 M rows) and a tail of heavy partitions on different executors, the events shuffled twice (243.9 GiB +
+  295.5 GiB instead of 297.7 GiB once), a 2.1 MiB exchange next to a 580.5 GiB one. The ticket's red herrings:
+  the page catalog's migration to a new CMS export (same file, same rows, and the join returns as many rows as
+  it gets), DataNode restarts, a queue capacity change; the PLAT change is in the calendar as "no action
+  needed". Fixes verified in `tests/test_scenario05.py`: `--conf spark.sql.autoBroadcastJoinThreshold=10m` and
+  the hint, both 5.5 min.
+- **Not modelled:** AQE's skew-join split and AQE's runtime SMJ → BHJ conversion
+  (`spark.sql.adaptive.autoBroadcastJoinThreshold`), so the solution discusses both without simulated numbers.
+
+## ADR-039 — The UnsafeShuffleWriter's buffer is execution memory: peak and spill
+
+- **Date:** 2026-11-13
+- **Status:** accepted; extends ADR-028
+- **Context:** Scenario 05's straggler is a *map* task: it joins 153 M rows and writes all of them to the next
+  shuffle. The cost model only charged memory and spill to operators (sorts, aggregation maps); a map task's
+  shuffle output cost no memory at all, and every map stage reported a Peak Execution Memory of 0. A real
+  3.5.9 run (local, 400 partitions, `spark.shuffle.spill.numElementsForceSpillThreshold` to force spills) and the
+  3.5.9 bytecode settled what Spark does: above `spark.shuffle.sort.bypassMergeThreshold` (200) reduce
+  partitions, SQL shuffles use UnsafeShuffleWriter; its ShuffleExternalSorter keeps the serialized records
+  (+ 4-byte length) in execution-memory pages with an 8-byte pointer per record in a LongArray that radix sort
+  uses half of; `UnsafeShuffleWriter.stop()` adds the sorter's peak to the task's Peak Execution Memory
+  (`incPeakExecutionMemory` adds up every consumer's peak); its spills count in Spill (Memory) / (Disk) and log
+  `ShuffleExternalSorter: Task <TID> on Thread <id> spilling sort data of <size> to disk (0  times so far)`
+  ("time" only for 1, unlike UnsafeExternalSorter). With ≤ 200 partitions (BypassMergeSortShuffleWriter) the peak
+  stays 0, as in the reference logs.
+- **Decision:** `cost.model._shuffle_sorter`: pages of serialized records + 16 bytes per record; past the task's
+  execution memory it spills like a sorter alone in its group (M − A/2, the last run goes into the output file),
+  at disk cost only (spill files are LZ4-compressed when written and fast-merged into the output). Its peak is
+  added to the task's Peak Execution Memory; the memory the task holds at once (heartbeat snapshots, container
+  RSS) is the larger of the operators' and the writer's. Executor logs print its spill lines after the join
+  sort's, while the output streams in.
+- **Consequences:** every map stage with 2,400 reduce partitions now reports its buffer (~140 MiB for an events
+  scan task), and executor memory snapshots follow; no other scenario's timing or evidence changed (their map
+  outputs fit in memory; the HS evidence tests of 00/01/02/09 pass unchanged). Still not Spark's: operator peaks
+  are combined as the larger of the join's sorts and the operators after the join, while Spark adds every
+  sorter's peak, so a spilling sort-merge join task's Peak Execution Memory (Scenario 02's "pinned at 2.4 GiB")
+  would read higher in real Spark; the forced spill of a reading sorter's last run when the writer needs memory
+  isn't modelled either.

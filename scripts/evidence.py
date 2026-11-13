@@ -694,8 +694,158 @@ S09 = {
     "E14": _slow_startup_log,
 }
 
+# ---------------------------------------------------------------------------- scenario 05 (missed broadcast join)
+
+
+def _below(q: dict, node: dict, name: str) -> dict:
+    """Follow a node's first input down the plan graph (through codegen wrappers, sorts, reads) to `name`."""
+    by_id = {n["nodeId"]: n for n in q["nodes"]}
+    while node["nodeName"] != name:
+        node = by_id[next(e["fromId"] for e in q["edges"] if e["toId"] == node["nodeId"])]
+    return node
+
+
+def _join_inputs(q: dict, join: dict) -> list[dict]:
+    """The nodes feeding a join (its two sides), in the order of the graph's edges."""
+    by_id = {n["nodeId"]: n for n in q["nodes"]}
+    return [by_id[e["fromId"]] for e in q["edges"] if e["toId"] == join["nodeId"]]
+
+
+def _page_scan(c: Ctx) -> dict:
+    return min(_nodes(c, 0, "Scan parquet "), key=_rows)
+
+
+def _joins(c: Ctx) -> str:
+    def names(run: Ctx) -> str:
+        q = _sql(run, 0)
+        joins = sorted((n for n in q["nodes"] if n["nodeName"].endswith("Join")), key=lambda n: -n["nodeId"])
+        return " + ".join(n["nodeName"] for n in joins)  # leaf side first: the page catalog join
+    return f"{names(c.runs['last_good'])} → {names(c)}"
+
+
+def _page_catalog_scan(c: Ctx) -> str:
+    def row(run: Ctx) -> str:
+        s = _page_scan(run)
+        n = int(_metric(s, "number of files read"))
+        return f"{n} file{'s' if n != 1 else ''}, {_metric(s, 'size of files read')}, {_rows(s):,} rows"
+    return f"{row(c.runs['last_good'])} → {row(c)}"
+
+
+def _page_catalog_exchange(c: Ctx) -> str:
+    (b,) = _nodes(c.runs["last_good"], 0, "BroadcastExchange")
+    pages = _page_scan(c)
+    ex = next(x for x in _nodes(c, 0, "Exchange") if _rows_metric(x, "records read") == _rows(pages))
+    return (f"BroadcastExchange: {_metric(b, 'data size')}, {_rows(b):,} rows → Exchange: {_metric(ex, 'data size')} "
+            f"in {_metric(ex, 'number of partitions')} partitions")
+
+
+def _page_join_events_exchange(c: Ctx) -> str:
+    """The Exchange on the events side of the page catalog's SortMergeJoin (the incident's first join)."""
+    q = _sql(c, 0)
+    smj = max((n for n in q["nodes"] if n["nodeName"] == "SortMergeJoin"), key=lambda n: n["nodeId"])  # leaf side
+    pages = _page_scan(c)
+    ex = next(x for x in (_below(q, k, "Exchange") for k in _join_inputs(q, smj))
+              if _rows_metric(x, "records read") != _rows(pages))
+    return (f"{_rows_metric(ex, 'records read'):,} records, data size {_metric(ex, 'data size')}, "
+            f"shuffle bytes written {_metric(ex, 'shuffle bytes written')}")
+
+
+def _event_stage_writes(c: Ctx) -> str:
+    g = c.runs["last_good"]
+    big = 50 << 30
+
+    def row(run: Ctx) -> str:
+        st = [s for s in run.stages if s["status"] == "COMPLETE" and s["shuffleWriteBytes"] > big]
+        return " + ".join(f"stage {s['stageId']} {fmt_bytes(s['shuffleWriteBytes'])}"
+                          for s in sorted(st, key=lambda s: s["stageId"]))
+    return f"{row(g)} → {row(c)}"
+
+
+def _longest_page_join_tasks(c: Ctx) -> str:
+    tasks = sorted(c.hs.all_tasks(c.app_id, 5), key=lambda t: -t["duration"])[:5]
+
+    def read(t: dict) -> int:
+        m = t["taskMetrics"]["shuffleReadMetrics"]
+        return m["remoteBytesRead"] + m["localBytesRead"]
+    execs = {t["executorId"] for t in tasks}
+    return (", ".join(f"{fmt_duration(t['duration'])} ({fmt_bytes_js(read(t))})" for t in tasks)
+            + f", on {len(execs)} different executors")
+
+
+def _page_join_spill(c: Ctx) -> str:
+    st = c.stage(5)
+    n = sum(1 for t in c.hs.all_tasks(c.app_id, 5) if t["taskMetrics"]["diskBytesSpilled"] > 0)
+    return (f"{fmt_bytes(st['memoryBytesSpilled'])} / {fmt_bytes(st['diskBytesSpilled'])}, "
+            f"from {n} of {st['numTasks']:,} tasks")
+
+
+def _same_events(c: Ctx) -> str:
+    good = max(_nodes(c.runs["last_good"], 0, "Scan parquet "), key=_rows)
+    bad = max(_nodes(c, 0, "Scan parquet "), key=_rows)
+    g, b = _rows(good), _rows(bad)
+    return f"{g:,} → {b:,} rows ({100 * (b - g) / g:+.1f} %)"
+
+
+def _straggler_spills(c: Ctx) -> str:
+    """The longest task's spill lines in its executor's stderr (through the NodeManager log link). The
+    ShuffleExternalSorter lines name the task and its thread; the UnsafeExternalSorter lines of that thread
+    between the task's start and end are its join sort's."""
+    import requests
+
+    t = _straggler(c, 5)
+    ex = next(e for e in c.get("allexecutors") if e["id"] == t["executorId"])
+    html = requests.get(ex["executorLogs"]["stderr"].replace("start=-4096", "start=0"), timeout=60).text
+    lines = html.splitlines()
+    start = next(i for i, ln in enumerate(lines) if f"(TID {t['taskId']})" in ln and "Running task" in ln)
+    end = next(i for i, ln in enumerate(lines) if f"(TID {t['taskId']})" in ln and "Finished task" in ln)
+    shuffle = [re.search(r"on Thread (\d+) spilling sort data of (.+?) to disk", ln)
+               for ln in lines[start:end] if f"ShuffleExternalSorter: Task {t['taskId']} on Thread" in ln]
+    thread = shuffle[0].group(1)
+    sort = [re.search(r"spilling sort data of (.+?) to disk", ln) for ln in lines[start:end]
+            if f"UnsafeExternalSorter: Thread {thread} spilling" in ln]
+    return (f"TID {t['taskId']} (Thread {thread}): {len(sort)} x UnsafeExternalSorter ({sort[0].group(1)}), "
+            f"then {len(shuffle)} x ShuffleExternalSorter ({shuffle[0].group(2)})")
+
+
+def _page_join_rows(c: Ctx) -> str:
+    """Rows into the page catalog's SortMergeJoin from the events side, and rows out of it."""
+    q = _sql(c, 0)
+    smj = max((n for n in q["nodes"] if n["nodeName"] == "SortMergeJoin"), key=lambda n: n["nodeId"])
+    pages = _page_scan(c)
+    ex = next(x for x in (_below(q, k, "Exchange") for k in _join_inputs(q, smj))
+              if _rows_metric(x, "records read") != _rows(pages))
+    return f"{_rows_metric(ex, 'records read'):,} events in → {_rows(smj):,} rows out"
+
+
+def _customer_join(c: Ctx) -> str:
+    """The customers join + write: stage 5 of the last good run, stage 10 of the incident."""
+    return f"{_stage_row(c.runs['last_good'], 5)} → {_stage_row(c, 10)}"
+
+
+S05 = {
+    "E1": lambda c: f"{_app_duration(c.runs['last_good'])} → {_app_duration(c)}",
+    "E2": lambda c: f"{_sql_durations(c.runs['last_good'])} → {_sql_durations(c)}",
+    "E3": lambda c: _stage_row(c, 5),
+    "E4": lambda c: _durations(c, 5),
+    "E5": lambda c: _shuffle_read_med_max(c, 5),
+    "E6": _longest_page_join_tasks,
+    "E7": _page_join_spill,
+    "E8": _joins,
+    "E9": _page_catalog_scan,
+    "E10": _page_catalog_exchange,
+    "E11": _event_stage_writes,
+    "E12": _page_join_events_exchange,
+    "E13": _conf_diff,
+    "E14": _customer_join,
+    "E15": _same_events,
+    "E16": _health,
+    "E17": _straggler_spills,
+    "E18": _page_join_rows,
+    "E19": _tail_wait,
+}
+
 EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02,
-            "09-bad-node-straggler": S09}
+            "05-missed-broadcast-join": S05, "09-bad-node-straggler": S09}
 
 
 # ---------------------------------------------------------------------------- solution.md

@@ -84,7 +84,7 @@ def test_baseline_and_incident_dont_mix():
 
 @pytest.mark.parametrize("fault, match", [
     ({**HOT, "dataset": "orders"}, "no dataset 'orders'"),
-    ({**HOT, "column": "page_id"}, "not a key column"),
+    ({**HOT, "column": "session_id"}, "not a key column"),
     ({**HOT, "hot_keys": [{"value": [-1, 3], "share": 0.1}]}, "has 1 column"),
 ])
 def test_faults_are_checked_against_the_workload(fault, match):

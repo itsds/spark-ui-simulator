@@ -384,3 +384,42 @@ what was done, what's next, gotchas.
 - **Still open:** the degraded node's DataNode / shuffle service serving others (write pipelines through it);
   disk-fault scenarios; speculation with barrier stages or decommissioning; the BypassMergeSortShuffleWriter's
   exception lines on a killed map task (our map stages use UnsafeShuffleWriter).
+
+## 2026-11-13 — Phase 10: Scenario 05 (missed broadcast join) + the shuffle writer's memory
+
+- **Done:**
+  - `scenarios/05-missed-broadcast-join` (ADR-038): the job in September, before its `F.broadcast(pages)`
+    (new workload param `broadcast_hint`, default true). Last good 2026-09-22 (app 40741), incident 2026-09-23
+    (app 40919), on the RM before the 2026-10-13 restart (`cluster_timestamp` 1787640083508, epoch 22). One
+    `config` fault: the platform's new gateway defaults (PLAT-1184) set `spark.sql.autoBroadcastJoinThreshold=-1`
+    (+ `spark.driver.maxResultSize=512m`). The page catalog join becomes a sort-merge join on `page_id`; page
+    popularity (`PAGE` key space, Zipf 0.85, part of the usual data) skews it: 5.5 → 22 min, stage 5 max 17 min
+    vs median 4 s. Ticket (BI SLA; CMS migration of the catalog as red herring, a colleague says "skew, turn on
+    AQE skew join"), 8 hints, solution with 19 evidence values (`scripts/evidence.py` S05,
+    `tests/test_scenario05_hs.py`). `tests/test_scenario05.py`: cause, plan (auto-broadcast = hinted plan, byte
+    for byte), skew from page popularity only in the page join, both fixes (5.5 min).
+  - UnsafeShuffleWriter memory (ADR-039), found while checking the straggler against real Spark: a local 3.5.9
+    run with forced writer spills + `javap` of `UnsafeShuffleWriter.stop()`. Map tasks with > 200 reduce
+    partitions report their ShuffleExternalSorter's peak in Peak Execution Memory (was 0), and spill in the writer
+    when their output outgrows the task's memory (log lines in Spark's format, "Task <TID> on Thread …",
+    "(0  times so far)"). Scenarios 00/01/02/09 regenerate with different map-stage peak memory and executor
+    memory snapshots; their timings and every evidence value are unchanged (HS tests pass).
+  - Docs: ROADMAP, SCENARIOS (05 row + workload params), README, ARCHITECTURE (shuffle writer), ADR-038/039.
+  - `uv run pytest`: 250 passed (~5.7 min, integration included); ruff clean.
+- **Next:** 03 (YARN memoryOverhead kills: `memory_pressure` exists; needs task failure → "failed after 4
+  attempts" → job abort, and a failed application in HS). Then 04 (small files: `data` overrides of the events'
+  files) or 13 (missing cache: needs a workload reusing a DataFrame and the Storage tab).
+- **Gotchas:**
+  - A scenario dated before 2026-10-13 needs the earlier RM's `cluster_timestamp` and `rm_epoch: 22`.
+  - `sparksim generate` takes `--logs-out`, not `--logs` (argparse accepts the prefix, so `--logs` works too).
+  - Map stages with > 200 reduce partitions now spill in the writer when a single map task's output exceeds
+    ~2.35 GiB (16g executors, 4 cores): a skewed *map* stage (any join before another shuffle) shows writer
+    spills, not only sort spills.
+  - Spark's peak execution memory is the sum of every consumer's peak; the model still combines operator peaks
+    with max (ADR-039). Fixing it would change Scenario 02's E7 narrative ("pinned at 2.4 GiB").
+  - `apt-get install -y openjdk-17-jdk-headless` again (not in the image); `javap` from it reads Spark's jars in
+    `.venv/lib/python3.11/site-packages/pyspark/jars/` when the source question is "what does 3.5.9 do?".
+  - The harness required branch `claude/admiring-goldberg-haqy9f` (not `scenario/05-…`).
+- **Still open:** summing operator peaks like Spark; AQE skew-join split and AQE's runtime SMJ → BHJ conversion
+  (05's solution discusses both without simulated numbers); the reading sorter's forced spill when the shuffle
+  writer needs memory.

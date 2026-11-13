@@ -89,6 +89,16 @@ class OpTrace:
 
 
 @dataclass
+class ShuffleSorterTrace:
+    """The ShuffleExternalSorter of an UnsafeShuffleWriter: the map output it buffered and what it spilled."""
+
+    records: int
+    held: float  # bytes it held at its peak (pages + pointer array), at most the task's execution memory
+    spill: float = 0.0  # serialized record bytes it spilled (Spill (Memory))
+    spill_ms: float = 0.0  # writing its spill files and reading them back into the output file
+
+
+@dataclass
 class SourceRead:
     """One source of a task, kept for the SQL metrics of its plan node."""
 
@@ -122,6 +132,7 @@ class TaskResult:
     commit_ms: float = 0.0  # task commit of a write task
     spill_op: int | None = None  # index in trace of the operator that spilled
     spill_ms: float = 0.0
+    shuffle_sorter: ShuffleSorterTrace | None = None  # an UnsafeShuffleWriter's buffer (> 200 reduce partitions)
 
     @property
     def duration_ms(self) -> int:
@@ -271,6 +282,7 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
 
     # ---------------------------------------------------------------- sink
     write_ms = 0.0
+    sorter = None
     output_file = None
     result_bytes = cal.RESULT_BASE_BYTES + rng.randint(0, cal.RESULT_JITTER_BYTES)
     sink = spec.sink
@@ -288,6 +300,14 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
         write_ms += disk_ms
         m.shuffle_write = ShuffleWriteMetrics(written, round(disk_ms * 1e6), recs)
         r = ctx.output_partitions
+        if r > cal.SHUFFLE_BYPASS_MERGE_THRESHOLD and rows:
+            sorter = _shuffle_sorter(rows, rb, page, env.memory_per_task, io_speed)
+            if sorter.spill:
+                m.memory_bytes_spilled = (m.memory_bytes_spilled or 0) + round(sorter.spill)
+                m.disk_bytes_spilled = (m.disk_bytes_spilled or 0) + round(sorter.spill * cal.LZ4_SHUFFLE_RATIO)
+                write_ms += sorter.spill_ms
+            m.peak_execution_memory += round(sorter.held)  # incPeakExecutionMemory adds every consumer's peak
+            exec_mem = max(exec_mem, sorter.held)  # it fills after the operators below it have let go
         result_bytes += r + 48 if r <= 2000 else 160 + r // 64  # Compressed / HighlyCompressedMapStatus
     elif isinstance(sink, WriteSink):
         nbytes = round(rows * sink.bytes_per_row * lognormal(rng, 0.02)) if rows else 0
@@ -351,7 +371,8 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
             if sr.stats is not None and sr.stats.remote_bytes:
                 sr.fetch_wait_ms = round(rd.fetch_wait_time * sr.stats.remote_bytes / rd.remote_bytes_read)
     return TaskResult(m, deser_ms, run, ser_ms, sched_ms, round(exec_mem), fetching, output_file,
-                      rows, trace, sources, wall_per_cpu, sink_rows, sink_rb, sink_cpu, commit_ms, spill_op, spill_ms)
+                      rows, trace, sources, wall_per_cpu, sink_rows, sink_rb, sink_cpu, commit_ms, spill_op, spill_ms,
+                      sorter)
 
 
 def killed_metrics(res: TaskResult, run_elapsed_ms: int) -> TaskMetrics:
@@ -388,6 +409,23 @@ def killed_metrics(res: TaskResult, run_elapsed_ms: int) -> TaskMetrics:
     if m.output is not None:
         out.output = OutputMetrics()
     return out
+
+
+def _shuffle_sorter(rows: int, row_bytes: int, page: int, available: float, io_speed: float) -> ShuffleSorterTrace:
+    """UnsafeShuffleWriter's ShuffleExternalSorter for one map task's output.
+
+    It needs a page for every `page` bytes of serialized records and a pointer array; past the task's execution
+    memory it spills, like a sorter alone in its group (ADR-028): it keeps on average half of that memory for
+    its last run, which goes into the output file itself, not into a spill. Spill files are LZ4-compressed when
+    written and copied into the output file at the end (the fast merge), so a spill costs disk time, not CPU.
+    """
+    data = rows * (row_bytes + cal.SHUFFLE_RECORD_LENGTH_BYTES)
+    need = _pages(data, page) + rows * cal.SHUFFLE_POINTER_BYTES
+    if need <= available:
+        return ShuffleSorterTrace(rows, need)
+    spill = data * (1.0 - 0.5 * available / need)
+    rate = cal.SHUFFLE_DISK_WRITE_MBPS * io_speed * MiB
+    return ShuffleSorterTrace(rows, available, spill, spill * cal.LZ4_SHUFFLE_RATIO / rate * 1e3 * 2)
 
 
 def _spill_group(trace: list[OpTrace], ix: list[int], available: float) -> None:
