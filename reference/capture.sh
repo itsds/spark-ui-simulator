@@ -10,7 +10,10 @@
 # second NodeManager and its throttled executors:
 #   REF_SECOND_NM=1 reference/yarn/cluster.sh start && reference/yarn/slow_node.sh start
 #   reference/capture.sh ref09_speculation && reference/yarn/slow_node.sh stop
+# Jobs in EXPECT_FAILED end in a FAILED application on purpose (ref10/ref11: pmem kills end the app in both YARN
+# attempts). Their event logs are kept per attempt: reference/event-logs/<app-name>_<attempt>.
 set -euo pipefail
+EXPECT_FAILED=" ref10_pmem_abort ref11_max_executor_failures "
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/scripts/env.sh"
@@ -44,7 +47,7 @@ for job in "${JOBS[@]}"; do
       --conf spark.yarn.appMasterEnv.REF_MODE=yarn \
       --conf spark.yarn.appMasterEnv.REF_DATA=hdfs:///data/ref \
       --conf spark.yarn.appMasterEnv.REF_EVENTLOG_BASE=hdfs:///ref-logs \
-      "$job.py" > "$ROOT/build/submit-$name.log" 2>&1 || {
+      "$job.py" > "$ROOT/build/submit-$name.log" 2>&1 || [[ "$EXPECT_FAILED" == *" $job "* ]] || {
         echo "!! $name failed on YARN. Driver (AM) output:" >&2
         app="$(grep -oE 'application_[0-9]+_[0-9]+' "$ROOT/build/submit-$name.log" | head -1)"
         tail -n 25 "$HADOOP_BUILD/nm-logs/$app"/container_*_01_000001/stdout >&2 || true
@@ -54,9 +57,16 @@ for job in "${JOBS[@]}"; do
     tmp="$(mktemp -d)"
     "$HADOOP_HOME/bin/hdfs" dfs -get "/ref-logs/$name/*" "$tmp/"
     files=("$tmp"/*)
-    [[ ${#files[@]} -eq 1 && -f "${files[0]}" ]] || { echo "!! expected one event log for $name" >&2; exit 1; }
     app_id="$(basename "${files[0]}" | sed -E 's/_[0-9]+$//')"
-    cp "${files[0]}" "$OUT/$name"; rm -rf "$tmp"
+    if [[ "$EXPECT_FAILED" == *" $job "* ]]; then  # one log per YARN attempt (application_<ts>_<seq>_<attempt>)
+      grep -q "final status: FAILED" "$ROOT/build/submit-$name.log" || { echo "!! $name was expected to fail" >&2; exit 1; }
+      rm -f "$OUT/$name" "$OUT/${name}"_[0-9]
+      for f in "${files[@]}"; do cp "$f" "$OUT/${name}_${f##*_}"; done
+    else
+      [[ ${#files[@]} -eq 1 && -f "${files[0]}" ]] || { echo "!! expected one event log for $name" >&2; exit 1; }
+      cp "${files[0]}" "$OUT/$name"
+    fi
+    rm -rf "$tmp"
     # Real container logs (driver = first container, the ApplicationMaster).
     dest="$ROOT/reference/yarn-logs/$name"; rm -rf "$dest"; mkdir -p "$dest"
     for c in "$HADOOP_BUILD"/nm-logs/"$app_id"/container_* "$HADOOP_BUILD"/nm2-logs/"$app_id"/container_*; do
@@ -70,5 +80,5 @@ for job in "${JOBS[@]}"; do
     [[ ${#files[@]} -eq 1 && -f "${files[0]}" ]] || { echo "!! expected one event log for $name" >&2; exit 1; }
     cp "${files[0]}" "$OUT/$name"
   fi
-  echo "    -> reference/event-logs/$name  ($(du -h "$OUT/$name" | cut -f1), $(( $(date +%s) - start ))s)"
+  echo "    -> reference/event-logs/$name*  ($(du -ch "$OUT/$name"* | tail -1 | cut -f1), $(( $(date +%s) - start ))s)"
 done

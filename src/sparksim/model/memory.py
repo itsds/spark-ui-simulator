@@ -62,8 +62,10 @@ class ContainerMemory:
     def heap_initial(self) -> float:
         return min(self.heap_max, self.host_ram * cal.JVM_INITIAL_HEAP_FRACTION_OF_RAM)
 
-    def check(self, t: int, running: int, exec_memory: float, fetching: int, stages_seen: int) -> int:
-        """Advance to time `t` with `running` tasks; return the process-tree RSS in bytes."""
+    def check(self, t: int, running: int, exec_memory: float, fetching: int, stages_seen: int,
+              task_native: float = 0.0) -> int:
+        """Advance to time `t` with `running` tasks; return the process-tree RSS in bytes. `task_native`: what
+        the running tasks' functions hold outside the heap right now (`sql.expr.Func.native_bytes`)."""
         if self.last_check is not None:
             self.busy_core_ms += running * (t - self.last_check)
         self.last_check = t
@@ -76,7 +78,7 @@ class ContainerMemory:
             + cal.JVM_OFF_HEAP_BASE + stages_seen * cal.JVM_OFF_HEAP_PER_STAGE
             + cal.DIRECT_POOL_BASE + fetching * cal.DIRECT_POOL_PER_FETCH
             + cal.THREAD_STACKS_RSS + self.cores * cal.MALLOC_ARENA_RSS_PER_CORE)
-        return int(self.committed + native + self.python_rss + running * self.native_per_task)
+        return int(self.committed + native + self.python_rss + running * self.native_per_task + task_native)
 
 
 def long2string(n: int) -> str:

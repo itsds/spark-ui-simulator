@@ -213,12 +213,18 @@ class Cast(Expr):
 
 @dataclass(eq=False)
 class Func(Expr):
-    """A scalar function call printed as `name(arg, arg, ...)` (Expression.toString with flatArguments)."""
+    """A scalar function call printed as `name(arg, arg, ...)` (Expression.toString with flatArguments; a Java
+    UDF registered by name, a `ScalaUDF` with `udfName`, prints the same way)."""
 
     name: str
     args: tuple = ()
     dtype: str = "string"
     avg_bytes: float = 0.0  # average size of a string result
+    # What the function's implementation holds outside the JVM heap in each task that evaluates it, e.g. a
+    # UDF's memory-mapped lookup file (the NodeManager's procfs RSS counts each mapping's touched pages), and
+    # the line its library logs on the executor when a task opens it: (logger, message).
+    native_bytes: int = 0
+    native_log: tuple[str, str] | None = None
 
     def children(self):
         return tuple(a for a in self.args if isinstance(a, Expr))

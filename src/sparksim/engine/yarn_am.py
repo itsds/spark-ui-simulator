@@ -225,7 +225,7 @@ class YarnAllocator:
         rng = self.rng
         eid = str(self.next_exec_id)
         self.next_exec_id += 1
-        launch = now + rng.randint(5, 60)
+        launch = self.run.localization_done(host, now + rng.randint(5, 60))
         registered = launch + int(rng.randint(*cal.EXECUTOR_START_MS) / host.cpu_speed)  # JVM start-up is CPU
         sz = self.sizing
         ex = Executor(

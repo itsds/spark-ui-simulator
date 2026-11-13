@@ -98,7 +98,7 @@ def write_log(ev, sc, role, fingerprint=None):
     app = sc.app_id(role)
     (ev / f"{app}_1").write_text("{}\n")
     m = Manifest.load(ev)
-    m.record(app, fingerprint or app_fingerprint(sc, role), [sc.id], f"{app}_1")
+    m.record(app, fingerprint or app_fingerprint(sc, role), [sc.id], [f"{app}_1"])
     m.save()
     return app
 
@@ -123,7 +123,7 @@ def test_run_states(tmp_path):
         listed.add(good)
         st = status(scs, ev, probe)
         assert st["apps"][good] | {"scenarios": None} == {"state": "ready", "text": "Ready", "stale": False,
-                                                          "attempt": "1", "scenarios": None}
+                                                          "attempts": ["1"], "scenarios": None}
         assert st["apps"][bad]["state"] == "loading" and st["apps"][bad]["stale"]
 
         m = Manifest.load(ev)

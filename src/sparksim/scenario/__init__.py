@@ -136,23 +136,31 @@ class Scenario:
     # ------------------------------------------------------------------ outputs
 
     def build(self, role: str):
+        """The run's first YARN attempt and its events (`build_attempts` for every attempt)."""
         from ..engine.emit import build_events
 
         run = AppRun(self.spec(role)).run()
         return run, build_events(run)
 
+    def build_attempts(self, role: str) -> list[tuple]:
+        """[(run, events)] for each YARN attempt of the run: one, or two when attempt 1 failed."""
+        from ..engine.emit import build_events
+        from ..engine.runtime import run_attempts
+
+        return [(run, build_events(run)) for run in run_attempts(self.spec(role))]
+
     def generate(self, out_dir: str | Path, logs_dir: str | Path | None = None,
                  roles: tuple[str, ...] | None = None) -> list[Path]:
-        """Write each run's event log (and its YARN container logs under `logs_dir`)."""
+        """Write each run's event logs, one per YARN attempt (and its container logs under `logs_dir`)."""
         from ..eventlog import write_event_log
         from ..yarnlogs import write_container_logs
 
         paths = []
         for role in roles or self.roles:
-            run, events = self.build(role)
-            if logs_dir is not None:
-                write_container_logs(run, logs_dir)
-            paths.append(write_event_log(Path(out_dir) / run.yapp.event_log_name, events))
+            for run, events in self.build_attempts(role):
+                if logs_dir is not None:
+                    write_container_logs(run, logs_dir)
+                paths.append(write_event_log(Path(out_dir) / run.yapp.event_log_name, events))
         return paths
 
 

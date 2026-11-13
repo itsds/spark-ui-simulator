@@ -21,6 +21,11 @@
   (`addPendingTask`) and counts the failure towards `spark.task.maxFailures`
   when the exit was caused by the app. The next attempt of a task gets the
   next attempt number, as `TaskSetManager.taskAttempts` does.
+* **Abort.** The failure that brings a task index to `spark.task.maxFailures` (4) aborts the task set
+  (`TaskSetManager.abort`): it turns zombie (no more launches), `on_abort` tells the driver (the
+  DAGScheduler's taskSetFailed), and the executor's other lost tasks are still handled afterwards, in the
+  same loop (ref10). A zombie task set leaves the pool when its last running attempt has ended
+  (`maybeFinishTaskSet`; `on_removed`).
 
 * **Speculation** (`spark.speculation`, off by default). Ported from Spark 3.5.9 `TaskSchedulerImpl` and
   `TaskSetManager`, checked against a real run on YARN (`reference/event-logs/ref09-speculation`): every
@@ -134,6 +139,8 @@ class TaskSet:
     on_kill: Callable[[Launch], None] | None = None
     on_speculatable: Callable[[int, Launch, float, int], None] | None = None  # (index, running attempt, threshold, n)
     records_of: Callable[[Launch], tuple[int, int]] | None = None  # (records read, run ms) of a finished task
+    on_abort: Callable[[int, Launch], None] | None = None  # (index, the attempt whose loss was the last straw)
+    on_removed: Callable[[], None] | None = None  # an aborted task set left the pool (no attempt running)
     done: Signal | None = None
     # --- TaskSetManager state
     launched: list[bool] = field(default_factory=list)
@@ -166,6 +173,7 @@ class TaskSet:
     rate_records: int = 0  # TaskProcessRateCalculator: records read / run time of successful tasks
     rate_runtime: int = 0
     zombie: bool = False
+    aborted: bool = False
     submitted_seq: int = 0
 
     @property
@@ -174,19 +182,17 @@ class TaskSet:
 
     @property
     def has_pending(self) -> bool:
+        if self.zombie:  # TaskSetManager.resourceOffer launches nothing for a zombie
+            return False
         return self.num_launched < len(self.preferred) or bool(self.speculatable)
 
     @property
     def num_pending(self) -> int:
-        return len(self.preferred) - self.num_launched
+        return 0 if self.zombie else len(self.preferred) - self.num_launched
 
     @property
     def num_running(self) -> int:
         return self.num_launched - self.num_done
-
-
-class TaskSetAborted(RuntimeError):
-    """A task failed spark.task.maxFailures times (job abort is not modelled yet)."""
 
 
 class TaskScheduler:
@@ -251,15 +257,16 @@ class TaskScheduler:
                 ts.on_fail(a)
             if ts.succeeded[a.index]:  # a copy already succeeded (or it was being killed): nothing to re-run
                 continue
-            if counts_as_failure:
+            if counts_as_failure and not ts.zombie:
                 ts.failures[a.index] += 1
                 if ts.failures[a.index] >= self.max_failures:
-                    raise TaskSetAborted(f"Task {a.index} in stage {ts.stage_id}.{ts.attempt} failed "
-                                         f"{self.max_failures} times")
+                    self.abort(ts, a.index, a)
+                    continue
             if ts.copies_running[a.index] == 0:
                 ts.launched[a.index] = False
                 ts.num_launched -= 1
             self._add_pending(ts, a.index)
+            self._maybe_remove(ts)
         for ts in self.tasksets:
             self._recompute_levels(ts)
         if lost and self.started:
@@ -283,6 +290,31 @@ class TaskScheduler:
         """Scheduling begins (YarnClusterScheduler.postStartHook returned)."""
         self.started = True
         self._offer(list(self.order), all_free=True)
+
+    def abort(self, ts: TaskSet, index: int, last: Launch) -> None:
+        """`TaskSetManager.abort`: the task set turns zombie and the driver hears of it (taskSetFailed)."""
+        if ts.zombie:
+            return
+        ts.zombie = ts.aborted = True
+        ts.speculatable.clear()
+        if ts.on_abort is not None:
+            ts.on_abort(index, last)
+        self._maybe_remove(ts)
+
+    def cancel(self, ts: TaskSet, reason: str, interrupt: bool) -> None:
+        """`TaskSchedulerImpl.cancelTasks`: kill the running attempts, then abort the task set ("Stage N
+        cancelled"; the DAGScheduler has already dropped the stage, so nobody is told)."""
+        self.kill_all(ts, reason, interrupt)
+        ts.zombie = ts.aborted = True
+        ts.speculatable.clear()
+        self._maybe_remove(ts)
+
+    def _maybe_remove(self, ts: TaskSet) -> None:
+        """`maybeFinishTaskSet`: an aborted (zombie) task set leaves the pool once nothing of it runs."""
+        if ts.aborted and ts in self.tasksets and not ts.running_by_tid:
+            self.tasksets.remove(ts)
+            if ts.on_removed is not None:
+                ts.on_removed()
 
     def _hosts_alive(self) -> set[str]:
         return {e.host.name for e in self.executors.values()}
@@ -560,8 +592,9 @@ class TaskScheduler:
             other.killed_by_other = True
             self.kill(other, "another attempt succeeded", interrupt=True)
         ts.on_finish(a)
+        self._maybe_remove(ts)  # an attempt of an aborted task set that finished before its kill landed
         self.free[eid] += 1
-        if ts.num_done == ts.num_tasks:
+        if ts.num_done == ts.num_tasks and not ts.aborted:
             ts.zombie = True
             self.tasksets.remove(ts)
             ts.done.fire()
@@ -583,10 +616,10 @@ class TaskScheduler:
             if a.kill_at < a.finish_time:
                 self.sim.at(a.kill_at, self._killed, a)
 
-    def kill_all(self, ts: TaskSet, reason: str) -> None:
-        """`killAllTaskAttempts(stageId, interruptThread = false, reason)`."""
+    def kill_all(self, ts: TaskSet, reason: str, interrupt: bool = False) -> None:
+        """`killAllTaskAttempts(stageId, interruptThread, reason)`."""
         for a in sorted(ts.running_by_tid.values(), key=lambda a: a.task_id):
-            self.kill(a, reason, interrupt=False)
+            self.kill(a, reason, interrupt=interrupt)
 
     def _killed(self, a: Launch) -> None:
         if a.ended:
@@ -603,6 +636,7 @@ class TaskScheduler:
         self._stop_running(ts, a)
         if ts.on_kill is not None:
             ts.on_kill(a)
+        self._maybe_remove(ts)
         if eid in self.free:
             self.free[eid] += 1
             gap = self.rng.randint(*cal.RELAUNCH_GAP_MS)

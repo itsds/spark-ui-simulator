@@ -28,12 +28,14 @@ from ..eventlog import (
     BlockManagerRemoved,
     DriverAccumUpdates,
     DriverLedger,
+    ExceptionInfo,
     ExecutorAdded,
     ExecutorInfo,
     ExecutorMetrics,
     ExecutorRemoved,
     ExecutorResourceRequest,
     JobEnd,
+    JobFailed,
     JobStart,
     JobSucceeded,
     LogStart,
@@ -41,6 +43,7 @@ from ..eventlog import (
     SQLAdaptiveExecutionUpdate,
     SQLExecutionEnd,
     SQLExecutionStart,
+    StackTraceElement,
     StageCompleted,
     StageInfo,
     StageSubmitted,
@@ -56,7 +59,8 @@ from ..eventlog.ordering import java_properties, java_properties_order
 from ..eventlog.timeline import Timeline
 from ..rng import substream
 from ..yarn import container_attributes, container_log_urls, unified_memory_max
-from .runtime import AppRun, StageRecord, TaskRecord
+from .callsites import ABORT_STAGE_STACK, CANCEL_JOB_STACK
+from .runtime import AppRun, JobRecord, StageRecord, TaskRecord
 
 MiB = 1024 * 1024
 
@@ -135,9 +139,17 @@ def _peak(a: ExecutorMetrics, b: ExecutorMetrics) -> ExecutorMetrics:
 
 
 def stage_info(st: StageRecord, submitted: int | None = None, completed: int | None = None,
-               accums=None) -> StageInfo:
+               accums=None, failure: str | None = None) -> StageInfo:
     return StageInfo(st.stage_id, st.attempt, st.name, st.num_tasks, st.rdds, st.parent_ids, st.details,
-                     submitted, completed, None, accums or [])
+                     submitted, completed, failure, accums or [])
+
+
+def job_result(job: JobRecord):
+    """JobSucceeded, or JobFailed with the SparkException the DAGScheduler failed the job with (ref10)."""
+    if job.failure is None:
+        return JobSucceeded()
+    stack = CANCEL_JOB_STACK if job.cancelled else ABORT_STAGE_STACK
+    return JobFailed(ExceptionInfo(job.failure, [StackTraceElement(*f) for f in stack]))
 
 
 def build_events(run: AppRun) -> list[Event]:
@@ -206,7 +218,7 @@ def build_events(run: AppRun) -> list[Event]:
         elif kind == "stage_completed":
             tl.add(t, _completed(ledger, obj))
         elif kind == "job_end":
-            tl.add(t, JobEnd(obj.job_id, obj.completed, JobSucceeded()))
+            tl.add(t, JobEnd(obj.job_id, obj.completed, job_result(obj)))
             done = active_jobs.pop(obj.job_id, set())
             gone = done - set().union(*active_jobs.values())  # cleanupStateForJobAndIndependentStages
             tl.add(t, _stages_removed(ledger, gone))
@@ -216,7 +228,7 @@ def build_events(run: AppRun) -> list[Event]:
             exec_id, updates = obj
             tl.add(t, DriverAccumUpdates(exec_id, [[i, v] for i, v in updates]))
         elif kind == "sql_end":
-            tl.add(t, SQLExecutionEnd(obj.execution_id, obj.end, ""))
+            tl.add(t, SQLExecutionEnd(obj.execution_id, obj.end, obj.error or ""))
         else:
             raise ValueError(kind)
     tl.add(run.app_end, ApplicationEnd(run.app_end))
@@ -299,5 +311,5 @@ def _task_end(ledger: DriverLedger, tk: TaskRecord):
 def _completed(ledger: DriverLedger, st: StageRecord):
     def make():
         return StageCompleted(stage_info(st, st.submitted, st.completed,
-                                         ledger.stage_accumulables(st.stage_id, st.attempt)))
+                                         ledger.stage_accumulables(st.stage_id, st.attempt), st.failure))
     return make

@@ -472,6 +472,10 @@ def _scan(log, run, ex, stage, src, part, st: _State, t: int, span: int, rng) ->
                  f"partition values: {_partition_values(pf.file.path)}")
         if i == 0 and bid is not None:
             cur = _read_broadcast(log, run, ex, st, bid, cur + 1, rng)
+        if i == 0:  # a UDF that opens its own resource in each task (its library's log line, first row)
+            for f in stage.native_funcs:
+                if f.native_log is not None:
+                    log.info(cur + 2, *f.native_log)
         if pred is not None:
             log.info(cur + 1, "FilterCompat", f"Filtering using predicate: {pred}")
         if st.decompressors < ex.cores:

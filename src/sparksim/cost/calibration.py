@@ -50,6 +50,22 @@ STAGE_COMPLETE_DELAY_MS = (1, 3)
 JOB_END_DELAY_MS = (1, 5)
 # [ref] JobStart → StageSubmitted 2–25 ms.
 JOB_TO_STAGE_MS = (2, 25)
+# [ref] A job aborted by spark.task.maxFailures (ref10/ref11, both attempts each): the TaskEnd of the loss that
+# was the last straw → the failed stage's StageCompleted 10–18 ms (the DAGScheduler's taskSetFailed); → its
+# JobEnd 4–19 ms later; AQE then cancels the query's other running jobs: their StageCompleted ("Job N
+# cancelled ") 13–17 ms after the failed job's end, their JobEnd 2–5 ms after that.
+ABORT_STAGE_DELAY_MS = (10, 18)
+ABORT_JOB_END_MS = (4, 19)
+AQE_CANCEL_MS = (13, 17)
+# [ref] The failed job's end → the query's SQLExecutionEnd (errorMessage) 116–240 ms (AQE cleans up, the
+# Py4JJavaError reaches Python); → the AM's "User application exited with status 1", the shutdown hook's
+# SparkContext.stop() and ApplicationEnd 154–244 ms after that.
+QUERY_FAIL_TO_SQL_END_MS = (115, 240)
+FAILED_DRIVER_EXIT_MS = (150, 245)
+# [ref] A failed AM attempt's ApplicationEnd → the next attempt's SparkContext start: 2.6–3.7 s (ref10, ref11:
+# the AM exits, the RM allocates and launches a new AM container, the Python driver starts again). A
+# production RM with busy NodeManagers is a little slower.
+AM_RETRY_TO_START_MS = (2_600, 5_200)
 # [ref] AQE: query-stage job end → next query-stage job start 80–500 ms (re-optimization, new stages).
 AQE_REPLAN_MS = (90, 420)
 # [ref] Broadcast job starts ~50 ms after the shuffle jobs submitted with it.
@@ -99,6 +115,9 @@ AM_ALLOCATE_INTERVAL_MS = 200
 # of the (cached) spark.yarn.archive, JVM start, CoarseGrainedExecutorBackend registration.
 # Reference: first executor 6–7 s after app start on a cold single node; production nodes ~3–5 s.
 EXECUTOR_START_MS = (2_900, 4_800)
+# [norm] NodeManager resource localization (--files / --jars on HDFS): one FSDownload per resource, a single
+# HDFS read stream into the NM's usercache, ~150 MB/s on a busy production DataNode.
+LOCALIZE_MBPS = 150
 # [ref] ExecutorAdded → executor BlockManagerAdded 60–200 ms.
 EXECUTOR_BLOCK_MANAGER_MS = (60, 200)
 # [spark] spark.scheduler.minRegisteredResourcesRatio on YARN (0.8) and maxRegisteredResourcesWaitingTime.
@@ -233,6 +252,9 @@ G1_COMMIT_HEADROOM = 1.25
 G1_NATIVE_FRACTION = 0.045
 NATIVE_FOOTPRINT_SIGMA = 0.06
 THREAD_STACKS_RSS = 48 * MiB
+# [norm] A task's lookups into a memory-mapped file (an IP-geolocation database read by a UDF) touch most of its
+# pages within the first third of the task's rows; touched pages stay resident (RSS) while the mapping lives.
+UDF_NATIVE_RAMP = 0.3
 MALLOC_ARENA_RSS_PER_CORE = 40 * MiB
 # [spark] yarn.nodemanager.sleep-delay-before-sigkill.ms (SIGTERM → SIGKILL); a JVM running shutdown hooks
 # exits after ~100-250 ms, so the container exits with 143 (SIGTERM).

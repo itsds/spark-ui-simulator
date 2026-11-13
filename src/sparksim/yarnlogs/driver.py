@@ -81,6 +81,10 @@ def _launch_context(run: AppRun) -> str:
         res(s.script, f"/user/{s.user}/.sparkStaging/{app}/{s.script}", 6_000 + rng.randint(0, 3_000), "FILE",
             "PRIVATE", ts + 60),
     ]
+    for path, size in s.dist_resources:  # --jars / --files already on HDFS: localized from where they are
+        rel = "/" + path.split("://", 1)[-1].split("/", 1)[-1]
+        uploaded = s.cluster.cluster_timestamp + substream(s.seed, f"dist/{path}").randint(1, 9) * 86_400_000
+        resources.append(res(rel.rsplit("/", 1)[-1], rel, size, "FILE", "PRIVATE", uploaded))
     env = [
         # with-Hadoop Spark build: spark.yarn.populateHadoopClasspath is false (as in the reference AM logs)
         "    CLASSPATH -> {{PWD}}<CPS>{{PWD}}/__spark_conf__<CPS>{{PWD}}/__spark_libs__/*<CPS>"
@@ -252,6 +256,9 @@ class _Driver:
                     log.warn(t, "TaskSetManager", f"Lost task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}."
                              f"{tk.attempt} (TID {tk.task_id}) ({ex.host.name} executor {ex.id}): ExecutorLostFailure "
                              f"(executor {ex.id} exited {why}) Reason: {reason}")
+                    if run.stages[tk.stage_id].abort_tid == tk.task_id:
+                        log.error(t, "TaskSetManager", f"Task {tk.index} in stage {tk.stage_id}.{tk.attempt} failed "
+                                  f"{run.sched.max_failures} times; aborting job")
                 if run.dynalloc is not None:
                     st = run.dynalloc.removed_stats
                     log.info(t + 1, "ExecutorMonitor", f"Executor {ex.id} is removed. Remove reason statistics: ("
@@ -259,6 +266,17 @@ class _Driver:
                              f"{st['driver killed']}, unexpectedly exited: {st['unexpectedly exited']}).")
                 if not released:
                     log.info(t + 2, DRIVER_EP, f"Asked to remove non-existent executor {ex.id}")
+            elif kind == "stage_cancelled":  # TaskSchedulerImpl.cancelTasks
+                st, why = p
+                log.info(t, "YarnClusterScheduler", f"Cancelling stage {st.stage_id}")
+                log.info(t, "YarnClusterScheduler", f"Killing all running tasks in stage {st.stage_id}: Stage "
+                         f"cancelled: {why}")
+                log.info(t, "YarnClusterScheduler", f"Stage {st.stage_id} was cancelled")
+            elif kind == "job_cancel_asked":
+                log.info(t, "DAGScheduler", f"Asked to cancel job {p.job_id}")
+            elif kind == "taskset_removed":  # an aborted task set's last running attempt has ended
+                log.info(t, "YarnClusterScheduler", f"Removed TaskSet {p.stage_id}.{p.attempt}, whose tasks have "
+                         "all completed, from pool ")
             elif kind == "da_target":
                 target, old, backlogged, delta = p
                 if backlogged:
@@ -381,13 +399,16 @@ class _Driver:
                 tk = obj
                 st = run.stages[tk.stage_id]
                 key = (tk.stage_id, tk.attempt)
-                if tk.killed is not None:  # handleFailedTask(TaskKilled): the task's index already succeeded
+                if tk.killed is not None:  # handleFailedTask(TaskKilled)
                     name = f"task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}.{tk.attempt} (TID {tk.task_id})"
                     log.warn(t, "TaskSetManager", f"Lost {name} ({tk.executor.host.name} executor {tk.executor.id}): "
                              f"TaskKilled ({tk.killed})")
-                    log.info(t, "TaskSetManager", f"{name} failed, but the task will not be re-executed (either "
-                             "because the task failed with a shuffle data fetch failure, so the previous stage needs "
-                             "to be re-run, or because a different copy of the task has already succeeded).")
+                    winner = st.by_index.get(tk.index)
+                    if winner is not None and winner.finish <= tk.finish:  # its index already succeeded
+                        log.info(t, "TaskSetManager", f"{name} failed, but the task will not be re-executed (either "
+                                 "because the task failed with a shuffle data fetch failure, so the previous stage "
+                                 "needs to be re-run, or because a different copy of the task has already "
+                                 "succeeded).")
                 elif tk.ok:
                     for lost in sorted(losers.get(tk.task_id, ()), key=lambda x: x.task_id):
                         log.info(t, "TaskSetManager", f"Killing attempt {lost.task_attempt} for task {lost.index}."
@@ -400,13 +421,17 @@ class _Driver:
                              f"{tk.executor.host.name} (executor {tk.executor.id}) ({done[key]}/{st.num_tasks})")
                 else:
                     continue  # ExecutorLostFailure: logged with the executor loss (yarn())
-                if last_end.get(key) == i and done.get(key, 0) == st.num_tasks:
+                if last_end.get(key) == i and done.get(key, 0) == st.num_tasks and st.failure is None:
                     log.info(t, "YarnClusterScheduler", f"Removed TaskSet {tk.stage_id}.{tk.attempt}, whose tasks have "
                              "all completed, from pool ")
             elif kind == "stage_completed":
                 st = obj
                 running.discard(st.stage_id)
                 secs = (st.completed - st.submitted) / 1000
+                if st.failure is not None:  # markStageAsFinished(stage, Some(reason))
+                    log.info(t, "DAGScheduler", f"{_stage_str(st)} ({st.name}) failed in {secs:.3f} s due to "
+                             f"{st.failure}")
+                    continue
                 log.info(t, "DAGScheduler", f"{_stage_str(st)} ({st.name}) finished in {secs:.3f} s")
                 if st.task_type == "ShuffleMapTask":
                     log.info(t, "DAGScheduler", "looking for newly runnable stages")
@@ -416,6 +441,11 @@ class _Driver:
             elif kind == "job_end":
                 job = obj
                 st = run.stages[job.final_stage]
+                if job.failure is not None:  # DAGScheduler.runJob's caller logs it (result stages only)
+                    if st.task_type == "ResultTask" and not job.cancelled:
+                        took = (t - job.submitted) / 1000 + r.uniform(0.0002, 0.004)
+                        log.info(t, "DAGScheduler", f"Job {job.job_id} failed: {st.name}, took {took:.6f} s")
+                    continue
                 if st.task_type == "ResultTask":
                     log.info(t, "DAGScheduler", f"Job {job.job_id} is finished. Cancelling potential speculative or "
                              "zombie tasks for this job")
@@ -456,6 +486,14 @@ class _Driver:
     def shutdown(self) -> None:
         run, log, r = self.run, self.log, self.rng
         t = run.app_end
+        failed = run.final_status != "SUCCEEDED"
+        if failed:  # the Py4JJavaError ended the Python driver; the shutdown hook stops the SparkContext (ref10)
+            t_exit = next(tt for tt, kind, _ in run.yarn_log if kind == "user_app_exited")
+            why = f"User application exited with status {run.exit_code}"
+            log.error(t_exit, "ApplicationMaster", why)
+            log.info(t_exit, "ApplicationMaster", f"Final app status: FAILED, exitCode: {run.exit_code}, (reason: "
+                     f"{why})")
+            log.info(t, "SparkContext", "Invoking stop() from shutdown hook")
         log.info(t, "SparkContext", "SparkContext is stopping with exitCode 0.")
         log.info(t + r.randint(5, 30), "SparkUI", f"Stopped Spark web UI at http://{self.am}:{self.ui_port}")
         t += r.randint(30, 60)
@@ -469,14 +507,25 @@ class _Driver:
         log.info(t + 9, "OutputCommitCoordinator$OutputCommitCoordinatorEndpoint", "OutputCommitCoordinator stopped!")
         t += r.randint(30, 90)
         log.info(t, "SparkContext", "Successfully stopped SparkContext")
-        t += r.randint(80, 300)
-        log.info(t, "ApplicationMaster", "Final app status: SUCCEEDED, exitCode: 0")
-        log.info(t + 3, "ApplicationMaster", "Unregistering ApplicationMaster with SUCCEEDED")
-        log.info(t + 15, "AMRMClientImpl", "Waiting for application to be successfully unregistered.")
-        t += r.randint(100, 250)
         s = run.spec
-        log.info(t, "ApplicationMaster", f"Deleting staging directory hdfs://{s.cluster.namenode}:8020/user/{s.user}/"
-                 f".sparkStaging/{run.yapp.app_id}")
+        staging = (f"Deleting staging directory hdfs://{s.cluster.namenode}:8020/user/{s.user}/.sparkStaging/"
+                   f"{run.yapp.app_id}")
+        if failed:  # only the last attempt cleans up and unregisters; otherwise YARN starts the next one
+            t += r.randint(1, 6)
+            if run.last_attempt:
+                log.info(t, "ApplicationMaster", staging)
+                log.info(t + r.randint(4, 12), "ApplicationMaster", f"Unregistering ApplicationMaster with FAILED "
+                         f"(diag message: {why})")
+                log.info(t + r.randint(14, 30), "AMRMClientImpl", "Waiting for application to be successfully "
+                         "unregistered.")
+                t += r.randint(100, 250)
+        else:
+            t += r.randint(80, 300)
+            log.info(t, "ApplicationMaster", "Final app status: SUCCEEDED, exitCode: 0")
+            log.info(t + 3, "ApplicationMaster", "Unregistering ApplicationMaster with SUCCEEDED")
+            log.info(t + 15, "AMRMClientImpl", "Waiting for application to be successfully unregistered.")
+            t += r.randint(100, 250)
+            log.info(t, "ApplicationMaster", staging)
         log.info(t + 20, "ShutdownHookManager", "Shutdown hook called")
         work = container_work_dir(local_dirs(run)[0], s.user, run.yapp, run.yapp.am_container_id)
         log.info(t + 21, "ShutdownHookManager", f"Deleting directory {work}/tmp/spark-{_uuid(r)}")
@@ -509,6 +558,34 @@ def am_stderr(run: AppRun, echo: list | None = None) -> str:
     return d.log.text()
 
 
+# PySpark 3.5.9's frames between the script's action and the Py4J error (ref10's AM stdout).
+_PY_FRAMES = [
+    ("pyspark.zip/pyspark/sql/readwriter.py", 1721, "parquet"),
+    ("py4j-0.10.9.7-src.zip/py4j/java_gateway.py", 1322, "__call__"),
+    ("pyspark.zip/pyspark/errors/exceptions/captured.py", 179, "deco"),
+    ("py4j-0.10.9.7-src.zip/py4j/protocol.py", 326, "get_return_value"),
+]
+
+
 def am_stdout(run: AppRun) -> str:
-    """The Python driver's own output. The scenario scripts print nothing."""
-    return ""
+    """The Python driver's own output: the scenario scripts print nothing, but an action that fails raises a
+    Py4JJavaError nobody catches, and Python prints its traceback before it exits with status 1 (the AM's
+    PythonRunner copies the process's output to the container's stdout; ref10). The Java part is the
+    SparkException's toString and its stack trace: the DAGScheduler frames of a map-stage job."""
+    from ..engine.callsites import ABORT_STAGE_STACK, java_frame
+
+    q = run.failed_query
+    if q is None:
+        return ""
+    spec = run.spec.queries[q.execution_id]
+    work = container_work_dir(local_dirs(run)[0], run.spec.user, run.yapp, run.yapp.am_container_id)
+    # Py4J numbers the JVM objects the script got back: the DataFrameWriter of a query's write
+    obj = 120 + 47 * q.execution_id + substream(run.spec.seed, "py4j-ids").randint(0, 12)
+    lines = ["Traceback (most recent call last):",
+             f'  File "{work}/{run.spec.script}", line {spec.source_line}, in <module>',
+             f"    {spec.source}"]
+    lines += [f'  File "{work}/{path}", line {n}, in {fn}' for path, n, fn in _PY_FRAMES]
+    lines.append(f"py4j.protocol.Py4JJavaError: An error occurred while calling o{obj}.{spec.action}.")
+    lines.append(f": org.apache.spark.SparkException: {q.error}")
+    lines += [f"\tat {java_frame(*f)}" for f in ABORT_STAGE_STACK]
+    return "\n".join(lines) + "\n\n"

@@ -34,7 +34,10 @@ def test_log_is_well_formed(path: Path):
     assert "SparkListenerApplicationEnd" in names
 
     starts = {e["Task Info"]["Task ID"] for e in ev if e["Event"] == "SparkListenerTaskStart"}
-    ends = [e["Task Info"]["Task ID"] for e in ev if e["Event"] == "SparkListenerTaskEnd"]
+    # A map task whose output was lost with its executor (no shuffle service) ends a second time as
+    # "Resubmitted" (ref05, ref10), with its original task id.
+    ends = [e["Task Info"]["Task ID"] for e in ev if e["Event"] == "SparkListenerTaskEnd"
+            and e["Task End Reason"]["Reason"] != "Resubmitted"]
     assert len(ends) == len(set(ends)), "task IDs must be unique"
     assert set(ends) <= starts, "every TaskEnd needs a TaskStart"
 
@@ -44,7 +47,9 @@ def test_captured_on_yarn_cluster_mode(path: Path):
     ev = events(path)
     app = next(e for e in ev if e["Event"] == "SparkListenerApplicationStart")
     assert app["App ID"].startswith("application_"), "reference logs must come from YARN (reference/capture.sh)"
-    assert app["App Attempt ID"] == "1"
+    # one file per YARN attempt for apps that failed on purpose (capture.sh EXPECT_FAILED): <name>_<attempt>
+    attempt = path.name.rsplit("_", 1)[1] if "_" in path.name else "1"
+    assert app["App Attempt ID"] == attempt
     env = next(e for e in ev if e["Event"] == "SparkListenerEnvironmentUpdate")
     props = dict(env["Spark Properties"]) if isinstance(env["Spark Properties"], list) else env["Spark Properties"]
     assert props["spark.master"] == "yarn"

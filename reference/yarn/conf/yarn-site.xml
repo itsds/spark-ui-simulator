@@ -10,6 +10,10 @@
        (so memoryOverhead breaches really get "Container killed by YARN"). -->
   <property><name>yarn.nodemanager.vmem-check-enabled</name><value>false</value></property>
   <property><name>yarn.nodemanager.pmem-check-enabled</name><value>true</value></property>
+  <!-- Hadoop 3.3.6's ContainersMonitorImpl.checkLimit returns early when resource.memory.enforced is true
+       (the default, meant for cgroups) and elastic memory control is off: the pmem check above would never
+       kill. Clusters that rely on the polling check set it to false (found capturing ref10). -->
+  <property><name>yarn.nodemanager.resource.memory.enforced</name><value>false</value></property>
   <property><name>yarn.nodemanager.local-dirs</name><value>@BUILD@/nm-local</value></property>
   <property><name>yarn.nodemanager.log-dirs</name><value>@BUILD@/nm-logs</value></property>
   <!-- Keep container logs on the NodeManager after the app finishes (real stdout/stderr references). -->

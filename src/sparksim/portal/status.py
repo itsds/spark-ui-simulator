@@ -51,15 +51,15 @@ class Probe:
     _value: tuple = (None, False)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def get(self) -> tuple[dict[str, str] | None, bool]:
-        """({app id: attempt id} or None when the History Server is down, NodeManager mock up)."""
+    def get(self) -> tuple[dict[str, list[str]] | None, bool]:
+        """({app id: its attempt ids} or None when the History Server is down, NodeManager mock up)."""
         with self._lock:
             if time.monotonic() - self._at < self.ttl:
                 return self._value
             apps = _get_json(f"{self.hs_api.rstrip('/')}/api/v1/applications")
             listed = None
             if isinstance(apps, list):
-                listed = {a["id"]: str((a.get("attempts") or [{}])[0].get("attemptId", "")) for a in apps}
+                listed = {a["id"]: [str(x.get("attemptId", "")) for x in a.get("attempts") or [{}]] for a in apps}
             nm_up = _reachable(self.nm_api.rstrip("/") + "/") if self.nm_api else False
             self._value, self._at = (listed, nm_up), time.monotonic()
             return self._value
@@ -108,12 +108,12 @@ def status(scenarios: list[Scenario], event_logs: Path, probe: Probe) -> dict:
             state = "missing"
         elif listed is None:
             state = "hs-down"
-        elif p.app_id not in listed:
-            state = "loading"
+        elif p.app_id not in listed or not set(m.attempts(p.app_id)) <= set(listed[p.app_id]):
+            state = "loading"  # (every YARN attempt the run was generated with must be listed)
         else:
             state = "ready"
         apps[p.app_id] = {"state": state, "text": STATE_TEXT[state], "stale": st == "stale",
-                          "attempt": (listed or {}).get(p.app_id) or "1", "scenarios": p.scenario_ids}
+                          "attempts": m.attempts(p.app_id), "scenarios": p.scenario_ids}
     return {
         "history_server": {"up": listed is not None},
         "nm_logs": {"up": nm_up},

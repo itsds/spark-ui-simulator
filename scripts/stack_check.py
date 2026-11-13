@@ -96,8 +96,7 @@ def main(argv=None) -> int:
         ok('class="md solution-body"' in page, "solution rendered (hidden until revealed)")
         apps = sorted(set(re.findall(r'data-run="(application_\d+_\d+)"', page)))
         ok(bool(apps), f"runs: {', '.join(apps)}")
-        for app in apps:
-            attempt = st["apps"][app]["attempt"]
+        for app, attempt in [(a, att) for a in apps for att in st["apps"][a]["attempts"]]:
             for p in PAGES:
                 code, body = get(f"{hs}/history/{app}/{attempt}/{p}")
                 ok(code == 200 and app in body, f"{app} {p}")

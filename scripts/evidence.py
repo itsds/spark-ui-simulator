@@ -72,13 +72,23 @@ def secs(ms: float) -> str:
 
 
 class Ctx:
-    def __init__(self, hs: hs_api.HistoryServer, app_id: str):
-        self.hs, self.app_id = hs, app_id
+    """One YARN attempt of a run (`attempt=None`: the latest, the History Server's default view)."""
+
+    def __init__(self, hs: hs_api.HistoryServer, app_id: str, attempt: str | None = None):
+        self.hs, self.app_id, self.attempt = hs, app_id, attempt
         self._stages = None
         self.runs: dict[str, Ctx] = {}  # every run of the scenario by role (baseline | last_good | incident)
 
     def get(self, sub: str, **params):
-        return self.hs.app(self.app_id, sub, **params)
+        return self.hs.app(self.app_id, sub, self.attempt, **params)
+
+    def tasks(self, sid: int, stage_attempt: int = 0) -> list[dict]:
+        return self.hs.all_tasks(self.app_id, sid, stage_attempt, app_attempt=self.attempt)
+
+    @property
+    def attempts(self) -> dict[str, Ctx]:
+        """Every YARN attempt of this run by attempt id ("1", "2")."""
+        return {a: Ctx(self.hs, self.app_id, a) for a in self.hs.attempts(self.app_id)}
 
     @property
     def stages(self) -> list[dict]:

@@ -1,0 +1,42 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/13 07:15:13 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 15080@vm
+26/11/13 07:15:13 INFO SignalUtils: Registering signal handler for TERM
+26/11/13 07:15:13 INFO SignalUtils: Registering signal handler for HUP
+26/11/13 07:15:13 INFO SignalUtils: Registering signal handler for INT
+26/11/13 07:15:13 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/13 07:15:13 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/13 07:15:14 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/13 07:15:14 INFO SecurityManager: Changing view acls to: root
+26/11/13 07:15:14 INFO SecurityManager: Changing modify acls to: root
+26/11/13 07:15:14 INFO SecurityManager: Changing view acls groups to: 
+26/11/13 07:15:14 INFO SecurityManager: Changing modify acls groups to: 
+26/11/13 07:15:14 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/13 07:15:14 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:39615 after 85 ms (0 ms spent in bootstraps)
+26/11/13 07:15:14 INFO SecurityManager: Changing view acls to: root
+26/11/13 07:15:14 INFO SecurityManager: Changing modify acls to: root
+26/11/13 07:15:14 INFO SecurityManager: Changing view acls groups to: 
+26/11/13 07:15:14 INFO SecurityManager: Changing modify acls groups to: 
+26/11/13 07:15:14 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/13 07:15:14 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:39615 after 6 ms (0 ms spent in bootstraps)
+26/11/13 07:15:14 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/blockmgr-061e9026-281b-40fb-8b0c-f9440ceba875
+26/11/13 07:15:14 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/13 07:15:15 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:39615
+26/11/13 07:15:15 INFO ResourceUtils: ==============================================================
+26/11/13 07:15:15 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/13 07:15:15 INFO ResourceUtils: ==============================================================
+26/11/13 07:15:15 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/13 07:15:15 INFO Executor: Starting executor ID 11 on host localhost
+26/11/13 07:15:15 INFO Executor: OS info Linux, 6.18.44-fc-v445, amd64
+26/11/13 07:15:15 INFO Executor: Java version 17.0.21.0.3
+26/11/13 07:15:15 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 33099.
+26/11/13 07:15:15 INFO NettyBlockTransferService: Server created on localhost:33099
+26/11/13 07:15:15 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/13 07:15:15 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(11, localhost, 33099, None)
+26/11/13 07:15:15 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(11, localhost, 33099, None)
+26/11/13 07:15:15 INFO BlockManager: Initialized BlockManager: BlockManagerId(11, localhost, 33099, None)
+26/11/13 07:15:15 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/container_1794552556368_0004_01_000014/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/container_1794552556368_0004_01_000014/__app__.jar'
+26/11/13 07:15:15 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@758b8efd for default.
+26/11/13 07:15:15 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/13 07:15:15 INFO MemoryStore: MemoryStore cleared
+26/11/13 07:15:15 INFO BlockManager: BlockManager stopped
+26/11/13 07:15:15 INFO ShutdownHookManager: Shutdown hook called

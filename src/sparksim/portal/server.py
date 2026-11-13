@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from ..prepare import Manifest
 from ..scenario import Scenario
 from .content import DEFAULT_HS_URL, documents
 from .status import STATE_TEXT, Probe, ScenarioCache, status
@@ -137,16 +138,23 @@ def run_label(sc: Scenario, role: str) -> str:
 
 def runs_panel(cfg: PortalConfig, sc: Scenario) -> str:
     items = []
+    manifest = Manifest.load(cfg.event_logs)
     for role in sc.roles:
         app = sc.app_id(role)
-        links = "".join(f'<a href="{esc(hs_link(cfg, app, page))}" target="sparkui" rel="noopener" '
-                        f'data-page="{esc(page)}">{esc(name)}</a>' for name, page in HS_PAGES)
+        attempts = manifest.attempts(app)  # a failed YARN attempt is followed by the next one
+        navs = []
+        for att in attempts:
+            links = "".join(f'<a href="{esc(hs_link(cfg, app, page, att))}" target="sparkui" rel="noopener" '
+                            f'data-page="{esc(page)}">{esc(name)}</a>' for name, page in HS_PAGES)
+            label = f'<span class="attempt">Attempt {esc(att)}</span>' if len(attempts) > 1 else ""
+            navs.append(f'<nav class="hs-links" data-attempt="{esc(att)}" aria-label="History Server pages of '
+                        f'{esc(app)}, attempt {esc(att)}">{label}{links}</nav>')
         items.append(f"""
 <div class="run" data-run="{esc(app)}">
   <div class="run-head"><span class="role">{esc(ROLE_TEXT[role])}</span>{run_state_badge(app)}</div>
   <p class="run-label">{esc(run_label(sc, role))}</p>
   <code class="app-id">{esc(app)}</code>
-  <nav class="hs-links" aria-label="History Server pages of {esc(app)}">{links}</nav>
+  {"".join(navs)}
   <p class="run-note" data-note-for="{esc(app)}" hidden></p>
 </div>""")
     return f"""
