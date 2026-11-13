@@ -920,7 +920,8 @@ def _executor_churn(c: Ctx) -> str:
         ex = [e for e in a.get("allexecutors") if e["id"] != "driver"]
         top = max(int(e["id"]) for e in ex)
         dead = [e for e in ex if not e["isActive"]]
-        out.append(f"attempt {att}: executors 1–{top}, {len(ex) - len(dead)} active at the end, {len(dead)} dead listed")
+        out.append(f"attempt {att}: executors 1–{top}, {len(ex) - len(dead)} active at the end, "
+                   f"{len(dead)} dead listed")
     return "; ".join(out)
 
 
@@ -984,7 +985,8 @@ def _killed_executor_log(c: Ctx) -> str:
     e = next(x for x in a.get("allexecutors") if x["id"] == eid)
     log = _stderr(e)
     tasks = len(re.findall(r"INFO Executor: Running task ", log))
-    opened = len(re.findall(r"GeoIpCity: Opened IP database \./ip-intel-2026q4\.mmdb \(2\.0 GiB\) in MEMORY_MAPPED", log))
+    opened = len(re.findall(r"GeoIpCity: Opened IP database \./ip-intel-2026q4\.mmdb \(2\.0 GiB\) in MEMORY_MAPPED",
+                            log))
     last = log.strip().splitlines()
     term = next((i for i, x in enumerate(last) if "RECEIVED SIGNAL TERM" in x), None)
     return (f"executor {eid}: {tasks} tasks, {opened} 'Opened IP database ... (2.0 GiB) in MEMORY_MAPPED mode', "

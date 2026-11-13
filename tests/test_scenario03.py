@@ -128,19 +128,28 @@ def test_driver_and_executor_logs(incident):
         in am_stderr(a2)
 
 
+def minutes(run) -> float:
+    return round((run.app_end - run.t0) / 60_000, 1)
+
+
 def test_fixes(sc):
+    """The numbers solution.md quotes for its fixes."""
     # tonight: room for four mappings (4 x 2.0 GiB) and the JVM's own native memory
     (r,) = variant(executors={"memory_overhead": "10g"})
-    assert r.final_status == "SUCCEEDED" and kills(r) == 0 and r.executors[0].container_mb == 26 * 1024
+    assert (r.final_status, kills(r), r.executors[0].container_mb, minutes(r)) == ("SUCCEEDED", 0, 26 * 1024, 7.3)
     # durable: one reader per executor JVM (a fixed UDF), and room for one mapping
     (r,) = variant(params={"geo_reader": "per_executor"}, executors={"memory_overhead": "4g"})
-    assert r.final_status == "SUCCEEDED" and kills(r) == 0 and r.executors[0].container_mb == 20 * 1024
+    assert (r.final_status, kills(r), r.executors[0].container_mb, minutes(r)) == ("SUCCEEDED", 0, 20 * 1024, 7.2)
 
 
 def test_what_does_not_fix_it(sc):
-    # a bigger heap brings 10 % more overhead, not 8 GiB more: still killed
-    runs = variant(executors={"memory": "24g"})
-    assert runs[-1].final_status == "FAILED" or kills(runs[0]) > 50
-    # the fixed UDF alone: one 2.0 GiB mapping per JVM still doesn't fit next to a full 16 GiB heap
+    # a bigger heap brings 10 % more overhead, not 6+ GiB more: a coin flip
+    a1, a2 = variant(executors={"memory": "24g"})
+    assert a1.executors[0].container_mb == 27 * 1024
+    assert (a1.final_status, a2.final_status, minutes(a2), kills(a2)) == ("FAILED", "SUCCEEDED", 8.2, 140)
+    # the fixed UDF alone: one 2.0 GiB mapping per JVM still doesn't fit next to a fully grown 16 GiB heap
     (r,) = variant(params={"geo_reader": "per_executor"})
-    assert kills(r) > 0
+    assert r.final_status == "SUCCEEDED" and kills(r) > 50
+    # 2 cores: two mappings still don't fit in 2 GiB
+    (r,) = variant(executors={"cores": 2})
+    assert r.final_status == "SUCCEEDED" and kills(r) > 100 and minutes(r) > 14
