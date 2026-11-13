@@ -42,7 +42,7 @@ def test_stage_ids_order():
                 assert scala_int_hashset_order(sorted(ids)) == ids, (p.name, e["Job ID"])
                 assert [s["Stage ID"] for s in e["Stage Infos"]] == ids
                 seen += len(ids) > 1
-    assert seen == 38  # ref00–ref09
+    assert seen == 42  # ref00–ref11 (ref10/ref11: one log per YARN attempt)
 
 
 def test_hashset_grows_like_flat_hash_table():

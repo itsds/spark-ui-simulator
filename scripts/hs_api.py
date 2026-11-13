@@ -93,7 +93,7 @@ def log_counts(path: Path) -> dict:
     ev = Counter()
     app_id = attempt = None
     stage_attempts = set()
-    task_ids = set()  # a Resubmitted map task ends twice with the same id
+    task_ids = set()  # started tasks: a Resubmitted map task ends twice, a task killed as the app stops never
     executors = set()
     removed = set()
     for e in read_events(path):
@@ -101,7 +101,7 @@ def log_counts(path: Path) -> dict:
         ev[name] += 1
         if name == "SparkListenerApplicationStart":
             app_id, attempt = e.get("App ID"), e.get("App Attempt ID")
-        elif name == "SparkListenerTaskEnd":
+        elif name == "SparkListenerTaskStart":  # the server lists every started task, ended or not
             task_ids.add(e["Task Info"]["Task ID"])
         elif name == "SparkListenerStageSubmitted":
             si = e["Stage Info"]

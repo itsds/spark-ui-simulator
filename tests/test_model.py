@@ -63,6 +63,9 @@ class _AllocRun:
     def _container_launched(self, ex):
         self.launched.append(ex)
 
+    def localization_done(self, host, t: int) -> int:  # no --files / --jars to localize
+        return t
+
 
 def _allocate(cluster, sizing, app, request_time, seed, until):
     run = _AllocRun(cluster, request_time)
