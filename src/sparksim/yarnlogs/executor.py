@@ -51,6 +51,7 @@ class _State:
     connections: set[str] = field(default_factory=set)
     echo: list | None = None  # what the driver logs in reaction (block updates, map status requests)
     threads: dict[int, int] = field(default_factory=dict)  # task id → id of the task launch thread running it
+    opened: set = field(default_factory=set)  # executor-wide UDF resources opened so far (sql.expr.Func)
 
 
 def _hex(rng: random.Random, n: int = 8) -> str:
@@ -472,6 +473,15 @@ def _scan(log, run, ex, stage, src, part, st: _State, t: int, span: int, rng) ->
                  f"partition values: {_partition_values(pf.file.path)}")
         if i == 0 and bid is not None:
             cur = _read_broadcast(log, run, ex, st, bid, cur + 1, rng)
+        if i == 0:  # a UDF that opens its resource (its library's log line, first row): in each task, or once
+            for f in stage.native_funcs:
+                if f.native_log is None:
+                    continue
+                if f.native_scope == "executor":
+                    if f in st.opened:
+                        continue
+                    st.opened.add(f)
+                log.info(cur + 2, *f.native_log)
         if pred is not None:
             log.info(cur + 1, "FilterCompat", f"Filtering using predicate: {pred}")
         if st.decompressors < ex.cores:

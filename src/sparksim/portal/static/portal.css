@@ -148,6 +148,7 @@ details.topics summary { cursor: pointer; color: var(--muted); }
 .hs-links { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 8px; }
 .hs-links a { font-size: 13px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 6px; text-decoration: none; background: var(--surface-2); }
 .hs-links a:hover { border-color: var(--accent); }
+.hs-links .attempt { font-size: 12px; color: var(--muted); flex-basis: 100%; }
 .run[data-ready="false"] .hs-links a { opacity: .55; }
 .run-note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
 

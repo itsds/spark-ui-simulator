@@ -15,10 +15,14 @@ do the same check in CI.
 from __future__ import annotations
 
 import argparse
+import collections
+import html
 import math
 import re
 import sys
 from pathlib import Path
+
+import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -72,13 +76,23 @@ def secs(ms: float) -> str:
 
 
 class Ctx:
-    def __init__(self, hs: hs_api.HistoryServer, app_id: str):
-        self.hs, self.app_id = hs, app_id
+    """One YARN attempt of a run (`attempt=None`: the latest, the History Server's default view)."""
+
+    def __init__(self, hs: hs_api.HistoryServer, app_id: str, attempt: str | None = None):
+        self.hs, self.app_id, self.attempt = hs, app_id, attempt
         self._stages = None
         self.runs: dict[str, Ctx] = {}  # every run of the scenario by role (baseline | last_good | incident)
 
     def get(self, sub: str, **params):
-        return self.hs.app(self.app_id, sub, **params)
+        return self.hs.app(self.app_id, sub, self.attempt, **params)
+
+    def tasks(self, sid: int, stage_attempt: int = 0) -> list[dict]:
+        return self.hs.all_tasks(self.app_id, sid, stage_attempt, app_attempt=self.attempt)
+
+    @property
+    def attempts(self) -> dict[str, Ctx]:
+        """Every YARN attempt of this run by attempt id ("1", "2")."""
+        return {a: Ctx(self.hs, self.app_id, a) for a in self.hs.attempts(self.app_id)}
 
     @property
     def stages(self) -> list[dict]:
@@ -844,8 +858,180 @@ S05 = {
     "E19": _tail_wait,
 }
 
+# ---------------------------------------------------------------------------- scenario 03
+
+PMEM = re.compile(r"Container killed by YARN for exceeding physical memory limits\. ([0-9.]+) GB of ([0-9.]+) GB")
+
+
+def _attempt_durations(c: Ctx) -> str:
+    att = sorted(c.hs.get(f"applications/{c.app_id}")["attempts"], key=lambda a: int(a["attemptId"]))
+    return ", ".join(f"attempt {a['attemptId']}: {fmt_duration(a['duration'])}" for a in att)
+
+
+def _failed_job(a: Ctx) -> dict:
+    return next(j for j in a.get("jobs") if j["status"] == "FAILED")
+
+
+def _failed_jobs(c: Ctx) -> str:
+    out = []
+    for att, a in c.attempts.items():
+        jobs = a.get("jobs")
+        j = _failed_job(a)
+        out.append(f"attempt {att}: {len(jobs)} jobs, job {j['jobId']} FAILED ({j['numCompletedTasks']:,}/"
+                   f"{j['numTasks']:,} tasks succeeded, {j['numFailedTasks']} failed, {j['numKilledTasks']} killed)")
+    return "; ".join(out)
+
+
+def _abort_reason(c: Ctx) -> str:
+    """The failed stage's Failure Reason, first line, as the Stages tab shows it."""
+    a = c.attempts["1"]
+    st = next(s for s in a.stages if s["status"] == "FAILED")
+    return st["failureReason"].split("\n")[0]
+
+
+def _failed_task_reasons(c: Ctx) -> str:
+    out = []
+    for att, a in c.attempts.items():
+        st = next(s for s in a.stages if s["status"] == "FAILED")
+        tasks = a.tasks(st["stageId"])
+        failed = [t for t in tasks if t["status"] == "FAILED"]
+        pmem = sum(1 for t in failed if PMEM.search(t.get("errorMessage", "")))
+        killed = [t for t in tasks if t["status"] == "KILLED"]
+        stage_cancelled = sum(1 for t in killed if "Stage cancelled" in t.get("errorMessage", ""))
+        out.append(f"attempt {att}: {len(failed)} FAILED, {pmem} of them pmem kills; {len(killed)} KILLED by "
+                   f"'Stage cancelled' ({stage_cancelled})")
+    return "; ".join(out)
+
+
+def _retries(c: Ctx) -> str:
+    a = c.attempts["1"]
+    st = next(s for s in a.stages if s["status"] == "FAILED")
+    per: dict[int, int] = {}
+    for t in a.tasks(st["stageId"]):
+        if t["status"] == "FAILED":
+            per[t["index"]] = per.get(t["index"], 0) + 1
+    counts = collections.Counter(per.values())
+    return ", ".join(f"{counts[k]} {'index' if counts[k] == 1 else 'indices'} failed {k}x" for k in sorted(counts))
+
+
+def _executor_churn(c: Ctx) -> str:
+    out = []
+    for att, a in c.attempts.items():
+        ex = [e for e in a.get("allexecutors") if e["id"] != "driver"]
+        top = max(int(e["id"]) for e in ex)
+        dead = [e for e in ex if not e["isActive"]]
+        out.append(f"attempt {att}: executors 1–{top}, {len(ex) - len(dead)} active at the end, "
+                   f"{len(dead)} dead listed")
+    return "; ".join(out)
+
+
+def _dead_reasons(c: Ctx) -> str:
+    used = []
+    for a in c.attempts.values():
+        for e in a.get("allexecutors"):
+            m = PMEM.search(e.get("removeReason") or "")
+            if m:
+                used.append(float(m.group(1)))
+                limit = m.group(2)
+    return f"every dead executor: pmem kill, {min(used):.1f}–{max(used):.1f} GB of {limit} GB"
+
+
+def _heap_peaks(c: Ctx) -> str:
+    def peak(a: Ctx) -> float:
+        return max(e["peakMemoryMetrics"]["JVMHeapMemory"] for e in a.get("allexecutors")
+                   if e["id"] != "driver" and e.get("peakMemoryMetrics"))
+    return (f"last good {fmt_bytes(peak(c.runs['last_good']))}, incident {fmt_bytes(peak(c.attempts['1']))} "
+            f"/ {fmt_bytes(peak(c.attempts['2']))} (heap 16 GiB)")
+
+
+def _dist_diff(c: Ctx) -> str:
+    good = dict(c.runs["last_good"].get("environment")["sparkProperties"])
+    bad = dict(c.attempts["1"].get("environment")["sparkProperties"])
+    diff = sorted(k for k in set(good) | set(bad) if good.get(k) != bad.get(k)
+                  and not k.startswith(("spark.app.", "spark.yarn.app.", "spark.driver.port", "spark.driver.host"))
+                  and "PROXY_URI_BASES" not in k and "log.dir" not in k)
+    over = bad.get("spark.executor.memoryOverhead", "not set")
+    return "; ".join(f"{k}: {bad.get(k, 'not set').rsplit('/', 1)[-1]}" for k in diff) + \
+        f"; spark.executor.memoryOverhead: {over}"
+
+
+def _udf_in_plan(c: Ctx) -> str:
+    """The SQL tab, query 0: the events-side Project's description in the plan graph (node details), and the
+    events scan's ReadSchema in the plan text (Details)."""
+    def page(a: Ctx) -> str:
+        base = a.hs.base.removesuffix("/api/v1")
+        return html.unescape(requests.get(f"{base}/history/{a.app_id}/{a.attempt or '1'}/SQL/execution/?id=0",
+                                          timeout=60).text)
+
+    def read_schema(a: Ctx) -> str:
+        text = a.get("sql/0", planDescription="true")["planDescription"]
+        return re.search(r"\(1\) Scan parquet.*?ReadSchema: (struct<[^>]*>)", text, re.S).group(1)
+
+    udf = re.findall(r"geoip_city\(ip_address#\d+\) AS geo_city#\d+", page(c.attempts["1"]))
+    none = not re.search(r"geoip_city\(", page(c.runs["last_good"]))
+    ip = ("ip_address" in read_schema(c.attempts["1"]), "ip_address" in read_schema(c.runs["last_good"]))
+    return (f"incident: {udf[0]}; last good: {'none' if none else 'there too'}; ip_address in the events "
+            f"scan's ReadSchema: incident {'yes' if ip[0] else 'no'}, last good {'yes' if ip[1] else 'no'}")
+
+
+def _stderr(e: dict) -> str:
+    return requests.get(e["executorLogs"]["stderr"].replace("start=-4096", "start=0"), timeout=60).text
+
+
+def _killed_executor_log(c: Ctx) -> str:
+    """The executor that ran the last straw (the abort's most recent failure)."""
+    a = c.attempts["1"]
+    eid = re.search(r"executor (\d+)\): ExecutorLostFailure", _abort_reason(c)).group(1)
+    e = next(x for x in a.get("allexecutors") if x["id"] == eid)
+    log = _stderr(e)
+    tasks = len(re.findall(r"INFO Executor: Running task ", log))
+    opened = len(re.findall(r"GeoIpCity: Opened IP database \./ip-intel-2026q4\.mmdb \(2\.0 GiB\) in MEMORY_MAPPED",
+                            log))
+    last = log.strip().splitlines()
+    term = next((i for i, x in enumerate(last) if "RECEIVED SIGNAL TERM" in x), None)
+    return (f"executor {eid}: {tasks} tasks, {opened} 'Opened IP database ... (2.0 GiB) in MEMORY_MAPPED mode', "
+            f"{'ends with RECEIVED SIGNAL TERM' if term is not None else 'no SIGTERM'}")
+
+
+def _am_logs(c: Ctx) -> str:
+    out = []
+    for att, a in c.attempts.items():
+        d = next(e for e in a.get("allexecutors") if e["id"] == "driver")
+        err = _stderr(d)
+        final = re.search(r"Final app status: (\w+), exitCode: (\d+)", err)
+        unreg = "Unregistering ApplicationMaster with FAILED" in err
+        out.append(f"attempt {att}: Final app status: {final.group(1)}, exitCode: {final.group(2)}"
+                   + (", Unregistering ApplicationMaster with FAILED" if unreg else ", no unregister"))
+    return "; ".join(out)
+
+
+def _am_stdout(c: Ctx) -> str:
+    d = next(e for e in c.attempts["1"].get("allexecutors") if e["id"] == "driver")
+    out = html.unescape(requests.get(d["executorLogs"]["stdout"].replace("start=-4096", "start=0"), timeout=60).text)
+    line = re.search(r'File ".*/(daily_enrichment\.py)", line (\d+), in <module>', out)
+    err = re.search(r"py4j\.protocol\.Py4JJavaError: (An error occurred while calling o\d+\.parquet\.)", out)
+    return f"{line.group(1)} line {line.group(2)}: Py4JJavaError: {err.group(1)}"
+
+
+S03 = {
+    "E1": lambda c: f"{_app_duration(c.runs['last_good'])} → {_attempt_durations(c)}",
+    "E2": _failed_jobs,
+    "E3": _abort_reason,
+    "E4": _failed_task_reasons,
+    "E5": _retries,
+    "E6": _executor_churn,
+    "E7": _dead_reasons,
+    "E8": _heap_peaks,
+    "E9": _dist_diff,
+    "E10": _udf_in_plan,
+    "E11": _killed_executor_log,
+    "E12": _am_logs,
+    "E13": _am_stdout,
+}
+
+
 EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02,
-            "05-missed-broadcast-join": S05, "09-bad-node-straggler": S09}
+            "03-memory-overhead-kills": S03, "05-missed-broadcast-join": S05, "09-bad-node-straggler": S09}
 
 
 # ---------------------------------------------------------------------------- solution.md

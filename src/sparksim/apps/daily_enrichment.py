@@ -31,8 +31,18 @@ The workload `clickstream_enrichment`: the queries above, the tables' schemas an
 usually is. Scenarios run it (`scenarios/00-healthy-baseline` is a normal night; `01-join-skew` a night
 whose events carry a hot `customer_id`). `broadcast_hint=False` is the script before 2026-09-24, which joined
 the page catalog without `F.broadcast()` and relied on Spark broadcasting it by size
-(`05-missed-broadcast-join`). The physical plans, the SQL tab and every number come from the queries and the
-data through the planner, the cost model and the scheduler.
+(`05-missed-broadcast-join`). `geo_udf=True` is the script from release 2.4 (2026-11-11) on: a `geo_city`
+column from the data platform's shared UDF jar,
+
+    spark.udf.registerJavaFunction("geoip_city", "com.acme.dp.udf.geo.GeoIpCity", StringType())
+    ... .select(..., F.expr("geoip_city(ip_address)").alias("geo_city"), "dt")
+
+    spark-submit --jars hdfs:///shared/udf/dp-udfs-2.3.1.jar --files hdfs:///shared/geo/ip-intel-2026q4.mmdb
+
+whose UDF opens its own reader on the IP database in each task (a transient field of the UDF instance) and
+memory-maps the whole 2.0 GiB file (`03-memory-overhead-kills`); `geo_reader="per_executor"` is the fixed
+UDF (one lazily opened reader per JVM). The physical plans, the SQL tab and every
+number come from the queries and the data through the planner, the cost model and the scheduler.
 """
 
 from __future__ import annotations
@@ -57,6 +67,12 @@ PAGE = KeySpace("page_id", distinct=44_000, zipf=0.85)
 SHUFFLE_PARTITIONS = 2400
 # lower(regexp_extract(page_url, ...)) on a ~150-character URL (java.util.regex): ~2 µs per row.
 PARSE_NS = 2_100.0
+# geoip_city(ip_address): parse the IP, walk the database's search tree, decode the city record into Java
+# objects (names in several locales): ~2.5 µs per row [norm, MaxMind-style readers without a cache].
+GEOIP_NS = 2_500.0
+UDF_JAR = (f"{NN}/shared/udf/dp-udfs-2.3.1.jar", 18_452_771)
+# the vendor's IP intelligence database (city, ISP, proxy flags; IPv4 + IPv6), Q4 release: 2.0 GiB
+GEO_DB = (f"{NN}/shared/geo/ip-intel-2026q4.mmdb", 2_143_289_344)
 
 
 def C(name: str, dtype: str, avg: float = 0.0, pq: float = 8.0) -> Column:  # noqa: N802
@@ -88,13 +104,17 @@ PAGES = Table(f"{WH}/web.db/page_catalog", (
     C("page_type", "string", 9, 1), C("funnel_step", "int", pq=1), C("category", "string", 12, 4),
     C("is_active", "boolean", pq=0.1), C("updated_at", "timestamp", pq=9.9)))
 ENRICHED_ROOT = f"{WH}/analytics.db/events_enriched"
-ENRICHED = Table(ENRICHED_ROOT, (
+_ENRICHED_COLS = (
     C("customer_id", "bigint", pq=5), C("page_id", "bigint", pq=2), C("event_id", "bigint", pq=8),
     C("event_ts", "timestamp", pq=8), C("session_id", "bigint", pq=6), C("event_type", "string", 8, 0.5),
-    C("device", "string", 7, 0.4), C("country", "string", 2, 0.4), C("revenue", "double", pq=1.6),
+    C("device", "string", 7, 0.4), C("country", "string", 2, 0.4), C("revenue", "double", pq=1.6))
+_ENRICHED_TAIL = (
     C("campaign", "string", 6, 0.9), C("page_type", "string", 9, 0.5), C("funnel_step", "int", pq=0.3),
-    C("segment", "string", 8, 0.4), C("loyalty_tier", "string", 6, 0.3), C("home_country", "string", 2, 0.3)),
-    (C("dt", "date"),))
+    C("segment", "string", 8, 0.4), C("loyalty_tier", "string", 6, 0.3), C("home_country", "string", 2, 0.3))
+ENRICHED = Table(ENRICHED_ROOT, _ENRICHED_COLS + _ENRICHED_TAIL, (C("dt", "date"),))
+# from release 2.4: geo_city after campaign (the select's order)
+ENRICHED_GEO = Table(ENRICHED_ROOT, _ENRICHED_COLS + _ENRICHED_TAIL[:1] + (C("geo_city", "string", 9, 1.2),)
+                     + _ENRICHED_TAIL[1:], (C("dt", "date"),))
 
 
 def queries(p: Params, data) -> tuple[SqlQuery, ...]:
@@ -111,25 +131,35 @@ def queries(p: Params, data) -> tuple[SqlQuery, ...]:
                                "device", "country", "revenue")]
         campaign = Func("lower", (Func("regexp_extract", (e["page_url"], "utm_campaign=([^&]+)", 1), "string", 6),),
                         "string", 6)
+        extra, ns = [], PARSE_NS
+        if p["geo_udf"]:  # each task's UDF instance memory-maps the database ("Opened ..." once per task)
+            db = GEO_DB[0].rsplit("/", 1)[1]
+            geo = Func("geoip_city", (e["ip_address"],), "string", 9, native_bytes=GEO_DB[1],
+                       native_log=("GeoIpCity", f"Opened IP database ./{db} (2.0 GiB) in MEMORY_MAPPED mode"),
+                       native_scope="executor" if p["geo_reader"] == "per_executor" else "task")
+            extra, ns = [geo.alias("geo_city")], PARSE_NS + GEOIP_NS
         enriched = (events.where(Not(e["is_bot"]), selectivity=0.93)
-                    .select(*cols, campaign.alias("campaign"), e["dt"], ns=PARSE_NS)
+                    .select(*cols, campaign.alias("campaign"), *extra, e["dt"], ns=ns)
                     .join(pages.select(pages["page_id"], pages["page_type"], pages["funnel_step"]), "page_id",
                           broadcast=bool(p["broadcast_hint"]), key_space=page)
                     .join(customers.where(Not(customers["is_deleted"]), selectivity=0.97)
                           .select(*(customers[c] for c in ("customer_id", "segment", "loyalty_tier", "home_country"))),
                           "customer_id", match=0.985, key_space=customer))
+        table = ENRICHED_GEO if p["geo_udf"] else ENRICHED
         return enriched.write_parquet(ENRICHED_ROOT, ["dt"], WriteSink(f"{ENRICHED_ROOT}/dt={dt}",
-                                                                       ENRICHED.file_bytes_per_row))
+                                                                       table.file_bytes_per_row))
+
+    enriched_table = ENRICHED_GEO if p["geo_udf"] else ENRICHED
 
     def funnel(spark: SparkSession):
-        e = spark.read(ENRICHED, f"{ENRICHED_ROOT}/dt={dt}")
+        e = spark.read(enriched_table, f"{ENRICHED_ROOT}/dt={dt}")
         out = f"{WH}/analytics.db/daily_funnel"
         daily = (e.group_by("dt", "page_type", "funnel_step", "device", "country")
                  .agg(agg("count", None, "events"), agg("sum", e["revenue"], "revenue"), groups=FUNNEL))
         return daily.write_parquet(out, ["dt"], WriteSink(f"{out}/dt={dt}", bytes_per_row=26))
 
     def activity(spark: SparkSession):
-        e = spark.read(ENRICHED, f"{ENRICHED_ROOT}/dt={dt}")
+        e = spark.read(enriched_table, f"{ENRICHED_ROOT}/dt={dt}")
         out = f"{WH}/analytics.db/customer_daily_activity"
         per_customer = (e.group_by("dt", "customer_id")
                         .agg(agg("count", None, "events"), agg("sum", e["revenue"], "spend"),
@@ -139,9 +169,14 @@ def queries(p: Params, data) -> tuple[SqlQuery, ...]:
 
     return (
         SqlQuery(f"events_enriched dt={dt}: web events + page catalog (broadcast) + customers (sort-merge join)",
-                 enrich, think_ms=(2_400, 4_200)),
-        SqlQuery(f"daily_funnel dt={dt}: events by page type, funnel step, device, country", funnel),
-        SqlQuery(f"customer_daily_activity dt={dt}: events, spend, first and last event per customer", activity),
+                 enrich, think_ms=(2_400, 4_200), source_line=61 if p["geo_udf"] else 54,
+                 source='enriched.write.mode("overwrite").partitionBy("dt").parquet(f"{WH}/analytics.db/events_enriched")'),
+        SqlQuery(f"daily_funnel dt={dt}: events by page type, funnel step, device, country", funnel,
+                 source_line=69 if p["geo_udf"] else 62, source='daily.write.mode("overwrite").partitionBy("dt")'
+                 '.parquet(f"{WH}/analytics.db/daily_funnel")'),
+        SqlQuery(f"customer_daily_activity dt={dt}: events, spend, first and last event per customer", activity,
+                 source_line=78 if p["geo_udf"] else 71, source='per_customer.write.mode("overwrite")'
+                 '.partitionBy("dt").parquet(f"{WH}/analytics.db/customer_daily_activity")'),
     )
 
 
@@ -167,5 +202,8 @@ WORKLOAD = Workload(
     datasets=datasets,
     queries=queries,
     # broadcast_hint: F.broadcast() around the page catalog (in the script since 2026-09-24)
-    params={"dt": "2026-11-02", "broadcast_hint": True},
+    # geo_udf: the geo_city column from dp-udfs' geoip_city (release 2.4, 2026-11-11); geo_reader: one reader
+    # per task (dp-udfs 2.3.1) or one per executor JVM (a fixed UDF)
+    params={"dt": "2026-11-02", "broadcast_hint": True, "geo_udf": False, "geo_reader": "per_task"},
+    dist_resources=lambda p: (UDF_JAR, GEO_DB) if p["geo_udf"] else (),
 )

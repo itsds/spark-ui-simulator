@@ -66,7 +66,7 @@ class AppPlan:
 
     @property
     def event_log_name(self) -> str:
-        return f"{self.app_id}_1"  # YARN cluster mode: attempt 1
+        return f"{self.app_id}_1"  # YARN cluster mode: attempt 1 (a failed attempt is followed by `_2`)
 
     @property
     def scenario_ids(self) -> list[str]:
@@ -126,9 +126,15 @@ class Manifest:
                                   sort_keys=True) + "\n", encoding="utf-8")
         os.replace(tmp, self.path)
 
-    def record(self, app_id: str, fingerprint: str, scenarios: list[str], event_log: str) -> None:
-        self.apps[app_id] = {"fingerprint": fingerprint, "scenarios": scenarios, "event_log": event_log,
-                             "generated_at": _now()}
+    def record(self, app_id: str, fingerprint: str, scenarios: list[str], event_logs: list[str]) -> None:
+        """`event_logs`: one per YARN attempt (`<app>_1`, `<app>_2` when attempt 1 failed)."""
+        self.apps[app_id] = {"fingerprint": fingerprint, "scenarios": scenarios, "event_log": event_logs[0],
+                             "event_logs": event_logs, "generated_at": _now()}
+
+    def attempts(self, app_id: str) -> list[str]:
+        """The YARN attempt ids an app was generated with ("1" if unknown)."""
+        logs = (self.apps.get(app_id) or {}).get("event_logs") or [f"{app_id}_1"]
+        return [name.rsplit("_", 1)[1] for name in logs]
 
     def active_progress(self) -> dict | None:
         """The progress of a prepare that is still running (not one that died half-way)."""
@@ -140,11 +146,12 @@ class Manifest:
 
 def app_state(plan: AppPlan, event_logs: Path, yarn_logs: Path | None, manifest: Manifest) -> str:
     """`fresh`, `missing` (no event log or container logs) or `stale` (generated from another fingerprint)."""
-    if not (event_logs / plan.event_log_name).is_file():
-        return "missing"
+    rec = manifest.apps.get(plan.app_id)
+    for name in (rec or {}).get("event_logs") or [plan.event_log_name]:
+        if not (event_logs / name).is_file():
+            return "missing"
     if yarn_logs is not None and not (yarn_logs / plan.app_id).is_dir():
         return "missing"
-    rec = manifest.apps.get(plan.app_id)
     return "fresh" if rec and rec.get("fingerprint") == plan.fingerprint else "stale"
 
 
@@ -153,13 +160,14 @@ def app_state(plan: AppPlan, event_logs: Path, yarn_logs: Path | None, manifest:
 
 def generate_app(sc: Scenario, role: str, event_logs: str | Path, yarn_logs: str | Path | None,
                  seed: int | None = None, manifest: Manifest | None = None) -> Path:
-    """Simulate one run and write its container logs, then its event log (atomically: the History Server
-    lists the app only once its container logs exist); record it in the manifest. A `seed` override
-    makes a run that is not the scenario's: it gets no fingerprint, so `prepare` regenerates it."""
+    """Simulate one run, every YARN attempt of it, and write their container logs, then their event logs
+    (atomically: the History Server lists the app only once its container logs exist); record it in the
+    manifest. Returns attempt 1's event log. A `seed` override makes a run that is not the scenario's: it
+    gets no fingerprint, so `prepare` regenerates it."""
     from dataclasses import replace
 
     from .engine.emit import build_events
-    from .engine.runtime import AppRun
+    from .engine.runtime import run_attempts
     from .eventlog import write_event_log
     from .yarnlogs import write_container_logs
 
@@ -167,18 +175,22 @@ def generate_app(sc: Scenario, role: str, event_logs: str | Path, yarn_logs: str
     spec = sc.spec(role)
     if seed is not None:
         spec = replace(spec, seed=seed)
-    run = AppRun(spec).run()
+    runs = run_attempts(spec)
+    app_id = runs[0].yapp.app_id
+    for old in event_logs.glob(f"{app_id}_*"):  # an older version may have had more attempts
+        old.unlink()
     if yarn_logs is not None:
-        shutil.rmtree(Path(yarn_logs) / run.yapp.app_id, ignore_errors=True)  # no containers of an older version
-        write_container_logs(run, yarn_logs)
-    path = write_event_log(event_logs / run.yapp.event_log_name, build_events(run))
+        shutil.rmtree(Path(yarn_logs) / app_id, ignore_errors=True)  # no containers of an older version
+        for run in runs:
+            write_container_logs(run, yarn_logs)
+    paths = [write_event_log(event_logs / run.yapp.event_log_name, build_events(run)) for run in runs]
     m = manifest or Manifest.load(event_logs)
     if seed is None:
-        m.record(run.yapp.app_id, app_fingerprint(sc, role), [sc.id], path.name)
+        m.record(app_id, app_fingerprint(sc, role), [sc.id], [p.name for p in paths])
     else:
-        m.apps.pop(run.yapp.app_id, None)
+        m.apps.pop(app_id, None)
     m.save()
-    return path
+    return paths[0]
 
 
 def prepare(scenarios: Iterable[str | Scenario] | None, event_logs: str | Path, yarn_logs: str | Path | None,

@@ -43,3 +43,43 @@ BROADCAST_LONG = "\n".join([
     "java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)",
     "java.base/java.lang.Thread.run(Thread.java:840)",
 ])
+
+
+# The SparkException of a failed job, as JobEnd's `JobFailed` carries it (`JsonProtocol.exceptionToJson`) and
+# the PySpark driver prints it under its Py4JJavaError (ref10, Spark 3.5.9). Created on the DAGScheduler's event
+# loop: abortStage after a task set failed, handleJobCancellation for a job AQE cancelled. A job submitted with
+# `runJob` (result stages) also gets its caller's frames appended, racing with the event-log writer (ref10/ref11
+# show both); AQE's map-stage jobs (`submitMapStage`) keep these frames only.
+_DAG = "org.apache.spark.scheduler.DAGScheduler"
+_LOOP = "org.apache.spark.scheduler.DAGSchedulerEventProcessLoop"
+_EVENT_LOOP_TAIL = [
+    (_LOOP, "onReceive", "DAGScheduler.scala", 3036),
+    (_LOOP, "onReceive", "DAGScheduler.scala", 3025),
+    ("org.apache.spark.util.EventLoop$$anon$1", "run", "EventLoop.scala", 49),
+]
+ABORT_STAGE_STACK = [
+    (_DAG, "failJobAndIndependentStages", "DAGScheduler.scala", 2898),
+    (_DAG, "$anonfun$abortStage$2", "DAGScheduler.scala", 2834),
+    (_DAG, "$anonfun$abortStage$2$adapted", "DAGScheduler.scala", 2833),
+    ("scala.collection.mutable.ResizableArray", "foreach", "ResizableArray.scala", 62),
+    ("scala.collection.mutable.ResizableArray", "foreach$", "ResizableArray.scala", 55),
+    ("scala.collection.mutable.ArrayBuffer", "foreach", "ArrayBuffer.scala", 49),
+    (_DAG, "abortStage", "DAGScheduler.scala", 2833),
+    (_DAG, "$anonfun$handleTaskSetFailed$1", "DAGScheduler.scala", 1253),
+    (_DAG, "$anonfun$handleTaskSetFailed$1$adapted", "DAGScheduler.scala", 1253),
+    ("scala.Option", "foreach", "Option.scala", 407),
+    (_DAG, "handleTaskSetFailed", "DAGScheduler.scala", 1253),
+    (_LOOP, "doOnReceive", "DAGScheduler.scala", 3102),
+    *_EVENT_LOOP_TAIL,
+]
+CANCEL_JOB_STACK = [
+    (_DAG, "failJobAndIndependentStages", "DAGScheduler.scala", 2898),
+    (_DAG, "handleJobCancellation", "DAGScheduler.scala", 2773),
+    (_LOOP, "doOnReceive", "DAGScheduler.scala", 3055),
+    *_EVENT_LOOP_TAIL,
+]
+
+
+def java_frame(cls: str, method: str, file: str, line: int) -> str:
+    """`StackTraceElement.toString` for the JDK 17 frames above (Spark's own classes: no module prefix)."""
+    return f"{cls}.{method}({file}:{line})"

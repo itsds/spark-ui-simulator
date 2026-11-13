@@ -1,0 +1,120 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/13 07:14:59 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 14702@vm
+26/11/13 07:14:59 INFO SignalUtils: Registering signal handler for TERM
+26/11/13 07:14:59 INFO SignalUtils: Registering signal handler for HUP
+26/11/13 07:14:59 INFO SignalUtils: Registering signal handler for INT
+26/11/13 07:14:59 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/13 07:14:59 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/13 07:14:59 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/13 07:14:59 INFO SecurityManager: Changing view acls to: root
+26/11/13 07:14:59 INFO SecurityManager: Changing modify acls to: root
+26/11/13 07:14:59 INFO SecurityManager: Changing view acls groups to: 
+26/11/13 07:14:59 INFO SecurityManager: Changing modify acls groups to: 
+26/11/13 07:14:59 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/13 07:15:00 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:39615 after 99 ms (0 ms spent in bootstraps)
+26/11/13 07:15:00 INFO SecurityManager: Changing view acls to: root
+26/11/13 07:15:00 INFO SecurityManager: Changing modify acls to: root
+26/11/13 07:15:00 INFO SecurityManager: Changing view acls groups to: 
+26/11/13 07:15:00 INFO SecurityManager: Changing modify acls groups to: 
+26/11/13 07:15:00 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/13 07:15:00 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:39615 after 3 ms (0 ms spent in bootstraps)
+26/11/13 07:15:00 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/blockmgr-af937db0-8b53-4bb2-9f70-71bfacca0336
+26/11/13 07:15:00 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/13 07:15:00 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:39615
+26/11/13 07:15:00 INFO ResourceUtils: ==============================================================
+26/11/13 07:15:00 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/13 07:15:00 INFO ResourceUtils: ==============================================================
+26/11/13 07:15:00 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/13 07:15:00 INFO Executor: Starting executor ID 7 on host localhost
+26/11/13 07:15:00 INFO Executor: OS info Linux, 6.18.44-fc-v445, amd64
+26/11/13 07:15:00 INFO Executor: Java version 17.0.21.0.3
+26/11/13 07:15:00 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 43515.
+26/11/13 07:15:00 INFO NettyBlockTransferService: Server created on localhost:43515
+26/11/13 07:15:00 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/13 07:15:01 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(7, localhost, 43515, None)
+26/11/13 07:15:01 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(7, localhost, 43515, None)
+26/11/13 07:15:01 INFO BlockManager: Initialized BlockManager: BlockManagerId(7, localhost, 43515, None)
+26/11/13 07:15:01 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/container_1794552556368_0004_01_000009/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/container_1794552556368_0004_01_000009/__app__.jar'
+26/11/13 07:15:01 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@758b8efd for default.
+26/11/13 07:15:01 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 36
+26/11/13 07:15:01 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 37
+26/11/13 07:15:01 INFO Executor: Running task 4.2 in stage 3.0 (TID 36)
+26/11/13 07:15:01 INFO Executor: Running task 1.2 in stage 3.0 (TID 37)
+26/11/13 07:15:01 INFO MapOutputTrackerWorker: Updating epoch to 1 and clearing cache
+26/11/13 07:15:01 INFO TorrentBroadcast: Started reading broadcast variable 2 with 1 pieces (estimated total size 4.0 MiB)
+26/11/13 07:15:01 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:44433 after 7 ms (0 ms spent in bootstraps)
+26/11/13 07:15:01 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 87.8 KiB, free 741.5 MiB)
+26/11/13 07:15:01 INFO TorrentBroadcast: Reading broadcast variable 2 took 99 ms
+26/11/13 07:15:01 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 318.8 KiB, free 741.2 MiB)
+26/11/13 07:15:02 INFO CodeGenerator: Code generated in 274.212874 ms
+26/11/13 07:15:02 INFO BaseAllocator: Debug mode disabled.
+26/11/13 07:15:02 INFO DefaultAllocationManagerOption: allocation manager type not specified, using netty as the default type
+26/11/13 07:15:02 INFO CheckAllocator: Using DefaultAllocationManager at memory-netty-12.0.1.jar!/org/apache/arrow/memory/DefaultAllocationManagerFactory.class
+26/11/13 07:15:03 INFO CodeGenerator: Code generated in 40.658049 ms
+26/11/13 07:15:03 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/13 07:15:03 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/13 07:15:03 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/13 07:15:03 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/13 07:15:04 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/13 07:15:04 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/13 07:15:04 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/13 07:15:04 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/13 07:15:04 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/13 07:15:04 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/13 07:15:04 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/13 07:15:04 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/13 07:15:05 INFO CodecConfig: Compression: SNAPPY
+26/11/13 07:15:05 INFO CodecConfig: Compression: SNAPPY
+26/11/13 07:15:05 INFO CodecConfig: Compression: SNAPPY
+26/11/13 07:15:05 INFO CodecConfig: Compression: SNAPPY
+26/11/13 07:15:05 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/13 07:15:05 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/13 07:15:05 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "geo",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 id;
+  optional binary geo (STRING);
+}
+
+       
+26/11/13 07:15:05 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "geo",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 id;
+  optional binary geo (STRING);
+}
+
+       
+26/11/13 07:15:06 ERROR CoarseGrainedExecutorBackend: RECEIVED SIGNAL TERM
+26/11/13 07:15:06 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/13 07:15:06 INFO MemoryStore: MemoryStore cleared
+26/11/13 07:15:06 INFO BlockManager: BlockManager stopped
+26/11/13 07:15:06 INFO ShutdownHookManager: Shutdown hook called

@@ -5,32 +5,32 @@ Interpretation and UI mapping live in `EVENT_LOG_FORMAT.md`.
 
 ## Event counts per reference app
 
-| Event | ref00 | ref01 | ref02 | ref03 | ref04 | ref05 | ref06 | ref07 | ref08 | ref09 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `SparkListenerLogStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerResourceProfileAdded` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerBlockManagerAdded` | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 |
-| `SparkListenerEnvironmentUpdate` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerApplicationStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerExecutorAdded` | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 |
-| `SparkListenerSQLExecutionStart` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  | 2 |
-| `SparkListenerSQLAdaptiveExecutionUpdate` | 4 | 6 |  | 6 | 13 | 3 | 8 | 12 |  | 6 |
-| `SparkListenerDriverAccumUpdates` | 7 | 14 | 12 | 12 | 11 | 2 | 8 | 15 |  | 6 |
-| `SparkListenerJobStart` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 | 7 |
-| `SparkListenerStageSubmitted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 | 7 |
-| `SparkListenerTaskStart` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 | 139 |
-| `SparkListenerTaskEnd` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 | 139 |
-| `SparkListenerStageCompleted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 | 7 |
-| `SparkListenerJobEnd` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 | 7 |
-| `SparkListenerSQLExecutionEnd` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  | 2 |
-| `SparkListenerApplicationEnd` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
-| `SparkListenerBlockUpdated` |  |  |  |  | 103 |  |  |  |  |  |
-| `SparkListenerUnpersistRDD` |  |  |  |  | 1 |  |  |  |  |  |
-| `SparkListenerBlockManagerRemoved` |  |  |  |  |  | 1 |  |  |  |  |
-| `SparkListenerExecutorRemoved` |  |  |  |  |  | 2 |  |  |  |  |
-| `SparkListenerTaskGettingResult` |  |  |  |  |  |  |  | 3 |  |  |
+| Event | ref00 | ref01 | ref02 | ref03 | ref04 | ref05 | ref06 | ref07 | ref08 | ref09 | ref10 | ref10 | ref11 | ref11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `SparkListenerLogStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerResourceProfileAdded` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerBlockManagerAdded` | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 4 | 6 | 6 | 12 | 13 |
+| `SparkListenerEnvironmentUpdate` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerApplicationStart` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerExecutorAdded` | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 3 | 5 | 5 | 11 | 12 |
+| `SparkListenerSQLExecutionStart` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  | 2 | 2 | 2 | 2 | 2 |
+| `SparkListenerSQLAdaptiveExecutionUpdate` | 4 | 6 |  | 6 | 13 | 3 | 8 | 12 |  | 6 | 3 | 3 | 2 | 2 |
+| `SparkListenerDriverAccumUpdates` | 7 | 14 | 12 | 12 | 11 | 2 | 8 | 15 |  | 6 | 3 | 3 | 2 | 2 |
+| `SparkListenerJobStart` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 | 7 | 4 | 4 | 3 | 3 |
+| `SparkListenerStageSubmitted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 | 7 | 4 | 4 | 3 | 3 |
+| `SparkListenerTaskStart` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 | 139 | 36 | 36 | 44 | 48 |
+| `SparkListenerTaskEnd` | 715 | 30 | 57 | 138 | 60 | 68 | 17 | 50 | 145 | 139 | 37 | 37 | 42 | 44 |
+| `SparkListenerStageCompleted` | 7 | 10 | 12 | 10 | 13 | 7 | 9 | 17 | 12 | 7 | 4 | 4 | 3 | 3 |
+| `SparkListenerJobEnd` | 7 | 10 | 5 | 10 | 13 | 4 | 9 | 17 | 6 | 7 | 4 | 4 | 3 | 3 |
+| `SparkListenerSQLExecutionEnd` | 5 | 2 | 2 | 2 | 5 | 2 | 4 | 8 |  | 2 | 2 | 2 | 2 | 2 |
+| `SparkListenerApplicationEnd` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `SparkListenerBlockUpdated` |  |  |  |  | 103 |  |  |  |  |  |  |  |  |  |
+| `SparkListenerUnpersistRDD` |  |  |  |  | 1 |  |  |  |  |  |  |  |  |  |
+| `SparkListenerBlockManagerRemoved` |  |  |  |  |  | 1 |  |  |  |  | 4 | 4 | 9 | 10 |
+| `SparkListenerExecutorRemoved` |  |  |  |  |  | 2 |  |  |  |  | 8 | 8 | 16 | 14 |
+| `SparkListenerTaskGettingResult` |  |  |  |  |  |  |  | 3 |  |  |  |  |  |  |
 
-Apps: `ref00-datagen`, `ref01-daily-etl-aqe`, `ref02-static-plan-spill`, `ref03-skew-join`, `ref04-cache-reuse`, `ref05-failures`, `ref06-python-udf`, `ref07-driver-bound`, `ref08-rdd-api`, `ref09-speculation`
+Apps: `ref00-datagen`, `ref01-daily-etl-aqe`, `ref02-static-plan-spill`, `ref03-skew-join`, `ref04-cache-reuse`, `ref05-failures`, `ref06-python-udf`, `ref07-driver-bound`, `ref08-rdd-api`, `ref09-speculation`, `ref10-pmem-abort_1`, `ref10-pmem-abort_2`, `ref11-max-executor-failures_1`, `ref11-max-executor-failures_2`
 
 ## Field trees
 

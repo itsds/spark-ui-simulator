@@ -188,6 +188,9 @@ def hadoop_site(c: ClusterSpec, nm_local_dirs: str, nm_log_dirs: str) -> dict[st
         "yarn.nodemanager.log-dirs": nm_log_dirs,
         "yarn.nodemanager.vmem-check-enabled": "false",
         "yarn.nodemanager.pmem-check-enabled": "true",
+        # Hadoop 3.3.6 skips the polling pmem kill while this is true (its default, meant for cgroups): a
+        # cluster that kills containers for physical memory runs with it off (ref10, ADR-040)
+        "yarn.nodemanager.resource.memory.enforced": "false",
         "yarn.nodemanager.recovery.enabled": "true",
         "yarn.nodemanager.recovery.dir": "/var/lib/hadoop-yarn/yarn-nm-recovery",
         "yarn.nodemanager.aux-services": "mapreduce_shuffle,spark_shuffle",

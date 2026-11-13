@@ -714,3 +714,84 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   sorter's peak, so a spilling sort-merge join task's Peak Execution Memory (Scenario 02's "pinned at 2.4 GiB")
   would read higher in real Spark; the forced spill of a reading sorter's last run when the writer needs memory
   isn't modelled either.
+
+## ADR-040 — ref10/ref11: failed applications captured on YARN; the NodeManager's pmem check needs `memory.enforced=false`
+
+- **Date:** 2026-11-13
+- **Status:** accepted
+- **Context:** Scenario 03 needs a job aborted by `spark.task.maxFailures` after pmem kills, a FAILED application
+  and YARN's second attempt. No reference log had a failed application or a second attempt. The first capture
+  succeeded: the NodeManager logged containers at 2.3 GB of 2 GB and never killed them. Hadoop 3.3.6's
+  `ContainersMonitorImpl.checkLimit` (javap) returns early while `yarn.nodemanager.resource.memory.enforced` is
+  true (its default, which assumes cgroups enforce the limit) and elastic memory control is off.
+- **Decision:** the reference cluster's yarn-site sets `resource.memory.enforced=false` (the polling check kills),
+  and so does the simulated cluster's (Environment tab: Hadoop Properties), since our scenarios show pmem kills.
+  `ref10-pmem-abort` (a Python worker of one partition maps 1.6 GB; a concurrent JVM map stage) and
+  `ref11-max-executor-failures` (every task maps 1.2 GB) were captured in both YARN attempts, the driver at INFO
+  (`common.session(driver_log_level=...)`), and stored per attempt (`<name>_<attempt>`; `capture.sh`
+  `EXPECT_FAILED`). What they settled is in EVENT_LOG_FORMAT.md §6.4: the order and content of the abort events,
+  `Stage cancelled: …` kills, AQE's `Job N cancelled `, the JobFailed stack traces (and the `runJob` race that
+  appends caller frames), `Resubmitted` map tasks without the shuffle service, the failed AM's log lines (it
+  unregisters only on its last attempt), the Python traceback in the AM's stdout, attempt 2's container ids
+  and timing. ref11 was meant to reach the AM's `spark.executor.maxNumFailures`; it did not: 3.5.9's
+  YarnAllocator counts only "Container from a bad node" exits towards it, never pmem/vmem kills (javap).
+- **Consequences:** the golden test re-derives both logs (a `Resubmitted` TaskEnd repeats its first TaskEnd's
+  accumulables; a stage none of whose tasks merged takes its task-metric ids from a killed task's updates);
+  `test_reference_logs.py` allows `Resubmitted` duplicates and per-attempt logs; the reference HS fixture counts
+  apps, not files. Every scenario's Environment tab gains one Hadoop property (the event logs change, nothing
+  else).
+
+## ADR-041 — Job abort, failed applications and YARN attempts in the engine
+
+- **Date:** 2026-11-13
+- **Status:** accepted; extends ADR-022 and ADR-036
+- **Context:** until now the scheduler raised `TaskSetAborted` at the 4th failure of a task index and nothing
+  handled it; every run produced one successful application.
+- **Decision:**
+  - `TaskScheduler.abort` (TaskSetManager.abort): the task set turns zombie, `on_abort` tells the driver; the
+    executor's other lost tasks are handled in the same loop; an aborted set leaves the pool when its last attempt
+    ends (`on_removed`: "Removed TaskSet …"). `cancel()` is `cancelTasks` (kill without interrupt unless
+    `spark.job.interruptOnCancel`).
+  - The DAGScheduler's abort is one event-loop step (`_task_set_aborted` → `_fail_job` → `_job_failed_end`):
+    the stage fails with "Job aborted due to stage failure: …\nDriver stacktrace:", its running attempts are
+    killed with "Stage cancelled: …", the JobEnd carries JobFailed with the 15 DAGScheduler frames; task
+    completions that arrive meanwhile are posted after the JobEnd (`_dag_busy_until`), so they merge nothing.
+    AQE then cancels the query's other running jobs ("Job N cancelled ", 6 frames); a running broadcast job or a
+    failing write job (FileFormatWriter's "Aborting job" path) is refused, not faked, until a reference shows it.
+  - The query raises `QueryFailed`: SQLExecutionEnd with the error, the PySpark driver exits with status 1
+    (traceback in the AM's stdout), "Final app status: FAILED, exitCode: 1", the shutdown hook stops the
+    SparkContext; nothing is posted after that.
+  - `run_attempts`: a failed attempt that isn't the last (`spark.yarn.maxAppAttempts`, capped by the RM's 2) is
+    followed by the next, 2.6–5.2 s later: same cluster, data and submit time (`AppSpec.data_seed`,
+    `submitted_at_ms`), new randomness, attempt-numbered containers and event log. The last attempt unregisters.
+  - `prepare` writes every attempt's log and records them in the manifest (`event_logs`); the portal shows one
+    row of History Server links per attempt; `hs_api`, `evidence.Ctx` and `stack_check.py` take an attempt.
+- **Consequences:** successful runs are byte-identical to before (checked against `main` for 00/09 and their
+  shared runs). The AM's executor-failure limit is not modelled (pmem kills don't count towards it; ADR-040).
+  Lost-task order within one executor loss stays by task id (Spark iterates a HashMap): it decides which index is
+  named in the abort message and which lost TaskEnds come after the JobEnd.
+
+## ADR-042 — Scenario 03: a UDF that memory-maps a 2.0 GiB file in every task
+
+- **Date:** 2026-11-13
+- **Status:** accepted
+- **Context:** the roadmap's candidates were a native library per task, `--executor-cores 4 → 6`, or Arrow
+  buffers. Experiments on the simulation showed that memory spread evenly over every task of a JVM job rarely
+  ends an application: executors die and are replaced, retries land on fresh executors and succeed, the job
+  limps on (35–150 kills, +5 to +55 %). Cores 4 → 6 with a uniform per-task footprint either survives or needs
+  a footprint the 4-core runs can't afford either. The "failed 4 times" ending needs memory that every task of a
+  stage brings with it, large against the container's headroom.
+- **Decision:** release 2.4 of the clickstream job adds `geo_city` through `geoip_city(ip_address)`, a Java UDF
+  from a shared jar whose instances (one per task) each open and memory-map the vendor's 2.0 GiB IP database
+  (`--files`). New model inputs: `Func.native_bytes` / `native_log` / `native_scope` (what a function holds
+  outside the heap per task or per executor JVM, and the line its library logs), summed per stage and added to
+  the NodeManager's RSS check as the task's lookups touch the file (`UDF_NATIVE_RAMP`); `Workload.dist_resources`
+  (`spark.yarn.dist.jars/files`, localized by each NodeManager before the app's first container on it,
+  `LOCALIZE_MBPS`, and listed in the AM's launch context). That a file mapped by N tasks counts N times in RSS was
+  checked in this sandbox (3 mappings of a 300 MB file: 911 MB RSS) and follows from `/proc/<pid>/stat`'s RSS.
+  The schema now accepts a code change (a workload param other than `dt`) as an incident's cause.
+- **Consequences:** both attempts fail (~150 kills each), the heap stays under 4 GiB of 16 GiB, the fix is
+  in the container's overhead (`10g`) or in the UDF (one reader per JVM, plus `4g`); `--executor-memory 24g`
+  turns the failure into a coin flip (verified). The ticket's suggestion of more heap is the trap. Not modelled:
+  mappings of finished tasks that linger until a GC collects their readers (real JVMs can be worse), page cache
+  pressure on the host.

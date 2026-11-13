@@ -1,0 +1,58 @@
+/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/pyspark.zip/pyspark/context.py:354: RuntimeWarning: Failed to add file [file:///home/user/spark-ui-simulator/reference/jobs/common.py] specified in 'spark.submit.pyFiles' to Python path:
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/filecache/22
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/spark-8b9abefb-8834-422f-99c1-7993142fb8e7/userFiles-8624929a-8ee3-45bc-bba0-7bce890d6968
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/filecache/10/spark-libs.zip/spark-core_2.12-3.5.9.jar
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/__pyfiles__
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/pyspark.zip
+  /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/py4j-0.10.9.7-src.zip
+  /usr/lib/python311.zip
+  /usr/lib/python3.11
+  /usr/lib/python3.11/lib-dynload
+  /home/user/spark-ui-simulator/.venv/lib/python3.11/site-packages
+  /home/user/spark-ui-simulator/src
+  warnings.warn(
+Traceback (most recent call last):
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/ref10_pmem_abort.py", line 84, in <module>
+    geo.join(scores, "customer_id").write.mode("overwrite").parquet(table("ref10_enriched"))
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/pyspark.zip/pyspark/sql/readwriter.py", line 1721, in parquet
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/py4j-0.10.9.7-src.zip/py4j/java_gateway.py", line 1322, in __call__
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/pyspark.zip/pyspark/errors/exceptions/captured.py", line 179, in deco
+  File "/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0003/container_1794552556368_0003_01_000001/py4j-0.10.9.7-src.zip/py4j/protocol.py", line 326, in get_return_value
+py4j.protocol.Py4JJavaError: An error occurred while calling o130.parquet.
+: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 3.0 failed 4 times, most recent failure: Lost task 0.3 in stage 3.0 (TID 34) (localhost executor 2): ExecutorLostFailure (executor 2 exited caused by one of the running tasks) Reason: Container killed by YARN for exceeding physical memory limits. 2.8 GB of 2 GB physical memory used. Consider boosting spark.executor.memoryOverhead.
+Driver stacktrace:
+	at org.apache.spark.scheduler.DAGScheduler.failJobAndIndependentStages(DAGScheduler.scala:2898)
+	at org.apache.spark.scheduler.DAGScheduler.$anonfun$abortStage$2(DAGScheduler.scala:2834)
+	at org.apache.spark.scheduler.DAGScheduler.$anonfun$abortStage$2$adapted(DAGScheduler.scala:2833)
+	at scala.collection.mutable.ResizableArray.foreach(ResizableArray.scala:62)
+	at scala.collection.mutable.ResizableArray.foreach$(ResizableArray.scala:55)
+	at scala.collection.mutable.ArrayBuffer.foreach(ArrayBuffer.scala:49)
+	at org.apache.spark.scheduler.DAGScheduler.abortStage(DAGScheduler.scala:2833)
+	at org.apache.spark.scheduler.DAGScheduler.$anonfun$handleTaskSetFailed$1(DAGScheduler.scala:1253)
+	at org.apache.spark.scheduler.DAGScheduler.$anonfun$handleTaskSetFailed$1$adapted(DAGScheduler.scala:1253)
+	at scala.Option.foreach(Option.scala:407)
+	at org.apache.spark.scheduler.DAGScheduler.handleTaskSetFailed(DAGScheduler.scala:1253)
+	at org.apache.spark.scheduler.DAGSchedulerEventProcessLoop.doOnReceive(DAGScheduler.scala:3102)
+	at org.apache.spark.scheduler.DAGSchedulerEventProcessLoop.onReceive(DAGScheduler.scala:3036)
+	at org.apache.spark.scheduler.DAGSchedulerEventProcessLoop.onReceive(DAGScheduler.scala:3025)
+	at org.apache.spark.util.EventLoop$$anon$1.run(EventLoop.scala:49)
+	at org.apache.spark.scheduler.DAGScheduler.runJob(DAGScheduler.scala:995)
+	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2393)
+	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2414)
+	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2433)
+	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2458)
+	at org.apache.spark.rdd.RDD.$anonfun$collect$1(RDD.scala:1049)
+	at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)
+	at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:112)
+	at org.apache.spark.rdd.RDD.withScope(RDD.scala:410)
+	at org.apache.spark.rdd.RDD.collect(RDD.scala:1048)
+	at org.apache.spark.sql.execution.SparkPlan.executeCollectIterator(SparkPlan.scala:455)
+	at org.apache.spark.sql.execution.exchange.BroadcastExchangeExec.$anonfun$relationFuture$1(BroadcastExchangeExec.scala:140)
+	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$2(SQLExecution.scala:224)
+	at org.apache.spark.JobArtifactSet$.withActiveJobArtifactState(JobArtifactSet.scala:94)
+	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$1(SQLExecution.scala:219)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+

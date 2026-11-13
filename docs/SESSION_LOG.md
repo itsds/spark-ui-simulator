@@ -447,3 +447,50 @@ what was done, what's next, gotchas.
     `scripts/evidence.Ctx`.
 - **Gotchas:** the reference cluster's `yarn-site.xml` already has `pmem-check-enabled=true`,
   `minimum-allocation-mb=512`; a second NodeManager (`REF_SECOND_NM=1`) helps tasks fail on different hosts.
+
+## 2026-11-13 (evening) — Phase 10: Scenario 03 (YARN memoryOverhead kills), job abort, YARN attempt 2
+
+- **Done:**
+  - Real references on the YARN reference cluster (ADR-040): `ref10-pmem-abort` and `ref11-max-executor-failures`,
+    both FAILED in both YARN attempts, the driver at INFO (`common.session(driver_log_level=...)`), one log per
+    attempt (`<name>_<attempt>`, `capture.sh EXPECT_FAILED`). Found on the way: Hadoop 3.3.6 never poll-kills
+    while `yarn.nodemanager.resource.memory.enforced` is true (its default) → the reference yarn-site and the
+    simulated cluster's Hadoop properties set it false; pmem kills never count towards the AM's
+    `spark.executor.maxNumFailures` (javap). EVENT_LOG_FORMAT.md §6.4 has the abort's event order, messages,
+    stack traces, the failed AM's lines and attempt 2. Golden test: `Resubmitted` TaskEnds; stages with no
+    merged task.
+  - Engine (ADR-041): `TaskScheduler.abort` / `cancel`, the DAGScheduler's abort in one event-loop step
+    (`_dag_busy_until`), AQE cancelling sibling jobs, `QueryFailed` → SQLExecutionEnd error → the driver's exit
+    → `Final app status: FAILED`; `run_attempts` (attempt 2 on the same cluster and data: `AppSpec.data_seed`,
+    `submitted_at_ms`); driver log, AM stdout (Py4JJavaError traceback), killed tasks in executor logs.
+    Successful runs are byte-identical to `main` (checked for 00/09 + shared runs in a worktree).
+  - Multi-attempt plumbing: `prepare` (all attempts, manifest `event_logs`), portal (one link row per attempt,
+    ready when the HS lists every attempt), `hs_api --app-attempt` + `attempts()`, `evidence.Ctx(attempt)` /
+    `.attempts`, `stack_check.py`, `screenshot.py --app-attempt`; `hs_api.validate` knows the HS keeps 91–100
+    dead executors (`spark.ui.retainedDeadExecutors`).
+  - Scenario 03 (ADR-042): release 2.4 adds `geoip_city(ip_address)` (workload params `geo_udf`, `geo_reader`),
+    a Java UDF that memory-maps a 2.0 GiB IP database in every task (`Func.native_bytes`, `--files` via
+    `Workload.dist_resources`, NodeManager localization). Last good 2026-11-11 (app 49641, 5.5 min), incident
+    2026-11-12 (app 49822): 4.0 + 4.4 min, both attempts FAILED, ~150 executor kills each, heap peak 3.8 of
+    16 GiB. Ticket (Airflow alert, "more executor memory" suggestion), 8 hints, solution with 13 evidence values
+    (`tests/test_scenario03_hs.py`), side-by-side, interview answer; `tests/test_scenario03.py` verifies the
+    fixes (`memoryOverhead=10g` 7.3 min; one reader per JVM + `4g` 7.2 min) and the non-fixes (24g: a coin flip;
+    2 cores; the fixed UDF alone). The schema accepts a code change (a workload param) as the incident's cause.
+  - `uv run pytest`: 286 passed (~8 min, integration included); ruff clean; `sparksim up` +
+    `scripts/stack_check.py` pass for Scenario 03 (both attempts' pages and log links).
+- **Next:** 12 (fetch failure / stage retry): lost shuffle files without the shuffle service, FetchFailed,
+  map-stage resubmission. ref05 has it for real; ref10 attempt 2 adds `Resubmitted` map tasks (the
+  executor-lost path without ESS), and the engine's abort/cancel machinery is in place.
+- **Gotchas:**
+  - Hadoop + JDK 17 are not in the image: `apt-get install -y openjdk-17-jdk-headless`, Hadoop 3.3.6 from
+    `downloads.apache.org` → `/opt/hadoop`. Stop the reference cluster before running nm-logs: its NodeManager
+    holds port 8042.
+  - Uniform per-task native memory rarely fails a JVM app in the simulation (and in life): executors die,
+    retries succeed elsewhere. The "failed 4 times" ending needs memory every task of a stage brings with it.
+  - A UDF's expressions are not in Spark's formatted explain (Project prints Output/Input only): they're in the
+    SQL page's plan-graph node descriptions (`SparkPlanInfo.simpleString`), which `evidence.py` reads from HTML.
+  - The NM mock HTML-escapes log text (`&quot;`): unescape before matching.
+  - The harness required branch `claude/zen-babbage-uebsw0`.
+- **Still open:** FileFormatWriter's "Aborting job" path (a write job that fails) and a running broadcast job
+  cancelled by a failed query are refused (no real reference); mappings of finished tasks lingering until GC;
+  the AM's executor-failure limit for non-pmem exits; `ExceptionFailure` tasks.

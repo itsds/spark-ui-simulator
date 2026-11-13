@@ -1,0 +1,55 @@
+# Scenario 03: the nightly enrichment fails after release 2.4 adds a geo_city column. The new column comes
+# from the data platform's shared UDF jar: geoip_city(ip_address), a Java UDF that opens its own reader on
+# the vendor's IP database in every task and memory-maps the whole 1.3 GiB file. The NodeManager's
+# physical-memory check sums the RSS of the container's processes, and the RSS counts the mapped pages each
+# task's lookups touch, once per mapping: four running tasks hold up to ~5 GiB outside the JVM heap, in a
+# container that leaves 2 GiB over the 16 GiB heap. Executors die once their heap has grown; their running
+# tasks fail with ExecutorLostFailure and count towards spark.task.maxFailures, the retried tasks land on
+# other executors that die too, a task fails a 4th time, the job and the app fail, and YARN's second
+# attempt fails the same way.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 03-memory-overhead-kills
+id: 03-memory-overhead-kills
+title: "The enrichment failed twice on YARN after the geo release"
+difficulty: medium
+topics: [YARN container memory, memoryOverhead, executor loss, task retries, failed jobs, YARN app attempts]
+summary: >-
+  The night after release 2.4 of the clickstream enrichment, the job failed. YARN retried it once and the
+  second attempt failed too. Find out why from the History Server and the container logs, and decide what
+  to change so that tonight's run succeeds.
+
+job:                                          # the same job and cluster as 00
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377          # the active RM (rm1) started 2026-10-13 14:35 UTC
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # the cron wrapper's spark-submit (as in 00)
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false
+
+runs:
+  last_good:
+    label: "Last good run: 2026-11-11 (dt=2026-11-10), release 2.3"
+    app_seq: 49641
+    seed: 20261110
+    started_at: "2026-11-11T02:10:06.522Z"
+    params: {dt: "2026-11-10"}
+  incident:
+    label: "Incident run: 2026-11-12 (dt=2026-11-11), release 2.4"
+    app_seq: 49822
+    seed: 20261111
+    started_at: "2026-11-12T02:10:08.140Z"
+    # Release 2.4 (deployed 2026-11-11 15:20 UTC): geo_city = geoip_city(ip_address) from dp-udfs 2.3.1,
+    # shipped with --jars and the database with --files. Nothing else changed: same submit options, same
+    # executors, the same data volume.
+    params: {dt: "2026-11-11", geo_udf: true}

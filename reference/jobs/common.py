@@ -35,11 +35,12 @@ else:
     os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
 
-def session(name: str, conf: dict | None = None) -> SparkSession:
-    """SparkSession whose event log lands in <EVENTLOG_BASE>/<name>/ (exactly one file).
+def session(name: str, conf: dict | None = None, driver_log_level: str = "WARN") -> SparkSession:
+    """SparkSession whose event log lands in <EVENTLOG_BASE>/<name>/ (exactly one file per YARN attempt).
 
     In yarn mode, master/memory/cores come from spark-submit (see capture.sh) and
-    the log directory is created on HDFS by capture.sh beforehand.
+    the log directory is created on HDFS by capture.sh beforehand. The driver logs at WARN unless a job
+    needs the driver's INFO lines as format truth (ref10: the AM and DAGScheduler lines of a failed app).
     """
     log_dir = f"{EVENTLOG_BASE}/{name}"
     b = SparkSession.builder.appName(name)
@@ -68,7 +69,7 @@ def session(name: str, conf: dict | None = None) -> SparkSession:
     spark = b.getOrCreate()
     if MODE != "yarn":
         spark.sparkContext.addPyFile(__file__)  # executors unpickle helpers from this module
-    spark.sparkContext.setLogLevel("WARN")
+    spark.sparkContext.setLogLevel(driver_log_level)
     return spark
 
 

@@ -569,3 +569,6 @@ class SqlQuery:
     action: str = "parquet"  # call site: "<action> at NativeMethodAccessorImpl.java:0"
     planning_ms: tuple[int, int] = (350, 900)  # analysis + optimization + physical planning on the driver
     think_ms: tuple[int, int] = (150, 1_200)  # Python driver code before the action
+    # Where the action is in the PySpark script (the traceback when it raises): line number and source line.
+    source_line: int = 0
+    source: str = ""

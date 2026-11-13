@@ -41,7 +41,7 @@ import numpy as np
 
 from ..cost import calibration as cal
 from ..cost.model import StageContext, TaskEnv, TaskPlan, TaskResult, killed_metrics, simulate_task
-from ..environment import CLUSTER_SPARK_DEFAULTS, PySparkYarnApp, spark_properties
+from ..environment import CLUSTER_SPARK_DEFAULTS, PySparkYarnApp, hadoop_defaults, spark_properties
 from ..eventlog import (
     SHUFFLE_READ_ACCUMS,
     ExecutorLostFailure,
@@ -127,6 +127,15 @@ class AppSpec:
     # Fault injection (sparksim.scenario.faults): inputs of the simulation, never its outputs.
     native_memory_per_task: int = 0  # bytes of native memory each running task holds in its container
     executor_kills: tuple[ExecutorKill, ...] = ()
+    # YARN application attempt (`run_attempts`): a failed attempt that isn't the last is followed by the next
+    # one, with the same submission, cluster and data (`data_seed`) and its own randomness (`seed`).
+    attempt: int = 1
+    submitted_at_ms: int | None = None  # spark-submit time of attempt 1 (spark.app.submitTime)
+    data_seed: int | None = None  # the cluster and the input data (default: seed)
+    # spark-submit --jars / --files on HDFS (spark.yarn.dist.*): (hdfs path, bytes). Every NodeManager
+    # localizes them before the app's first container on it starts; hosts in `localized_hosts` have them.
+    dist_resources: tuple[tuple[str, int], ...] = ()
+    localized_hosts: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -217,6 +226,9 @@ class StageRecord:
     task_binary_bc: int | None = None
     scan_bcs: list[int] = field(default_factory=list)  # Hadoop conf broadcasts of its scans
     epoch: int = 0  # MapOutputTracker epoch its tasks carry
+    failure: str | None = None  # StageInfo.failureReason: the stage was aborted or cancelled
+    abort_tid: int | None = None  # the lost attempt whose failure aborted it (spark.task.maxFailures)
+    native_funcs: list = field(default_factory=list)  # functions it evaluates that hold memory outside the heap
 
 
 @dataclass
@@ -229,6 +241,8 @@ class JobRecord:
     props: dict[str, str]
     completed: int | None = None
     done: Signal | None = None
+    failure: str | None = None  # JobFailed's exception message
+    cancelled: bool = False  # failed by cancellation (handleJobCancellation), not by its own stage
 
 
 @dataclass
@@ -238,6 +252,12 @@ class QueryRecord:
     start: int
     end: int | None = None
     job_ids: list[int] = field(default_factory=list)
+    error: str | None = None  # SQLExecutionEnd.errorMessage
+    failed: Signal | None = None  # fires when one of its jobs fails
+
+
+class QueryFailed(Exception):
+    """The action's job failed: Py4JJavaError in the PySpark driver (nothing catches it)."""
 
 
 # --------------------------------------------------------------------------- run
@@ -247,11 +267,15 @@ class AppRun:
     def __init__(self, spec: AppSpec):
         self.spec = spec
         seed = spec.seed
+        self.world_seed = world = spec.seed if spec.data_seed is None else spec.data_seed
         self.rng = substream(seed, "driver")
-        self.cluster: Cluster = build_cluster(spec.cluster, seed)
-        self.yapp = YarnApp(spec.cluster.cluster_timestamp, spec.app_seq, epoch=spec.cluster.rm_epoch)
+        self.cluster: Cluster = build_cluster(spec.cluster, world)
+        self.yapp = YarnApp(spec.cluster.cluster_timestamp, spec.app_seq, attempt=spec.attempt,
+                            epoch=spec.cluster.rm_epoch)
         self.t0 = iso_ms(spec.started_at)
         self.submit_time = self.t0 - self.rng.randint(*spec.submit_to_start_ms)
+        if spec.submitted_at_ms is not None:
+            self.submit_time = spec.submitted_at_ms
 
         # YARN: the AM container (driver), then Spark's YarnAllocator asks the RM for executor containers.
         conf = {**CLUSTER_SPARK_DEFAULTS, **dict(spec.conf)}  # the cluster's spark-defaults.conf, then --conf
@@ -285,10 +309,10 @@ class AppRun:
         self.executor_java_opts = ""
         self.stopping = False
         self.scheduling_started: int | None = None
-        self.hdfs = Hdfs(self.cluster, substream(seed, "hdfs"))
+        self.hdfs = Hdfs(self.cluster, substream(world, "hdfs"))
         for d in spec.inputs:
             self.hdfs.create_dataset(d.path, d.files, d.mean_file_bytes, d.file_size_sigma, d.bytes_per_row,
-                                     _upstream_file_namer(substream(seed, f"names/{d.path}")),
+                                     _upstream_file_namer(substream(world, f"names/{d.path}")),
                                      row_group_bytes=d.row_group_bytes)
         am = self.am_host
         self.env_app = PySparkYarnApp(
@@ -351,11 +375,46 @@ class AppRun:
         self.epoch = 0  # MapOutputTrackerMaster epoch: +1 per finished map stage and per lost executor
         self.scan_split_bytes: dict[str, tuple[int, int]] = {}  # path -> (maxSplitBytes, openCost)
         self.app_end: int | None = None
+        # YARN retries a failed AM up to spark.yarn.maxAppAttempts, capped by the RM's am.max-attempts (2).
+        rm_max = int(hadoop_defaults()["yarn.resourcemanager.am.max-attempts"])
+        self.max_app_attempts = min(int(conf.get("spark.yarn.maxAppAttempts", rm_max)), rm_max)
+        # How the driver program ended (the AM's "Final app status"); a failed query ends it with status 1.
+        self.final_status = "SUCCEEDED"
+        self.exit_code = 0
+        self.failed_query: QueryRecord | None = None
+        # The DAGScheduler's event loop handles an abort in one go (kill the stage's attempts, StageCompleted,
+        # clean-up, JobEnd): task completions that arrive meanwhile are processed, and their TaskEnds posted,
+        # after it (ref10: the executor's other lost tasks and the killed attempts follow the JobEnd).
+        self._dag_busy_until: int | None = None
+        # NodeManager localization of the dist resources: hosts that have them, hosts downloading them (until)
+        self.localized: set[str] = set(spec.localized_hosts) | {self.am_host.name}
+        self._localizing: dict[str, int] = {}
+
+    def localization_done(self, host: Host, t: int) -> int:
+        """When a container launched on `host` at `t` can start: after its NodeManager has localized the app's
+        dist resources (one download per host and user; containers launched meanwhile wait for it)."""
+        size = sum(b for _, b in self.spec.dist_resources)
+        if not size or host.name in self.localized:
+            return t
+        done = self._localizing.get(host.name)
+        if done is None:
+            done = self._localizing[host.name] = t + int(size / (cal.LOCALIZE_MBPS * MiB) * 1000)
+        return max(t, done)
+
+    @property
+    def last_attempt(self) -> bool:
+        """The AM unregisters (and deletes the staging dir) only on its last attempt."""
+        return self.spec.attempt >= self.max_app_attempts
 
     # ------------------------------------------------------------------ helpers
 
     def _record(self, kind: str, payload, t: int | None = None) -> None:
-        self.log.append((self.sim.now if t is None else t, kind, payload))
+        if self.stopping and kind == "task_end":  # the DAGScheduler stopped with the SparkContext: never posted
+            return
+        t = self.sim.now if t is None else t
+        if kind == "task_end" and self._dag_busy_until is not None and t <= self._dag_busy_until:
+            t = self._dag_busy_until + 1
+        self.log.append((t, kind, payload))
 
     def _jitter(self, lo_hi: tuple[int, int]) -> int:
         return self.rng.randint(*lo_hi)
@@ -407,9 +466,29 @@ class AppRun:
             yield any_of(self.sim, [self.ready, timeout])
         self.scheduling_started = self.sim.now
         self.sched.start()
-        for qi, q in enumerate(self.spec.queries):
-            yield from self._run_query(qi, q)
+        try:
+            for qi, q in enumerate(self.spec.queries):
+                yield from self._run_query(qi, q)
+        except QueryFailed:
+            yield from self._driver_failed()
+            return
         yield self._jitter(self.spec.stop_ms)
+        self.stopping = True
+        self.allocator.stop()
+        self.app_end = self.sim.now
+
+    def _driver_failed(self):
+        """The action raised: AQE cleans up, SQLExecutionEnd carries the error, the Py4JJavaError ends the
+        Python driver with status 1, the AM finishes the attempt as FAILED and its shutdown hook stops the
+        SparkContext (ref10). The remaining queries never run."""
+        qrec = self.failed_query
+        yield self._jitter(cal.QUERY_FAIL_TO_SQL_END_MS)
+        qrec.end = self.sim.now
+        self._record("sql_end", qrec)
+        self.final_status, self.exit_code = "FAILED", 1
+        yield self._jitter(cal.FAILED_DRIVER_EXIT_MS)
+        self.yarn_log.append((self.sim.now, "user_app_exited", 1))
+        yield self.rng.randint(2, 9)  # the AM's finish(), then its shutdown hook stops the SparkContext
         self.stopping = True
         self.allocator.stop()
         self.app_end = self.sim.now
@@ -444,14 +523,19 @@ class AppRun:
         if self.stopping or ex.nm_kill_at is not None:
             return
         now = self.sim.now
-        exec_mem, fetching, running = 0.0, 0, 0
+        exec_mem, fetching, running, native = 0.0, 0, 0, 0.0
         for a in self.sched.running.get(ex.id, {}).values():
             rec = self.task_records[a.task_id]
             frac = (now - rec.launch) / max(1, rec.finish - rec.launch)
             exec_mem += rec.result.exec_memory * min(1.0, frac / 0.7)
             fetching += rec.result.fetching
             running += 1
-        rss = mem.check(now, running, exec_mem, fetching, len(self.exec_stages.get(ex.id, ())))
+            for f in self.stages[rec.stage_id].native_funcs:  # mapped pages the task's lookups have touched
+                if f.native_scope == "task":
+                    native += f.native_bytes * min(1.0, frac / cal.UDF_NATIVE_RAMP)
+        for f, since in ex.extra.get("native_opened", {}).items():  # one per JVM, open from its first task on
+            native += f.native_bytes * min(1.0, max(0, now - since[0]) / max(1, since[1]))
+        rss = mem.check(now, running, exec_mem, fetching, len(self.exec_stages.get(ex.id, ())), native)
         ex.extra["peak_rss"] = max(ex.extra.get("peak_rss", 0), rss)
         if rss > mem.limit:
             t_exit = now + self.rng.randint(*cal.JVM_SIGTERM_EXIT_MS)
@@ -577,6 +661,7 @@ class AppRun:
         """One DataFrame action = one SQL execution, run by AdaptiveSparkPlanExec (AQE on, the default)."""
         yield self._jitter(q.think_ms)
         qrec = QueryRecord(qi, q.description, self.sim.now)
+        qrec.failed = self.sim.signal()
         self.queries.append(qrec)
         logical = q.build(self.spark)
         aqe = AdaptiveExecution(logical, self._plan_context(), self._coalescer, name_prefix=f"e{qi}.")
@@ -610,8 +695,12 @@ class AppRun:
             waiting = [sig for sid, sig in materialized.items() if not sig.fired]
             if not waiting:
                 raise RuntimeError(f"query {q.description!r}: AQE has no running stage to wait for")
-            yield any_of(self.sim, waiting)
+            yield any_of(self.sim, [*waiting, qrec.failed])
+            if qrec.failed.fired:  # a query stage failed: AdaptiveSparkPlanExec rethrows (cleanUpAndThrowException)
+                raise QueryFailed(qrec.error)
             yield self._jitter(cal.AQE_REPLAN_MS)
+            if qrec.failed.fired:
+                raise QueryFailed(qrec.error)
             for sid, sig in materialized.items():
                 st = stages[sid]
                 if sig.fired and not st.materialized:
@@ -624,7 +713,11 @@ class AppRun:
         lineage = self.scope_sim.materialize_write(aqe.root.current)
         self._stage_driver_metrics(qrec, aqe.root.current)
         final = self._submit_job(qi, q, aqe, None, lineage, qrec)
-        yield final
+        yield any_of(self.sim, [final, qrec.failed])
+        if qrec.failed.fired:
+            raise NotImplementedError(
+                f"query {q.description!r}: its write job failed. FileFormatWriter's 'Aborting job' path (the "
+                "committer's abortJob, the error log) has no real reference yet (ref10 fails in a map stage)")
         stage = self.stages[self.jobs[-1].final_stage]
         files = [t.result.output_file for t in stage.tasks if t.ok and t.result.output_file]
         commit = int(cal.JOB_COMMIT_FIXED_MS + len(files) * cal.JOB_COMMIT_MS_PER_FILE * self.rng.uniform(0.85, 1.2))
@@ -757,7 +850,9 @@ class AppRun:
                          on_finish=lambda a, st=stage: self._on_finish(st, a),
                          on_fail=lambda a, st=stage: self._on_fail(st, a),
                          on_kill=lambda a, st=stage: self._on_kill(st, a),
-                         records_of=self._records_read)
+                         records_of=self._records_read,
+                         on_abort=lambda i, a, st=stage: self._task_set_aborted(st, job, qrec, i, a),
+                         on_removed=lambda st=stage: self.yarn_log.append((self.sim.now, "taskset_removed", st)))
             stage.taskset = ts
             ts.done = self.sim.signal()
             ts.done.wait(lambda: self.sim.after(self._jitter(cal.STAGE_COMPLETE_DELAY_MS), stage_completed))
@@ -788,6 +883,74 @@ class AppRun:
 
         self.sim.after(self._jitter(cal.JOB_TO_STAGE_MS), submit_stage)
         return materialized
+
+    # ------------------------------------------------------------------ failed jobs (DAGScheduler)
+
+    def _task_set_aborted(self, stage: StageRecord, job: JobRecord, qrec: QueryRecord, index: int,
+                          a: Launch) -> None:
+        """`TaskSetManager.abort` after a task index's `spark.task.maxFailures`-th failure (an executor loss
+        caused by the app): taskSetFailed → abortStage → failJobAndIndependentStages, then AQE cancels the
+        query's other running jobs (ref10). The executor's other lost tasks are handled after the abort and
+        post their TaskEnds after the JobEnd."""
+        if job.failure is not None:
+            return
+        rec = self.task_records[a.task_id]
+        ex, reason, _ = self._loss_reason
+        err = f"ExecutorLostFailure (executor {ex.id} exited caused by one of the running tasks) Reason: {reason}"
+        msg = (f"Job aborted due to stage failure: Task {index} in stage {stage.stage_id}.{stage.attempt} failed "
+               f"{self.sched.max_failures} times, most recent failure: Lost task {index}.{rec.task_attempt} in "
+               f"stage {stage.stage_id}.{stage.attempt} (TID {a.task_id}) ({ex.host.name} executor {ex.id}): "
+               f"{err}\nDriver stacktrace:")
+        stage.abort_tid = a.task_id
+        job.failure = msg
+        if qrec.error is None:
+            qrec.error = msg
+            self.failed_query = qrec
+        t_stage = self.sim.now + self._jitter(cal.ABORT_STAGE_DELAY_MS)
+        t_job = t_stage + self._jitter(cal.ABORT_JOB_END_MS)
+        self._dag_busy_until = max(self._dag_busy_until or 0, t_job)
+        self.sim.at(t_stage, self._fail_job, job, stage, msg, t_job, qrec)
+
+    def _fail_job(self, job: JobRecord, stage: StageRecord, msg: str, t_job: int, qrec: QueryRecord) -> None:
+        """failJobAndIndependentStages: cancelTasks on the job's running stage (kill its running attempts with
+        "Stage cancelled: <msg>", the TaskSetManager turns zombie), markStageAsFinished with the failure, then
+        the JobEnd (JobFailed)."""
+        interrupt = job.props.get("spark.job.interruptOnCancel") == "true"
+        self.yarn_log.append((self.sim.now, "stage_cancelled", (stage, msg)))
+        self.sched.cancel(stage.taskset, "Stage cancelled: " + msg, interrupt)
+        stage.failure = msg
+        stage.completed = self.sim.now
+        self._record("stage_completed", stage)
+        self.sim.at(t_job, self._job_failed_end, job, qrec)
+
+    def _job_failed_end(self, job: JobRecord, qrec: QueryRecord) -> None:
+        job.completed = self.sim.now
+        self._record("job_end", job)
+        if job.cancelled:
+            return
+        qrec.failed.fire()
+        # AdaptiveSparkPlanExec.cleanUpAndThrowException cancels the query's other running query stages
+        others = [j for j in self.jobs if j.query == job.query and j.completed is None and j.failure is None]
+        if others:
+            self.sim.after(self._jitter(cal.AQE_CANCEL_MS), self._cancel_jobs, others, qrec)
+
+    def _cancel_jobs(self, jobs: list[JobRecord], qrec: QueryRecord) -> None:
+        """`DAGScheduler.handleJobCancellation`: "Job N cancelled " (no reason given), its stage cancelled."""
+        for job in jobs:
+            if job.completed is not None:
+                continue
+            stage = self.stages[job.final_stage]
+            if job.props.get("spark.job.tags", "").startswith("broadcast exchange"):
+                raise NotImplementedError("a running broadcast job cancelled by a failed query: its job-tag "
+                                          "cancellation has no real reference yet")
+            self.yarn_log.append((self.sim.now, "job_cancel_asked", job))
+            job.failure = f"Job {job.job_id} cancelled "
+            job.cancelled = True
+            if stage.submitted is None:
+                raise NotImplementedError(f"job {job.job_id} cancelled before its stage was submitted")
+            t_job = self.sim.now + self._jitter(cal.JOB_END_DELAY_MS)
+            self._dag_busy_until = max(self._dag_busy_until or 0, t_job)
+            self._fail_job(job, stage, job.failure, t_job, qrec)
 
     def _broadcast_built(self, qrec, stage: StageRecord, job: JobRecord, spec: StageSpec, materialized: Signal):
         """BroadcastExchangeExec.relationFuture after the collect job: build the HashedRelation, broadcast it."""
@@ -845,14 +1008,15 @@ class AppRun:
         rec.scan_bcs = [self.scan_bc[id(s.node)] for s in spec.sources
                         if isinstance(s, ScanSource) and id(s.node) in self.scan_bc]
         rec.plan_root = plan_root
+        rec.native_funcs = _native_funcs(plan_root)
         out_ex = None
         if isinstance(spec.sink, ShuffleSink):
             sink = spec.sink
             distinct_rows = sink.unique_keys or (spec.ops and spec.ops[-1].kind == "partial_agg")
-            if distinct_rows:
-                shares = cluster = key_shares(sink.key, sink.num_partitions, self.spec.seed)
+            if distinct_rows:  # where the data's keys land: the same in every attempt
+                shares = cluster = key_shares(sink.key, sink.num_partitions, self.world_seed)
             else:
-                shares, cluster = row_shares_split(sink.key, sink.num_partitions, self.spec.seed)
+                shares, cluster = row_shares_split(sink.key, sink.num_partitions, self.world_seed)
             out_ex = ShuffleExchange(sink.exchange, self.shuffle_ids.next(), len(plans), sink.num_partitions, shares,
                                      cluster_shares=cluster)
             self.exchanges[sink.exchange] = out_ex
@@ -864,7 +1028,7 @@ class AppRun:
             self.fetch_batch_prop = True  # ShuffledRowRDD sets this thread-local property once created
         self.stages[sid] = rec
         self.stage_rng[sid] = substream(self.spec.seed, f"tasks/{sid}")
-        self.stage_nprng[sid] = numpy_rng(self.spec.seed, f"blocks/{sid}")
+        self.stage_nprng[sid] = numpy_rng(self.world_seed, f"blocks/{sid}")
         return rec
 
     def _scan_partitions(self, scan: ScanSource):
@@ -946,6 +1110,10 @@ class AppRun:
                          a.launch_time, a.launch_time + res.duration_ms, st.task_type, res, touched,
                          task_attempt=a.attempt, speculative=a.speculative)
         rec.sql = sqlm.task_updates(st.plan_root, res)
+        for f in st.native_funcs:  # an executor-wide resource: opened by the first task that needs it
+            if f.native_scope == "executor":
+                ex.extra.setdefault("native_opened", {}).setdefault(
+                    f, (a.launch_time, int(res.duration_ms * cal.UDF_NATIVE_RAMP)))
         st.tasks.append(rec)
         self.task_records[a.task_id] = rec
         self.exec_stages[ex.id].add(st.stage_id)
@@ -1030,6 +1198,52 @@ class AppRun:
             st._job_uuid = uuid.UUID(int=substream(self.spec.seed, f"jobuuid/{st.stage_id}").getrandbits(128),
                                      version=4)
         return f"part-{index:05d}-{st._job_uuid}.c000.snappy.parquet"
+
+
+def run_attempts(spec: AppSpec) -> list[AppRun]:
+    """One YARN application: its first attempt and, while an attempt fails and is not the last, the next one.
+    A new attempt is a new AM container (`container_<…>_02_000001`), a new SparkContext and new executors on
+    the same cluster and data, `AM_RETRY_TO_START_MS` after the failed attempt's SparkContext stopped."""
+    from dataclasses import replace
+
+    runs = [AppRun(spec).run()]
+    while runs[-1].final_status != "SUCCEEDED" and not runs[-1].last_attempt:
+        prev = runs[-1]
+        n = prev.spec.attempt + 1
+        r = substream(spec.seed, f"yarn-attempt/{n}")
+        start = prev.app_end + r.randint(*cal.AM_RETRY_TO_START_MS)
+        hosts = prev.localized | {e.host.name for e in prev.executors} | set(prev._localizing)
+        nxt = replace(spec, attempt=n, seed=r.getrandbits(48), data_seed=prev.world_seed,
+                      started_at=datetime.fromtimestamp(start / 1000, UTC).isoformat(timespec="milliseconds"),
+                      submitted_at_ms=prev.submit_time, localized_hosts=frozenset(hosts))
+        runs.append(AppRun(nxt).run())
+    return runs
+
+
+def _native_funcs(plan) -> list:
+    """The functions a stage's operators evaluate that hold memory outside the heap (not into query stages)."""
+    from ..sql.expr import Expr, Func
+
+    out: list = []
+
+    def expr(e) -> None:
+        if isinstance(e, Func) and e.native_bytes and e not in out:
+            out.append(e)
+        if isinstance(e, Expr):
+            for c in e.children():
+                expr(c)
+
+    def visit(n) -> None:
+        if n is None or isinstance(n, sqln.QueryStage):
+            return
+        for v in vars(n).values():
+            for e in v if isinstance(v, (list, tuple)) else (v,):
+                expr(e)
+        for c in n.children:
+            visit(c)
+
+    visit(plan)
+    return out
 
 
 def _scans(plan) -> list:

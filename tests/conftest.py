@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import socket
 import subprocess
 import time
@@ -85,6 +86,7 @@ def run_nm_logs(log_dir: Path):
 @pytest.fixture(scope="session")
 def history_server():
     """Real History Server on reference/event-logs."""
-    expected = len([p for p in REFERENCE_LOGS.iterdir() if p.is_file()])
+    # one app per log, except apps with several YARN attempts: <name>_1, <name>_2 (ref10, ref11)
+    expected = len({re.sub(r"_\d+$", "", p.name) for p in REFERENCE_LOGS.iterdir() if p.is_file()})
     with run_history_server(REFERENCE_LOGS, expected) as url:
         yield url

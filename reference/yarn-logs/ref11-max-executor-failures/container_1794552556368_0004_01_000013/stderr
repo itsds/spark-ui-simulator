@@ -1,0 +1,67 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/13 07:15:12 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 15033@vm
+26/11/13 07:15:12 INFO SignalUtils: Registering signal handler for TERM
+26/11/13 07:15:12 INFO SignalUtils: Registering signal handler for HUP
+26/11/13 07:15:12 INFO SignalUtils: Registering signal handler for INT
+26/11/13 07:15:12 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/13 07:15:12 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/13 07:15:12 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/13 07:15:12 INFO SecurityManager: Changing view acls to: root
+26/11/13 07:15:12 INFO SecurityManager: Changing modify acls to: root
+26/11/13 07:15:12 INFO SecurityManager: Changing view acls groups to: 
+26/11/13 07:15:12 INFO SecurityManager: Changing modify acls groups to: 
+26/11/13 07:15:12 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/13 07:15:13 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:39615 after 70 ms (0 ms spent in bootstraps)
+26/11/13 07:15:13 INFO SecurityManager: Changing view acls to: root
+26/11/13 07:15:13 INFO SecurityManager: Changing modify acls to: root
+26/11/13 07:15:13 INFO SecurityManager: Changing view acls groups to: 
+26/11/13 07:15:13 INFO SecurityManager: Changing modify acls groups to: 
+26/11/13 07:15:13 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/13 07:15:13 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:39615 after 2 ms (0 ms spent in bootstraps)
+26/11/13 07:15:13 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/blockmgr-c1796e80-4e01-4e16-9fbd-6b4b9eb96db5
+26/11/13 07:15:13 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/13 07:15:13 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:39615
+26/11/13 07:15:13 INFO ResourceUtils: ==============================================================
+26/11/13 07:15:13 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/13 07:15:13 INFO ResourceUtils: ==============================================================
+26/11/13 07:15:13 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/13 07:15:13 INFO Executor: Starting executor ID 10 on host localhost
+26/11/13 07:15:13 INFO Executor: OS info Linux, 6.18.44-fc-v445, amd64
+26/11/13 07:15:13 INFO Executor: Java version 17.0.21.0.3
+26/11/13 07:15:13 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 34295.
+26/11/13 07:15:13 INFO NettyBlockTransferService: Server created on localhost:34295
+26/11/13 07:15:13 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/13 07:15:13 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(10, localhost, 34295, None)
+26/11/13 07:15:13 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(10, localhost, 34295, None)
+26/11/13 07:15:13 INFO BlockManager: Initialized BlockManager: BlockManagerId(10, localhost, 34295, None)
+26/11/13 07:15:13 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/container_1794552556368_0004_01_000013/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794552556368_0004/container_1794552556368_0004_01_000013/__app__.jar'
+26/11/13 07:15:13 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@758b8efd for default.
+26/11/13 07:15:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 42
+26/11/13 07:15:13 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 43
+26/11/13 07:15:13 INFO Executor: Running task 3.3 in stage 3.0 (TID 43)
+26/11/13 07:15:13 INFO Executor: Running task 0.3 in stage 3.0 (TID 42)
+26/11/13 07:15:14 INFO MapOutputTrackerWorker: Updating epoch to 1 and clearing cache
+26/11/13 07:15:14 INFO TorrentBroadcast: Started reading broadcast variable 2 with 1 pieces (estimated total size 4.0 MiB)
+26/11/13 07:15:14 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:37629 after 3 ms (0 ms spent in bootstraps)
+26/11/13 07:15:14 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 87.8 KiB, free 741.5 MiB)
+26/11/13 07:15:14 INFO TorrentBroadcast: Reading broadcast variable 2 took 121 ms
+26/11/13 07:15:14 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 318.8 KiB, free 741.2 MiB)
+26/11/13 07:15:14 INFO CodeGenerator: Code generated in 203.842774 ms
+26/11/13 07:15:15 INFO Executor: Executor is trying to kill task 0.3 in stage 3.0 (TID 42), reason: Stage cancelled: Job aborted due to stage failure: Task 1 in stage 3.0 failed 4 times, most recent failure: Lost task 1.3 in stage 3.0 (TID 41) (localhost executor 9): ExecutorLostFailure (executor 9 exited caused by one of the running tasks) Reason: Container killed by YARN for exceeding physical memory limits. 3.0 GB of 2 GB physical memory used. Consider boosting spark.executor.memoryOverhead.
+Driver stacktrace:
+26/11/13 07:15:15 INFO Executor: Executor is trying to kill task 3.3 in stage 3.0 (TID 43), reason: Stage cancelled: Job aborted due to stage failure: Task 1 in stage 3.0 failed 4 times, most recent failure: Lost task 1.3 in stage 3.0 (TID 41) (localhost executor 9): ExecutorLostFailure (executor 9 exited caused by one of the running tasks) Reason: Container killed by YARN for exceeding physical memory limits. 3.0 GB of 2 GB physical memory used. Consider boosting spark.executor.memoryOverhead.
+Driver stacktrace:
+26/11/13 07:15:15 INFO BaseAllocator: Debug mode disabled.
+26/11/13 07:15:15 INFO DefaultAllocationManagerOption: allocation manager type not specified, using netty as the default type
+26/11/13 07:15:15 INFO CheckAllocator: Using DefaultAllocationManager at memory-netty-12.0.1.jar!/org/apache/arrow/memory/DefaultAllocationManagerFactory.class
+26/11/13 07:15:15 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/13 07:15:15 INFO YarnCoarseGrainedExecutorBackend: Driver from 192.0.2.2:39615 disconnected during shutdown
+26/11/13 07:15:15 INFO YarnCoarseGrainedExecutorBackend: Driver from 192.0.2.2:39615 disconnected during shutdown
+26/11/13 07:15:15 INFO MemoryStore: MemoryStore cleared
+26/11/13 07:15:15 INFO BlockManager: BlockManager stopped
+26/11/13 07:15:15 INFO ShutdownHookManager: Shutdown hook called
+26/11/13 07:15:15 INFO CodeGenerator: Code generated in 22.88401 ms
+26/11/13 07:15:15 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/13 07:15:15 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/13 07:15:15 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/13 07:15:15 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false

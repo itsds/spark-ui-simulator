@@ -49,8 +49,10 @@
       const info = st.apps[app];
       if (!info) return;
       run.dataset.ready = String(info.state === "ready");
-      run.querySelectorAll(".hs-links a[data-page]").forEach((a) => {
-        a.href = st.history_server.url.replace(/\/$/, "") + "/history/" + app + "/" + info.attempt + "/" + a.dataset.page;
+      run.querySelectorAll(".hs-links[data-attempt]").forEach((nav) => {
+        nav.querySelectorAll("a[data-page]").forEach((a) => {
+          a.href = st.history_server.url.replace(/\/$/, "") + "/history/" + app + "/" + nav.dataset.attempt + "/" + a.dataset.page;
+        });
       });
       const note = run.querySelector(".run-note");
       const text = noteFor(app, info, info.scenarios);

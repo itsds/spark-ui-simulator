@@ -62,10 +62,13 @@ model/   cluster.py   racks, NodeManagers (+ other tenants' load), container siz
          shuffle.py   block matrices records[map, reducer], local/remote reads, AQE coalescing
 cost/    calibration.py ([ref]/[norm] constants), model.py: one task's phases → TaskMetrics
 sched/   sim.py (event heap, signals, generator processes), scheduler.py (TaskSchedulerImpl + TaskSetManager:
-         delay scheduling, executor loss, speculative execution with kills that take effect when the executor acts)
+         delay scheduling, executor loss, abort at spark.task.maxFailures, speculative execution with kills that
+         take effect when the executor acts)
 engine/  runtime.py   the driver: executors register, one AdaptiveExecution per query, its query stages → jobs,
                       skipped stages, SQL events and driver metrics, write → new HDFS files; executor loss
-                      (disconnect → loss reason → ExecutorLostFailure, re-run), broadcasts, MapOutputTracker epoch
+                      (disconnect → loss reason → ExecutorLostFailure, re-run), broadcasts, MapOutputTracker epoch;
+                      a failed job (DAGScheduler abort, AQE cancels its siblings) fails the query, the PySpark
+                      driver and the YARN attempt; run_attempts() runs the next attempt (ADR-041)
          yarn_am.py   YARN in the simulation (Phase 5): RM grants at NodeManager heartbeats (absolute asks,
                       over-allocation), Spark's YarnAllocator loop (200 ms doubling to 3 s), container launch,
                       NodeManager memory monitor (pmem kill, Hadoop diagnostics), completed containers → reasons
@@ -166,6 +169,12 @@ what upstream wrote.
   node" for other exits, ExecutorLostFailure for the running tasks, a
   replacement container; dynamic allocation with the external shuffle service
   (idle executors: "Executor killed by driver.").
+- A job whose task index fails `spark.task.maxFailures` times is aborted: the stage and the job fail, running
+  attempts are killed ("Stage cancelled: …"), AQE cancels the query's other jobs, the PySpark driver exits with
+  status 1, the AM reports FAILED and YARN runs attempt 2 (`<app>_2`, `container_…_02_…`); the History Server
+  lists both attempts (ref10/ref11, ADR-040/041).
+- Native memory a UDF holds outside the heap (`Func.native_bytes`, per task or per JVM) counts in the container's
+  RSS; `--jars` / `--files` are localized by each NodeManager before the app's first container there.
 - `spark.yarn.exclude.nodes`: the AM's excluded node list, so the RM grants no container on those hosts.
 - Speculative execution (`spark.speculation`): copies of slow tasks on other hosts, the losers killed
   ("another attempt succeeded", "Stage finished"), as in the real two-NodeManager capture `ref09`.

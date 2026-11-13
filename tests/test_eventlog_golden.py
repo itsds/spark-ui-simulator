@@ -16,6 +16,7 @@ import pytest
 from sparksim.eventlog import (
     INTERNAL_ACCUM_OFFSETS,
     INTERNAL_METRICS_PREFIX,
+    TASK_METRIC_ACCUMS,
     AccumulatorDef,
     DriverLedger,
     JobEnd,
@@ -28,6 +29,7 @@ from sparksim.eventlog import (
     TaskKilled,
     read_event_log,
 )
+from sparksim.eventlog.reasons import Resubmitted, Success
 
 INTERNAL_ACCUM_NAMES = {off: name for name, off in INTERNAL_ACCUM_OFFSETS.items()}
 
@@ -45,6 +47,14 @@ def internal_bases(events) -> dict[tuple[int, int], int]:
                     base = a.id - INTERNAL_ACCUM_OFFSETS[a.name[len(INTERNAL_METRICS_PREFIX):]]
                     key = (ev.stage_id, ev.stage_attempt_id)
                     assert bases.setdefault(key, base) == base, f"stage {key}: task-metric IDs not one block"
+    for ev in events:  # a stage attempt none of whose tasks merged (all lost or killed late, ref10): its
+        # killed tasks' nameless updates start at the first non-zero task metric in registration order
+        key = (getattr(ev, "stage_id", None), getattr(ev, "stage_attempt_id", None))
+        if (isinstance(ev, TaskEnd) and isinstance(ev.reason, TaskKilled) and ev.reason.accum_updates
+                and ev.task_metrics is not None and key not in bases):
+            first = next(name for name, path in TASK_METRIC_ACCUMS
+                         if path is not None and (ev.task_metrics.get(path) != 0 or name == "resultSize"))
+            bases[key] = min(a.id for a in ev.reason.accum_updates) - INTERNAL_ACCUM_OFFSETS[first]
     return bases
 
 
@@ -54,6 +64,7 @@ def rederive(events):
     bases = internal_bases(events)
     undeclared: set[int] = set()
     job_stages: dict[int, set[int]] = {}  # active jobs -> their stage ids
+    succeeded: dict[int, list] = {}  # task id -> the Accumulables its Success TaskEnd listed
     for i, ev in enumerate(events):
         if isinstance(ev, JobStart):
             job_stages[ev.job_id] = set(ev.stage_ids)
@@ -66,6 +77,12 @@ def rederive(events):
         elif isinstance(ev, StageSubmitted):
             si = ev.stage_info
             ledger.register_stage_attempt(si.stage_id, si.attempt_id, bases.get((si.stage_id, si.attempt_id), -1))
+        elif isinstance(ev, TaskEnd) and isinstance(ev.reason, Resubmitted):
+            # TaskSetManager.executorLost (no shuffle service): a finished map task's output died with its
+            # executor. Its second TaskEnd reuses the same TaskInfo object, accumulables included, and
+            # merges nothing (no task metrics): ref10.
+            yield (f"line {i + 1} Resubmitted TaskEnd TID {ev.task_info.task_id}",
+                   succeeded[ev.task_info.task_id], ev.task_info.accumulables)
         elif isinstance(ev, TaskEnd):
             real = ev.task_info.accumulables
             touched = {a.name[len(INTERNAL_METRICS_PREFIX):] for a in real if a.is_task_metric and a.update == 0}
@@ -85,6 +102,8 @@ def rederive(events):
                        ledger.failure_updates(ev.stage_id, ev.stage_attempt_id, ev.task_metrics, tried), upd)
             derived = ledger.task_end(ev.stage_id, ev.stage_attempt_id, ev.reason, ev.task_metrics,
                                       touched=touched, external=external)
+            if isinstance(ev.reason, Success):
+                succeeded[ev.task_info.task_id] = derived
             yield f"line {i + 1} TaskEnd TID {ev.task_info.task_id}", derived, real
         elif isinstance(ev, StageCompleted):
             si = ev.stage_info

@@ -41,7 +41,8 @@ def _generate(a) -> int:
     for role in ([a.run] if a.run else sc.roles):
         path = generate_app(sc, role, a.out, logs, seed=a.seed)
         label = sc.model.runs[role].label
-        print(f"{role:9s} {sc.app_id(role)}  {label}\n          wrote {path}"
+        written = ", ".join(str(p) for p in sorted(path.parent.glob(f"{sc.app_id(role)}_*")))  # one per YARN attempt
+        print(f"{role:9s} {sc.app_id(role)}  {label}\n          wrote {written}"
               + (f" (+ container logs under {logs})" if logs else ""))
     return 0
 
