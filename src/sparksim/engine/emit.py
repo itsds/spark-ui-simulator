@@ -195,6 +195,8 @@ def build_events(run: AppRun) -> list[Event]:
             tl.add(t, ExecutorAdded(ex.registered_at, ex.id, info))
         elif kind == "block_manager_added":
             ex = obj
+            if t > run.app_end:  # registered while the SparkContext stopped: its listener bus is gone
+                continue
             bm = BlockManagerId(ex.id, ex.host.name, ex.block_manager_port)
             tl.add(t, BlockManagerAdded(bm, ex.max_memory, ex.block_manager_at, ex.max_memory, 0))
         elif kind == "block_manager_removed":

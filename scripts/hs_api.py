@@ -30,6 +30,9 @@ import requests
 DEFAULT_URL = "http://localhost:18080"
 
 
+RETAINED_DEAD_EXECUTORS = 100  # spark.ui.retainedDeadExecutors (the History Server's default)
+
+
 class HistoryServer:
     def __init__(self, base_url: str = DEFAULT_URL):
         self.base = base_url.rstrip("/") + "/api/v1"
@@ -92,6 +95,7 @@ def log_counts(path: Path) -> dict:
     stage_attempts = set()
     task_ids = set()  # a Resubmitted map task ends twice with the same id
     executors = set()
+    removed = set()
     for e in read_events(path):
         name = e["Event"].rsplit(".", 1)[-1]
         ev[name] += 1
@@ -104,6 +108,8 @@ def log_counts(path: Path) -> dict:
             stage_attempts.add((si["Stage ID"], si["Stage Attempt ID"]))
         elif name == "SparkListenerExecutorAdded":
             executors.add(e["Executor ID"])
+        elif name == "SparkListenerExecutorRemoved":
+            removed.add(e["Executor ID"])
     return {
         "app_id": app_id,
         "attempt": attempt,
@@ -111,6 +117,7 @@ def log_counts(path: Path) -> dict:
         "stage_attempts": len(stage_attempts),
         "tasks": len(task_ids),
         "executors": executors,
+        "removed": removed,
         "sql": ev["SparkListenerSQLExecutionStart"],
         "events": ev,
     }
@@ -145,8 +152,12 @@ def validate(hs: HistoryServer, log_dir: Path) -> int:
             for k, v in got.items():
                 if v != want[k]:
                     problems.append(f"{k}: log={want[k]} server={v}")
+            # AppStatusListener keeps the latest spark.ui.retainedDeadExecutors (100) dead executors: past that it
+            # deletes the oldest max(10, dead - 100) at a time, so 91-100 of them stay (ref: AppStatusListener)
             missing = want["executors"] - execs
-            if missing:
+            kept = len(want["removed"]) - len(missing)
+            lo = RETAINED_DEAD_EXECUTORS - RETAINED_DEAD_EXECUTORS // 10
+            if missing and (not missing <= want["removed"] or not lo < kept <= RETAINED_DEAD_EXECUTORS):
                 problems.append(f"executors missing on server: {sorted(missing)}")
         status = "OK  " if not problems else "FAIL"
         failures += bool(problems)

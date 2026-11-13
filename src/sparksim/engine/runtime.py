@@ -531,7 +531,10 @@ class AppRun:
             fetching += rec.result.fetching
             running += 1
             for f in self.stages[rec.stage_id].native_funcs:  # mapped pages the task's lookups have touched
-                native += f.native_bytes * min(1.0, frac / cal.UDF_NATIVE_RAMP)
+                if f.native_scope == "task":
+                    native += f.native_bytes * min(1.0, frac / cal.UDF_NATIVE_RAMP)
+        for f, since in ex.extra.get("native_opened", {}).items():  # one per JVM, open from its first task on
+            native += f.native_bytes * min(1.0, max(0, now - since[0]) / max(1, since[1]))
         rss = mem.check(now, running, exec_mem, fetching, len(self.exec_stages.get(ex.id, ())), native)
         ex.extra["peak_rss"] = max(ex.extra.get("peak_rss", 0), rss)
         if rss > mem.limit:
@@ -1107,6 +1110,10 @@ class AppRun:
                          a.launch_time, a.launch_time + res.duration_ms, st.task_type, res, touched,
                          task_attempt=a.attempt, speculative=a.speculative)
         rec.sql = sqlm.task_updates(st.plan_root, res)
+        for f in st.native_funcs:  # an executor-wide resource: opened by the first task that needs it
+            if f.native_scope == "executor":
+                ex.extra.setdefault("native_opened", {}).setdefault(
+                    f, (a.launch_time, int(res.duration_ms * cal.UDF_NATIVE_RAMP)))
         st.tasks.append(rec)
         self.task_records[a.task_id] = rec
         self.exec_stages[ex.id].add(st.stage_id)

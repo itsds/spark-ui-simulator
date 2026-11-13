@@ -107,8 +107,8 @@ class Scenario:
             if d.file_size_sigma is not None:
                 ch["file_size_sigma"] = d.file_size_sigma
             datasets[name] = replace(datasets[name], **ch)
-        setup = RunSetup(datasets=datasets, conf=[(k, spark_value(v)) for k, v in job.conf.items()],
-                         sizing=_sizing(job.executors), cluster=_cluster(job.cluster))
+        conf = [(k, spark_value(v)) for k, v in job.conf.items()] + wl.submit_conf(params)  # + --jars / --files
+        setup = RunSetup(datasets=datasets, conf=conf, sizing=_sizing(job.executors), cluster=_cluster(job.cluster))
         if job.executors.memory_overhead is not None and "spark.executor.memoryOverhead" not in job.conf:
             setup.conf.append(("spark.executor.memoryOverhead", spark_value(job.executors.memory_overhead)))
         for f in run.faults:
@@ -126,6 +126,7 @@ class Scenario:
             cluster=s.cluster, sizing=s.sizing, inputs=tuple(s.datasets.values()),
             queries=wl.queries(params, s.datasets), conf=tuple(s.conf), queue=job.queue,
             native_memory_per_task=s.native_per_task, executor_kills=tuple(s.executor_kills),
+            dist_resources=tuple(wl.dist_resources(params)),
         )
 
     def validate(self) -> None:

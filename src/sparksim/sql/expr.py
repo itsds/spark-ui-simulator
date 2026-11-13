@@ -225,6 +225,7 @@ class Func(Expr):
     # the line its library logs on the executor when a task opens it: (logger, message).
     native_bytes: int = 0
     native_log: tuple[str, str] | None = None
+    native_scope: str = "task"  # "task": every task holds its own; "executor": one per JVM, kept once opened
 
     def children(self):
         return tuple(a for a in self.args if isinstance(a, Expr))

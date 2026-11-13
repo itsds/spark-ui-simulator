@@ -285,8 +285,12 @@ class ScenarioModel(_Model):
             good, bad_run = self.runs["last_good"], self.runs["incident"]
             if good.faults:
                 raise ValueError("the last good run has no faults")
-            if not bad_run.faults:
-                raise ValueError("the incident run needs at least one fault: the injected cause")
+            # the injected cause: a fault, or a change of the job's code (a workload param other than the date,
+            # e.g. a release that adds a UDF: 03-memory-overhead-kills)
+            code_change = {k: v for k, v in bad_run.params.items() if k != "dt" and good.params.get(k) != v}
+            if not bad_run.faults and not code_change:
+                raise ValueError("the incident run needs at least one fault or code change (a workload param "
+                                 "other than dt): the injected cause")
             if good.started_at >= bad_run.started_at:
                 raise ValueError("the last good run starts before the incident run")
         elif self.runs["baseline"].faults:
