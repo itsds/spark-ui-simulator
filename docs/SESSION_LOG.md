@@ -423,3 +423,27 @@ what was done, what's next, gotchas.
 - **Still open:** summing operator peaks like Spark; AQE skew-join split and AQE's runtime SMJ → BHJ conversion
   (05's solution discusses both without simulated numbers); the reading sorter's forced spill when the shuffle
   writer needs memory.
+
+## 2026-11-13 (later) — Phase 10 plan: one scenario per session; Scenario 03 groundwork
+
+- **Done:** PR #11 (Scenario 05 + ADR-039) merged. Decided with the owner: **one scenario per session**, in the
+  order of the table in `docs/ROADMAP.md` (Phase 10+): 03 → 12 → 06 → 07 → 04 → 15 → 13 → 10 → 11 → 08 → 14 →
+  capstone(s), 12 sessions. Groundwork for 03: its checklist in the roadmap, design notes in `docs/SCENARIOS.md`
+  (row 03, three story candidates). No code changed.
+- **Next (session for 03):** start with the real reference `ref10-pmem-abort` (Hadoop 3.3.6 into `/opt/hadoop`
+  from `downloads.apache.org`, `reference/yarn/cluster.sh start`, a job whose tasks hold native memory beyond
+  `memoryOverhead` until the job aborts and the app fails in both YARN attempts). Then the engine's job abort,
+  multi-attempt runs (prepare / portal / evidence / HS tests), then the scenario.
+- **What 03 starts from:**
+  - `sched/scheduler.py` counts failures per task index and raises `TaskSetAborted` at `spark.task.maxFailures`
+    (4), which nothing handles yet; pmem kills, ExecutorLostFailure, re-runs and replacement containers work
+    (ADR-022, `tests/test_executor_loss.py`); `memory_pressure` sets native memory per running task.
+  - `reference/event-logs/ref05-failures` has a real job abort after 4 `ExceptionFailure`s (the app survives:
+    the script catches it) and an executor loss with FetchFailed + stage retry (Scenario 12's truth). No real
+    log of a *failed application* or of a second YARN attempt exists yet; ref04 once produced one by accident
+    (`container_…_02_000001`) but it was not kept.
+  - Single-attempt assumptions: `prepare.AppPlan.event_log_name` (`<app>_1`), `portal.server.hs_link`
+    (attempt "1"), `portal.status` (first attempt), `scripts/hs_api.HistoryServer.app_path` (first attempt),
+    `scripts/evidence.Ctx`.
+- **Gotchas:** the reference cluster's `yarn-site.xml` already has `pmem-check-enabled=true`,
+  `minimum-allocation-mb=512`; a second NodeManager (`REF_SECOND_NM=1`) helps tasks fail on different hosts.

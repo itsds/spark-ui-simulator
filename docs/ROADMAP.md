@@ -190,10 +190,30 @@ Goal: real Spark 3.5.9 event logs that we can trust as format and calibration tr
 
 ## Phase 10+ — Scenario library 🟨
 
-Work through `docs/SCENARIOS.md` in priority order. One branch per scenario: `scenario/<NN>-<slug>`.
-Each scenario is done when it has `scenario.yaml`, ticket, hints and solution, a test without the History
-Server (cause → symptoms, and the recommended fix verified in the simulation) and its evidence test
-against HS 3.5.9.
+**One scenario per session** (decided 2026-11-13, after Scenario 05 needed a whole session: half of it went
+into checking a detail against real Spark, which a rushed session would skip). Each scenario is done when it
+has `scenario.yaml`, ticket, hints and solution, a test without the History Server (cause → symptoms, and the
+recommended fix verified in the simulation) and its evidence test against HS 3.5.9. Where a scenario needs
+Spark behaviour the simulator doesn't have yet, check it against a real run first (a `reference/` capture on
+the YARN reference cluster, or a local PySpark run + `javap` of the 3.5.9 jars), as for ref09 and ADR-039.
+
+Order (12 sessions; the "needs" column is the simulator work before the scenario itself):
+
+| Session | Scenario | Needs |
+|---|---|---|
+| ✅ | 05 Missed broadcast join | done (ADR-038, ADR-039) |
+| **next** | **03 YARN memoryOverhead kills** | task failures → job abort → failed app, YARN app attempt 2 (see the checklist below) |
+| 2 | 12 Fetch failure / stage retry | lost shuffle files without the shuffle service, FetchFailed, map-stage resubmission (ref05 has it for real; builds on 03) |
+| 3 | 06 Partition pruning failure | the planner keeps `PartitionFilters: []` when the filter casts the partition column; a multi-day table |
+| 4 | 07 Exploding join | duplicate keys on the dimension side (`unique_right=False`): join output rows ≫ input |
+| 5 | 04 Small files / tiny tasks | an input of ~120k small files; check the event log size and the HS heap (1 GiB default) |
+| 6 | 15 Skewed / small-file output | `repartition(col)` in the DataFrame DSL, skewed write tasks, output file counts |
+| 7 | 13 Missing cache / recomputation | a workload reusing a DataFrame; cache / persist, RDD blocks, the Storage tab (ref04 has it for real) |
+| 8 | 10 Python UDF bottleneck | `BatchEvalPython` / `ArrowEvalPython` plan nodes, Python worker cost and logs (ref06 has them for real) |
+| 9 | 11 Driver bottleneck | driver-side time between jobs, `collect` / `toPandas` result sizes (ref07 has it for real) |
+| 10 | 08 GC pressure | a GC model that reacts to heap occupancy (object-heavy rows, cached deserialized data) |
+| 11 | 14 YARN queue starvation | queue capacity and other tenants in the RM model, a slow executor ramp-up |
+| 12 | ★ Capstone(s) | 2–3 faults combined, red herrings |
 
 - [x] 05 Missed broadcast join (`05-missed-broadcast-join`, ADR-038): the script before its `F.broadcast()`
       (workload param `broadcast_hint`), a platform default `spark.sql.autoBroadcastJoinThreshold=-1` from the
@@ -203,8 +223,26 @@ against HS 3.5.9.
       the UnsafeShuffleWriter's memory (ADR-039): its buffer counts in Peak Execution Memory of every map task
       with > 200 reduce partitions, and spills when a map task's output outgrows its memory (checked on a real
       3.5.9 run)
-- [ ] 03 YARN memoryOverhead kills (`memory_pressure`; needs task exceptions / job abort for "failed after 4 attempts")
-- [ ] the rest of `docs/SCENARIOS.md`
+- [ ] 03 YARN memoryOverhead kills (`03-memory-overhead-kills`). Design notes: `docs/SCENARIOS.md`, row 03.
+  - [ ] Real reference `ref10-pmem-abort` on the YARN reference cluster (pmem check is already on in
+        `reference/yarn/conf/yarn-site.xml`): native memory per task beyond `memoryOverhead` → NodeManager kills
+        (-104) → the same task index lost 4 times → job aborted → the PySpark driver exits with an uncaught
+        `Py4JJavaError` → AM `Final app status: FAILED` → YARN starts app attempt 2 (cluster mode,
+        `yarn.resourcemanager.am.max-attempts` 2) → attempt 2 fails the same way. Keep both attempts' event logs
+        (`<app>_1`, `<app>_2`) and container logs (attempt 2's containers are `…_02_…`). What to read off it:
+        the abort events (TaskSetManager abort, StageCompleted `Failure Reason`, JobEnd `JobFailed`, running
+        tasks of other stages killed, SQLExecutionEnd `errorMessage`), the order of events at the end of a failed
+        attempt, whether attempt 1's log ends with ApplicationEnd, and the AM / Python lines.
+  - [ ] Engine: abort the job when a task index reaches `spark.task.maxFailures` (today `TaskSetAborted` is raised
+        and refused), the events above, the driver's exit, the application's final status.
+  - [ ] Multi-attempt runs: a run can produce attempts 1 and 2 (new AM container, new executors, the same
+        app id); `prepare` (one log per run today: `AppPlan.event_log_name` is `<app>_1`), the manifest, the portal's
+        deep links (`/history/<app>/<attempt>/…`), `hs_api.app_path` (first attempt only), `evidence.Ctx`,
+        `stack_check.py` and the HS tests have to handle two attempts.
+  - [ ] Scenario 03 itself: ticket ("failed after 4 attempts" from the orchestrator), hints, solution with
+        evidence from both attempts and the executors' / AM's logs; the fix (`spark.executor.memoryOverhead`,
+        fewer cores per executor) verified in the simulation.
+- [ ] the rest, in the order above
 
 ## Backlog (later)
 
