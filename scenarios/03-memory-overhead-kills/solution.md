@@ -99,6 +99,18 @@ container (`..._02_000001`) with new executors. Same code, same data: attempt 2 
 the last attempt, **unregisters the application as FAILED** (E12). That's the "User application exited with
 status 1" Airflow reported. An Airflow retry would have failed a third and fourth time.
 
+## The two runs side by side
+
+| | Last good (release 2.3) | Incident (release 2.4), attempt 1 / attempt 2 |
+|---|---|---|
+| Outcome | SUCCEEDED, 5.5 min, 8 jobs | FAILED, 4.0 min / FAILED, 4.4 min, 3 jobs each |
+| Stage 2 (events scan) | complete | FAILED: task 386 / 2598 lost 4 times |
+| Executors | 40, none lost | ids up to 182 / 207, 145 / 173 containers killed (pmem) |
+| Peak JVM heap used | 4.7 GiB of 16 GiB | 3.8 GiB / 3.8 GiB of 16 GiB |
+| Container (heap + overhead) | 18 GiB (16 + 1.6 rounded) | 18 GiB, the same |
+| Spark properties | — | + `spark.yarn.dist.jars` (dp-udfs), `spark.yarn.dist.files` (2.0 GiB `.mmdb`) |
+| Events-side Project | `…, campaign, dt` | `…, campaign, geoip_city(ip_address) AS geo_city, dt` |
+
 ## The fix
 
 The memory has to fit, or there has to be less of it. All of these were verified in the simulation
@@ -134,3 +146,19 @@ check, at production parallelism.
 reads each process's RSS (`/proc/<pid>/stat`). Hadoop can account with `smaps` instead
 (`yarn.nodemanager.container-monitor.procfs-tree.smaps-based-rss.enabled`), which treats clean, read-only
 file pages differently; that is a cluster-wide decision for the platform team, not a fix for one job.
+
+## 60-second interview answer
+
+*"A Spark job on YARN fails with 'Container killed by YARN for exceeding physical memory limits'. How do you debug
+and fix it?"*
+
+> First I read the whole failure: the stage was aborted because one task failed four times, and every failure was
+> its executor being killed by YARN for physical memory, so retries just moved the problem around, and YARN's
+> second attempt failed the same way. YARN measures the container's whole process tree, not the heap, so I check
+> the heap: peak use was under 4 of 16 GiB, so more executor memory isn't the answer. The container is heap plus
+> memoryOverhead, 10 % by default, about 2 GiB here, and the JVM needs half of that for itself. So I look for what
+> uses memory outside the heap and what changed: the release added a Java UDF, and the executor logs show every
+> task memory-mapping a 2 GiB IP database. Four cores means four mappings, 8 GiB in a 2 GiB budget. Tonight I'd
+> raise spark.executor.memoryOverhead to 10g so four mappings fit; for good I'd make the UDF share one reader per
+> executor and give it 4g, or replace the file lookup with a broadcast join. Fewer cores or a bigger heap alone
+> don't fix it, and retries only repeat the kills.

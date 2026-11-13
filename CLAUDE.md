@@ -79,7 +79,7 @@ src/sparksim/          Python package: eventlog/ (typed events, JsonProtocol byt
                        static/), up.py (`sparksim up`), yarn.py, environment.py, cli.py,
                        data/ (Spark archive jars, Hadoop 3.3.6 defaults)
 scenarios/NN-slug/     scenario.yaml (job + runs + faults), ticket.md, hints.md, solution.md (Evidence checked by tests)
-reference/jobs/        real PySpark reference jobs (ref00–ref09) + common.py
+reference/jobs/        real PySpark reference jobs (ref00–ref11) + common.py
 reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
 reference/yarn-logs/   REAL container stdout/stderr for those apps (driver = container ..._000001)
 reference/yarn/        single-node HDFS+YARN config + cluster.sh (REF_SECOND_NM=1: 2nd NodeManager) + slow_node.sh
@@ -126,11 +126,11 @@ JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
 | History Server on a log dir | `services/history-server/run.sh [LOG_DIR] [PORT]` (default `event-logs/`, 18080) |
 | Mock NodeManager logs (executor stdout/stderr links) | `services/nm-logs/run.sh [LOG_DIR] [PORT]` (default `yarn-logs/`, 8042) |
 | Validate replay (log vs server counts) | `uv run scripts/hs_api.py validate --log-dir <dir>` |
-| Query the REST API | `uv run scripts/hs_api.py stages <app-id>` / `summary <app-id> <stage>` / `get <app-id> <path>` / `sql <app-id>` |
+| Query the REST API | `uv run scripts/hs_api.py stages <app-id>` / `summary <app-id> <stage>` / `get <app-id> <path>` / `sql <app-id>` (`--app-attempt 1` for a failed app's first YARN attempt) |
 | Check a solution's evidence numbers | `uv run scripts/evidence.py 01-join-skew` (against a running HS + nm-logs) |
 | Screenshot key UI pages | `uv run scripts/screenshot.py <app-id> [--stage N]` → `build/screenshots/` |
 | Start reference YARN cluster | `reference/yarn/cluster.sh start` (needs Hadoop 3.3.x at `/opt/hadoop`) |
-| Re-capture reference logs | `reference/capture.sh [ref0N_name ...]` (YARN cluster mode; ref09 needs `REF_SECOND_NM=1` + `reference/yarn/slow_node.sh start`) |
+| Re-capture reference logs | `reference/capture.sh [ref0N_name ...]` (YARN cluster mode; ref09 needs `REF_SECOND_NM=1` + `reference/yarn/slow_node.sh start`; ref10/ref11 fail on purpose: one log per YARN attempt, `<name>_<attempt>`) |
 | Regenerate event schema doc | `uv run scripts/event_inventory.py` |
 
 Environment notes (cloud dev container): JDK 17 comes from apt

@@ -2,7 +2,7 @@
 """Screenshot key Spark History Server pages for an app (visual smoke test).
 
   uv run scripts/screenshot.py <app-id> [--url http://localhost:18080] [--out build/screenshots]
-      [--stage 6] [--sql 0]
+      [--stage 6] [--sql 0] [--job 2] [--app-attempt 1]
 
 Saves jobs, job detail (DAG), stages, stage detail (DAG, Event Timeline, all
 additional metrics, aggregated metrics by executor), executors, environment
@@ -53,10 +53,11 @@ def main(argv=None) -> int:
     ap.add_argument("--stage", type=int, help="stage id for the stage-detail shot (default: longest stage)")
     ap.add_argument("--sql", type=int, help="SQL execution id for the plan shot (default: first)")
     ap.add_argument("--job", type=int, default=0, help="job id for the job-detail shot (default: 0)")
+    ap.add_argument("--app-attempt", help="YARN attempt of the app (default: the latest)")
     a = ap.parse_args(argv)
 
     api = f"{a.url}/api/v1/applications/{a.app_id}"
-    attempt = requests.get(api, timeout=60).json()["attempts"][0].get("attemptId")
+    attempt = a.app_attempt or requests.get(api, timeout=60).json()["attempts"][0].get("attemptId")
     base = f"{a.url}/history/{a.app_id}" + (f"/{attempt}" if attempt else "")
     api = api + (f"/{attempt}" if attempt else "")
     stages = requests.get(f"{api}/stages", timeout=120).json()

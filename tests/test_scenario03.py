@@ -64,7 +64,7 @@ def test_the_cause_is_the_release(sc):
 
 def test_last_good_run_is_clean(sc):
     (run,) = run_attempts(sc.spec("last_good"))
-    assert run.final_status == "SUCCEEDED" and kills(run) == 0 and len(run.executors) == 40
+    assert run.final_status == "SUCCEEDED" and kills(run) == 0 and len(run.executors) == 40 and len(run.jobs) == 8
 
 
 def test_both_yarn_attempts_fail_on_pmem_kills(incident):
@@ -72,6 +72,9 @@ def test_both_yarn_attempts_fail_on_pmem_kills(incident):
     assert [r.final_status for r in incident] == ["FAILED", "FAILED"]
     assert [r.last_attempt for r in incident] == [False, True]
     a1, a2 = incident
+    assert [kills(r) for r in incident] == [145, 173]  # the solution's side-by-side table
+    assert [re.search(r"Task (\d+) in stage 2\.0", next(s.failure for s in r.stages.values() if s.failure)).group(1)
+            for r in incident] == ["386", "2598"]
     assert a2.t0 > a1.app_end and a2.submit_time == a1.submit_time
     assert a2.yapp.am_container_id.endswith("_02_000001")
     for r in incident:

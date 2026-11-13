@@ -48,7 +48,8 @@ aggregation, exactly as in production.
 | Rolling logs | `eventlog_v2_<appId>/events_<n>_<appId>` when `spark.eventLog.rolling.enabled`. Not used by us |
 
 The History Server reads the app ID and attempt from `SparkListenerApplicationStart`,
-not from the file name. Reference logs are stored as `reference/event-logs/<ref-name>`.
+not from the file name. Reference logs are stored as `reference/event-logs/<ref-name>`, one per YARN attempt
+(`<ref-name>_<attempt>`) for the apps that fail on purpose (ref10, ref11).
 
 ## 3. Canonical event order (one app)
 
@@ -254,6 +255,25 @@ ref09 ran on two NodeManagers, `localhost` and `slownode`, whose executors a cgr
 | Executor log | `Executor: Executor is trying to kill task N.0 in stage S.A (TID t), reason: R` per kill request, then `Executor killed …` (TaskKilledException at the next record) or `Executor interrupted and killed …` (an interrupted call), no `Finished task`. A killed BypassMergeSortShuffleWriter also logs `Stream Closed` exceptions while it deletes its files (not modelled: our map stages use the UnsafeShuffleWriter). |
 | YARN | `spark.yarn.exclude.nodes`: the AM's `YarnAllocatorNodeHealthTracker` sends it to the RM as the app's excluded node list when the allocator is created (`adding nodes to YARN application master's excluded node list: List(…)`), so no executor container lands there. |
 
+### 6.4 A failed job, a failed application, YARN attempt 2 (verified on ref10/ref11 + the 3.5.9 bytecode)
+
+ref10 and ref11 ran on the YARN reference cluster with the NodeManager's pmem check on: Python workers that
+map 1.2–1.6 GB push their 2 GB containers over the limit until a task index fails 4 times. Both applications
+failed in both YARN attempts; the driver logged at INFO (`common.session(driver_log_level=...)`).
+
+| Topic | What Spark 3.5.9 / Hadoop 3.3.6 do |
+|---|---|
+| The kill | Hadoop 3.3.6's `ContainersMonitorImpl.checkLimit` returns early while `yarn.nodemanager.resource.memory.enforced` is true (its default, for cgroups) and elastic memory control is off: the polling pmem kill needs it **false** (`reference/yarn/conf/yarn-site.xml`; the simulated cluster's yarn-site too). A tree over the limit is killed only if its processes older than one 3 s interval are over it (or the whole tree is over twice the limit), so a fresh process survives one check. RSS is `/proc/<pid>/stat`'s: a file mapped twice counts twice. |
+| Counting | an executor lost "caused by one of the running tasks" counts a failure for **each** of its running tasks; the failure that brings an index to `spark.task.maxFailures` (4) aborts the task set. The AM's own limit (`spark.executor.maxNumFailures`, default 2 x executors, min 3) counts only "Container from a bad node" exits: **pmem/vmem kills never count** (`YarnAllocatorNodeHealthTracker.handleResourceAllocationFailure`; ref11 lost 9 executors with a limit of 6 and still ended through the task path). |
+| Order | TaskEnd of the attempt whose loss was the last straw, `ExecutorRemoved` x2, the failed stage's `StageCompleted` (10–18 ms later) with `"Failure Reason": "Job aborted due to stage failure: Task I in stage S.A failed 4 times, most recent failure: Lost task I.3 in stage S.A (TID t) (host executor E): ExecutorLostFailure (executor E exited caused by one of the running tasks) Reason: <YARN reason>\nDriver stacktrace:"`, `JobEnd` 4–19 ms later, then the executor's other lost tasks (their CompletionEvents queue behind the abort), then AQE's cancellation of the query's other running jobs, the killed attempts, `SQLExecutionEnd` with `errorMessage` = the abort message (116–240 ms after the JobEnd), `ApplicationEnd` 154–244 ms later. |
+| JobFailed | `"Job Result": {"Result": "JobFailed", "Exception": {"Message": <the abort message>, "Stack Trace": [...]}}`: 15 DAGScheduler frames (`failJobAndIndependentStages` … `EventLoop$$anon$1.run`) for an AQE map-stage job; a `runJob` (result stage, broadcast) caller appends its own frames to the same exception object, racing with the event-log writer (15, 34 and 63 frames seen). A cancelled job: `"Job N cancelled "` (trailing space) and 6 frames (`handleJobCancellation`). |
+| Killed attempts | the failed stage's running attempts are killed with `"Kill Reason": "Stage cancelled: <the abort message>"` (`cancelTasks` → `killAllTaskAttempts`, no interrupt unless `spark.job.interruptOnCancel`); a sibling query stage AQE cancels: its stage fails with `Job N cancelled `, its tasks with `Stage cancelled: Job N cancelled `. They report after the stage left the DAGScheduler: no `Accumulables`, nameless `Accumulator Updates` as in §6.2. Python tasks that don't notice the kill before the driver stops never get a TaskEnd. |
+| Resubmitted | without the shuffle service, a *finished* map task whose executor died is re-queued with a second TaskEnd, `"Reason": "Resubmitted"`, the same `Task Info` object (its first TaskEnd's accumulables), no Task Metrics. Our scenarios run with the shuffle service: not generated. |
+| History Server | a dead executor whose task's TaskEnd came after its `ExecutorRemoved` keeps that task as "active" (ref10: dead executors with 1–2 active tasks). Only the latest `spark.ui.retainedDeadExecutors` (100) dead executors are kept: past that, the oldest `max(10, dead − 100)` are deleted at a time, and Aggregated Metrics by Executor shows `CANNOT FIND ADDRESS` for them. |
+| Driver log | `ERROR TaskSetManager: Task I in stage S.A failed 4 times; aborting job` after the last straw's `Lost task` line, then `YarnClusterScheduler: Cancelling stage S` / `Killing all running tasks in stage S: Stage cancelled: …` / `Stage S was cancelled`, `DAGScheduler: <Stage> S (…) failed in T s due to …`, `Job N failed: <callsite>, took T s` (result-stage jobs only), `Asked to cancel job N` (AQE), `Lost task … TaskKilled (…)`, `Removed TaskSet S.A, whose tasks have all completed, from pool `, then `ERROR ApplicationMaster: User application exited with status 1`, `Final app status: FAILED, exitCode: 1, (reason: User application exited with status 1)`, `SparkContext: Invoking stop() from shutdown hook` and the usual stop. **Only the last attempt** logs `Deleting staging directory …`, `Unregistering ApplicationMaster with FAILED (diag message: User application exited with status 1)`, `AMRMClientImpl: Waiting for application to be successfully unregistered.` |
+| AM stdout | the Python traceback: the script's frame, PySpark's (`readwriter.py` 1721, `java_gateway.py` 1322, `captured.py` 179, `protocol.py` 326), `py4j.protocol.Py4JJavaError: An error occurred while calling o<N>.parquet.`, `: org.apache.spark.SparkException: <message>` and its stack (tabs, `at …`), a blank line. |
+| Attempt 2 | YARN (`yarn.resourcemanager.am.max-attempts` 2) starts a new AM container `container_…_02_000001` 2.6–3.7 s after attempt 1's ApplicationEnd: a new SparkContext, executors numbered from 1 again in containers `…_02_…`, the log `<appId>_2`. Same `spark.app.submitTime`, new `spark.app.startTime`, `spark.app.attempt.id` 2. The History Server lists one application with two attempts (newest first in the REST API), each with its own UI under `/history/<app>/<attempt>/`. |
+
 ### 6.3 Container logs (`reference/yarn-logs`, `sparksim/yarnlogs`)
 
 - Layout `%d{yy/MM/dd HH:mm:ss} %p %c{1}: %m`, first line `Using Spark's default log4j profile: …`,
@@ -299,6 +319,7 @@ ref09 ran on two NodeManagers, `localhost` and `slownode`, whose executors a cgr
 | `ref*` app names, `/data/ref` paths, `REF_*` env properties | reference harness | use the scenario's realistic job names, tables and properties |
 | `Locality` mostly `NODE_LOCAL`/`PROCESS_LOCAL` | HDFS blocks on the only node | model locality from block placement |
 | ref09's `slownode` host, seconds-long kills there | a second NodeManager on 127.0.0.2 whose executors share half a CPU (cgroup quota) | degrade hosts through `slow_node` faults; kill latency scales with the host's CPU factor |
+| ref10/ref11: Python workers holding memory, `Resubmitted` map tasks, the addPyFile warning in the AM's stdout | the harness's way to exceed a 2 GB container; no shuffle service on the reference NodeManager; `--py-files common.py` | native memory from the scenario's cause (`Func.native_bytes`); the shuffle service is on (no Resubmitted); stdout holds only the traceback |
 
 ## 9. Reference apps and what each one is for
 
@@ -314,6 +335,8 @@ ref09 ran on two NodeManagers, `localhost` and `slownode`, whose executors a cgr
 | `ref07-driver-bound` | big `collect()`/`toPandas()` (result size, getting-result time), driver-side gaps between jobs, small-files scan + listing |
 | `ref08-rdd-api` | pure RDD jobs (no SQL tab), `groupByKey` vs `reduceByKey`, `sortByKey` sampling job, RDD join |
 | `ref09-speculation` | two NodeManagers, one CPU-throttled: speculative copies, `TaskKilled` ("another attempt succeeded", "Stage finished"), killed attempts after their stage completed, a 6-task stage the slow host dominates (no speculation: 75 % never finish), driver + executor kill lines |
+| `ref10-pmem-abort_1`, `_2` | pmem kills until a task index fails 4 times: the aborted job (a broadcast), AQE cancelling its sibling map-stage job, killed attempts, `Resubmitted`, a FAILED application in both YARN attempts; INFO driver log and the Python traceback (`reference/yarn-logs`) |
+| `ref11-max-executor-failures_1`, `_2` | every task over the limit: 9 executor kills against an AM limit of 6 that pmem kills don't count; again the task path, both attempts |
 
 Regenerate everything: `reference/yarn/cluster.sh start && reference/capture.sh && uv run scripts/event_inventory.py`
 (ref09 needs `REF_SECOND_NM=1` and `reference/yarn/slow_node.sh start`, see `reference/capture.sh`).

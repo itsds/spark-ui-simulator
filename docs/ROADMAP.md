@@ -202,8 +202,8 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
 | Session | Scenario | Needs |
 |---|---|---|
 | ✅ | 05 Missed broadcast join | done (ADR-038, ADR-039) |
-| **next** | **03 YARN memoryOverhead kills** | task failures → job abort → failed app, YARN app attempt 2 (see the checklist below) |
-| 2 | 12 Fetch failure / stage retry | lost shuffle files without the shuffle service, FetchFailed, map-stage resubmission (ref05 has it for real; builds on 03) |
+| ✅ | 03 YARN memoryOverhead kills | done (ADR-040, ADR-041, ADR-042) |
+| **next** | **12 Fetch failure / stage retry** | lost shuffle files without the shuffle service, FetchFailed, map-stage resubmission (ref05 has it for real; builds on 03) |
 | 3 | 06 Partition pruning failure | the planner keeps `PartitionFilters: []` when the filter casts the partition column; a multi-day table |
 | 4 | 07 Exploding join | duplicate keys on the dimension side (`unique_right=False`): join output rows ≫ input |
 | 5 | 04 Small files / tiny tasks | an input of ~120k small files; check the event log size and the HS heap (1 GiB default) |
@@ -223,25 +223,28 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
       the UnsafeShuffleWriter's memory (ADR-039): its buffer counts in Peak Execution Memory of every map task
       with > 200 reduce partitions, and spills when a map task's output outgrows its memory (checked on a real
       3.5.9 run)
-- [ ] 03 YARN memoryOverhead kills (`03-memory-overhead-kills`). Design notes: `docs/SCENARIOS.md`, row 03.
-  - [ ] Real reference `ref10-pmem-abort` on the YARN reference cluster (pmem check is already on in
-        `reference/yarn/conf/yarn-site.xml`): native memory per task beyond `memoryOverhead` → NodeManager kills
-        (-104) → the same task index lost 4 times → job aborted → the PySpark driver exits with an uncaught
-        `Py4JJavaError` → AM `Final app status: FAILED` → YARN starts app attempt 2 (cluster mode,
-        `yarn.resourcemanager.am.max-attempts` 2) → attempt 2 fails the same way. Keep both attempts' event logs
-        (`<app>_1`, `<app>_2`) and container logs (attempt 2's containers are `…_02_…`). What to read off it:
-        the abort events (TaskSetManager abort, StageCompleted `Failure Reason`, JobEnd `JobFailed`, running
-        tasks of other stages killed, SQLExecutionEnd `errorMessage`), the order of events at the end of a failed
-        attempt, whether attempt 1's log ends with ApplicationEnd, and the AM / Python lines.
-  - [ ] Engine: abort the job when a task index reaches `spark.task.maxFailures` (today `TaskSetAborted` is raised
-        and refused), the events above, the driver's exit, the application's final status.
-  - [ ] Multi-attempt runs: a run can produce attempts 1 and 2 (new AM container, new executors, the same
-        app id); `prepare` (one log per run today: `AppPlan.event_log_name` is `<app>_1`), the manifest, the portal's
-        deep links (`/history/<app>/<attempt>/…`), `hs_api.app_path` (first attempt only), `evidence.Ctx`,
-        `stack_check.py` and the HS tests have to handle two attempts.
-  - [ ] Scenario 03 itself: ticket ("failed after 4 attempts" from the orchestrator), hints, solution with
-        evidence from both attempts and the executors' / AM's logs; the fix (`spark.executor.memoryOverhead`,
-        fewer cores per executor) verified in the simulation.
+- [x] 03 YARN memoryOverhead kills (`03-memory-overhead-kills`, ADR-042): release 2.4 adds `geo_city` through a
+      Java UDF (`geoip_city(ip_address)`, workload param `geo_udf`) whose every task memory-maps a 2.0 GiB IP
+      database shipped with `--files`; 4 tasks hold up to 8 GiB outside the heap in an 18 GiB container. ~150
+      executors killed per attempt, task 386 lost 4 times, job 2 aborted, the app FAILED in both YARN attempts
+      (5.5 min → 4.0 + 4.4 min); 13 evidence values from both attempts and the AM's / executors' logs
+      (`tests/test_scenario03_hs.py`); fixes verified (`memoryOverhead=10g`: 7.3 min; one reader per JVM +
+      `4g`: 7.2 min) and non-fixes (`--executor-memory 24g`, 2 cores, the fixed UDF alone)
+  - [x] Real references `ref10-pmem-abort` and `ref11-max-executor-failures` (both YARN attempts, INFO driver
+        log; ADR-040): the NodeManager only poll-kills with `yarn.nodemanager.resource.memory.enforced=false`;
+        abort events and their order, `Stage cancelled: …` kills, AQE's `Job N cancelled `, JobFailed stack
+        traces, the failed AM's lines (unregister only on the last attempt), the Python traceback, attempt 2;
+        pmem kills never count towards the AM's `spark.executor.maxNumFailures`. Golden test re-derives both
+        (`Resubmitted` TaskEnds, task-metric ids of a stage with no merged task)
+  - [x] Engine (ADR-041): `TaskSetManager.abort` at `spark.task.maxFailures`, the DAGScheduler's abort in one
+        event-loop step (failed StageCompleted, JobFailed, later completions after it), AQE cancelling the query's
+        other running jobs, the failed query's SQLExecutionEnd, the PySpark driver's exit, `Final app status:
+        FAILED`; executor and driver logs; `Func.native_bytes` (per task or per executor) in the container's RSS;
+        `--files` / `--jars` localization per NodeManager
+  - [x] Multi-attempt runs: `run_attempts` (same cluster and data, new randomness, the original submit time),
+        `prepare` + manifest (`event_logs` per app), portal links per attempt, `hs_api --app-attempt`,
+        `evidence.Ctx.attempts`, `stack_check.py`, HS tests; the History Server's 100 retained dead executors
+        in `hs_api.validate`
 - [ ] the rest, in the order above
 
 ## Backlog (later)
