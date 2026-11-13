@@ -29,8 +29,10 @@
 
 The workload `clickstream_enrichment`: the queries above, the tables' schemas and how big the day's input
 usually is. Scenarios run it (`scenarios/00-healthy-baseline` is a normal night; `01-join-skew` a night
-whose events carry a hot `customer_id`). The physical plans, the SQL tab and every number come from the
-queries and the data through the planner, the cost model and the scheduler.
+whose events carry a hot `customer_id`). `broadcast_hint=False` is the script before 2026-09-24, which joined
+the page catalog without `F.broadcast()` and relied on Spark broadcasting it by size
+(`05-missed-broadcast-join`). The physical plans, the SQL tab and every number come from the queries and the
+data through the planner, the cost model and the scheduler.
 """
 
 from __future__ import annotations
@@ -49,6 +51,9 @@ WH = f"{NN}/warehouse"
 CUSTOMER = KeySpace("customer_id", distinct=208_000_000, freq_cv=2.5)
 ACTIVE_CUSTOMER = KeySpace("dt,customer_id", distinct=61_000_000, freq_cv=2.5)
 FUNNEL = KeySpace("dt,page_type,funnel_step,device,country", distinct=57_600)
+# The page ids of a day of events: ~44 k of the catalog's ~46 k pages are visited, and page popularity
+# follows a Zipf law (home, search and cart pages first). It only matters where events are shuffled on it.
+PAGE = KeySpace("page_id", distinct=44_000, zipf=0.85)
 SHUFFLE_PARTITIONS = 2400
 # lower(regexp_extract(page_url, ...)) on a ~150-character URL (java.util.regex): ~2 µs per row.
 PARSE_NS = 2_100.0
@@ -95,6 +100,7 @@ ENRICHED = Table(ENRICHED_ROOT, (
 def queries(p: Params, data) -> tuple[SqlQuery, ...]:
     dt = p["dt"]
     customer = data["events"].keys["customer_id"]
+    page = data["events"].keys["page_id"]
 
     def enrich(spark: SparkSession):
         events = spark.read(EVENTS, f"{EVENTS.root}/dt={dt}")
@@ -108,7 +114,7 @@ def queries(p: Params, data) -> tuple[SqlQuery, ...]:
         enriched = (events.where(Not(e["is_bot"]), selectivity=0.93)
                     .select(*cols, campaign.alias("campaign"), e["dt"], ns=PARSE_NS)
                     .join(pages.select(pages["page_id"], pages["page_type"], pages["funnel_step"]), "page_id",
-                          broadcast=True)
+                          broadcast=bool(p["broadcast_hint"]), key_space=page)
                     .join(customers.where(Not(customers["is_deleted"]), selectivity=0.97)
                           .select(*(customers[c] for c in ("customer_id", "segment", "loyalty_tier", "home_country"))),
                           "customer_id", match=0.985, key_space=customer))
@@ -144,7 +150,7 @@ def datasets(p: Params) -> dict[str, InputDataset]:
     return {
         "events": InputDataset(f"{EVENTS.root}/dt={p['dt']}", files=4_300, mean_file_bytes=285 * MiB,
                                file_size_sigma=0.22, bytes_per_row=EVENTS.file_bytes_per_row,
-                               keys={"customer_id": CUSTOMER}),
+                               keys={"customer_id": CUSTOMER, "page_id": PAGE}),
         "customers": InputDataset(CUSTOMERS.root, files=520, mean_file_bytes=116 * MiB, file_size_sigma=0.12,
                                   bytes_per_row=CUSTOMERS.file_bytes_per_row),
         "pages": InputDataset(PAGES.root, files=1, mean_file_bytes=3 * MiB, file_size_sigma=0.0,
@@ -160,5 +166,6 @@ WORKLOAD = Workload(
                 "aggregates of it (daily_funnel, customer_daily_activity).",
     datasets=datasets,
     queries=queries,
-    params={"dt": "2026-11-02"},
+    # broadcast_hint: F.broadcast() around the page catalog (in the script since 2026-09-24)
+    params={"dt": "2026-11-02", "broadcast_hint": True},
 )

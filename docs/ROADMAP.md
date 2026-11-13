@@ -195,7 +195,14 @@ Each scenario is done when it has `scenario.yaml`, ticket, hints and solution, a
 Server (cause → symptoms, and the recommended fix verified in the simulation) and its evidence test
 against HS 3.5.9.
 
-- [ ] 05 Missed broadcast join (`config` `autoBroadcastJoinThreshold`; the broadcast hint has to go)
+- [x] 05 Missed broadcast join (`05-missed-broadcast-join`, ADR-038): the script before its `F.broadcast()`
+      (workload param `broadcast_hint`), a platform default `spark.sql.autoBroadcastJoinThreshold=-1` from the
+      gateways' spark-defaults; the page catalog join becomes a sort-merge join on `page_id`, page popularity
+      (Zipf, always in the data) skews it: 5.5 → 22 min, a 17-min straggler; 19 evidence values
+      (`tests/test_scenario05_hs.py`); both fixes verified (`--conf …=10m`, the hint: 5.5 min). Along the way
+      the UnsafeShuffleWriter's memory (ADR-039): its buffer counts in Peak Execution Memory of every map task
+      with > 200 reduce partitions, and spills when a map task's output outgrows its memory (checked on a real
+      3.5.9 run)
 - [ ] 03 YARN memoryOverhead kills (`memory_pressure`; needs task exceptions / job abort for "failed after 4 attempts")
 - [ ] the rest of `docs/SCENARIOS.md`
 

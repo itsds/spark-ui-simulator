@@ -45,7 +45,7 @@ Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 | 02 | Too few shuffle partitions → spill ✅ [`scenarios/02-shuffle-partitions-spill`](scenarios/02-shuffle-partitions-spill/ticket.md) |
 | 03 | YARN memoryOverhead container kills |
 | 04 | Small files / tiny tasks |
-| 05 | Missed broadcast join |
+| 05 | Missed broadcast join ✅ [`scenarios/05-missed-broadcast-join`](scenarios/05-missed-broadcast-join/ticket.md) |
 | 06 | Partition pruning failure |
 | 07 | Exploding join (duplicate keys) |
 | 08 | GC pressure |
@@ -175,8 +175,8 @@ uv run scripts/event_inventory.py    # regenerates docs/event-log-schema.md
 
 Phases 0–9 are done (see [`docs/ROADMAP.md`](docs/ROADMAP.md)): the simulator, YARN realism, the
 scenario DSL with fault injection, Scenarios 00 and 01, the portal and the one-command start, Scenario 02,
-and speculative execution with Scenario 09. The rest of the scenario library is under way (one or two
-scenarios per session).
+and speculative execution with Scenario 09. Phase 10+, the rest of the scenario library, is under way (one or
+two scenarios per session): Scenario 05 is done.
 
 ## Docs
 

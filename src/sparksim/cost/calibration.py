@@ -193,6 +193,15 @@ PAGE_SIZE_MIN = 1 * MiB
 PAGE_SIZE_MAX = 64 * MiB
 # Bytes of sort-pointer array per record in UnsafeInMemorySorter (pointer + key prefix, x2 for radix).
 SORT_POINTER_BYTES = 32
+# [spark] UnsafeShuffleWriter (SortShuffleManager picks it over BypassMergeSortShuffleWriter above
+# spark.shuffle.sort.bypassMergeThreshold reduce partitions when nothing is combined map-side, i.e. every SQL
+# shuffle): ShuffleExternalSorter keeps each record serialized in execution-memory pages, behind a 4-byte
+# length (UnsafeRowSerializer), and one 8-byte pointer per record in a LongArray that radix sort uses only
+# half of (ShuffleInMemorySorter.getUsableCapacity). It spills when it can't get another page, and
+# UnsafeShuffleWriter.stop() adds its peak to the task's Peak Execution Memory (verified on 3.5.9).
+SHUFFLE_BYPASS_MERGE_THRESHOLD = 200
+SHUFFLE_RECORD_LENGTH_BYTES = 4
+SHUFFLE_POINTER_BYTES = 16
 # Hash map overhead per group in BytesToBytesMap / UnsafeFixedWidthAggregationMap.
 HASH_MAP_BYTES_PER_GROUP = 48
 # [ref]/[norm] Executor heap shape for heartbeat snapshots.

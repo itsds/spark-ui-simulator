@@ -332,8 +332,11 @@ def _task_work(log, run: AppRun, ex: Executor, w: _Work, st: _State, rng: random
     windows = _fill_windows(res)
     to_wall = _wall_clock(t, run_end, res.run_ms)
     if m.memory_bytes_spilled > 0:
-        _spill_lines(log, st.threads.get(tk.task_id, THREAD_ID_BASE), page_size(ex.heap_bytes, ex.cores),
-                     res.exec_memory, windows, to_wall)
+        thread = st.threads.get(tk.task_id, THREAD_ID_BASE)
+        page = page_size(ex.heap_bytes, ex.cores)
+        _spill_lines(log, thread, page, res.exec_memory, windows, to_wall)
+        if res.shuffle_sorter is not None and res.shuffle_sorter.spill > 0:
+            _shuffle_spill_lines(log, tk.task_id, thread, page, res, windows, to_wall)
     if isinstance(spec.sink, WriteSink) and res.output_file:
         # FileFormatWriter.executeTask sets the task's committer up first; the first output file opens when the
         # first row reaches the writer, i.e. once the sort before the write has consumed all of its input.
@@ -402,6 +405,24 @@ def _spill_lines(log: ContainerLog, thread: int, page: int, cap: int, windows, t
             ts_ = to_wall(a + (b - a) * (i + 1) / (spills + 1))
             log.info(ts_, "UnsafeExternalSorter", f"Thread {thread} spilling sort data of "
                      f"{bytes_to_string(usage)} to disk ({i} {' times' if i > 1 else ' time'} so far)")
+
+
+def _shuffle_spill_lines(log: ContainerLog, task_id: int, thread: int, page: int, res, windows, to_wall) -> None:
+    """`ShuffleExternalSorter.spill` of an UnsafeShuffleWriter: one line per spill file, while the map output
+    streams in (after the operators below a join have sorted their input). Its count reads "0  times",
+    "1  time", "2  times" (`!= 1`, unlike UnsafeExternalSorter), and it names the task (a real 3.5.9 run)."""
+    sorter = res.shuffle_sorter
+    spills = max(1, math.ceil(sorter.spill / max(1.0, sorter.held)))
+    records = sorter.records / (spills + 0.5)  # every spill file holds a full buffer, the last run half of one
+    array = 1 << max(15, math.ceil(math.log2(max(1.0, records * cal.SHUFFLE_POINTER_BYTES))))
+    usage = max(1, int((sorter.held - array) // page)) * page + array
+    joined = any(op.kind == "smj" for op, _, _ in windows)
+    a = max((b for _, a0, b in windows if a0 == 0.0), default=0.0) if joined else 0.0  # the join's sorts are done
+    b = res.run_ms - sorter.spill_ms / 2  # the merge into the output file comes last
+    for i in range(spills):
+        ts_ = to_wall(a + (b - a) * (i + 1) / (spills + 1))
+        log.info(ts_, "ShuffleExternalSorter", f"Task {task_id} on Thread {thread} spilling sort data of "
+                 f"{bytes_to_string(usage)} to disk ({i} {' time' if i == 1 else ' times'} so far)")
 
 
 def _codegen_classes(stage: StageRecord) -> int:

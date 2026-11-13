@@ -97,7 +97,8 @@ yarn-logs/<appId>/<containerId>/{stdout,stderr}  ──►  services/nm-logs (mo
 Lines are placed on the simulated clock: a task's lines sit between its launch and finish, tasks of a
 stage that wait for the first one's broadcast fetch and code generation log after it, and a killed
 container writes nothing after its SIGTERM. Inside a task the order follows the code path and its cost
-breakdown: shuffle fetch, committer set-up, each sorter's spills while it fills, then the Parquet writer once
+breakdown: shuffle fetch, committer set-up, each sorter's spills while it fills, the shuffle writer's spills
+while the map output streams in (`ShuffleExternalSorter: Task … on Thread …`), then the Parquet writer once
 the sort before the write has consumed its input. Each task runs on a thread of the executor's cached task
 launch pool (`task_threads`), so concurrent tasks log different thread ids and idle threads are reused (ADR-034).
 
@@ -210,7 +211,10 @@ Hot keys go to the partition Spark's hash partitioning picks
 (`model/murmur3.py`: `pmod(Murmur3Hash(key, 42), n)`, checked against PySpark), Zipf
 heads rank by rank, the tail by its second moment. A partition's size decides its
 task's work and, against the task's execution memory, its spill (each sorter or
-aggregation map spills its own share, `cost.model._spill_group`).
+aggregation map spills its own share, `cost.model._spill_group`). A map task that writes more than 200
+reduce partitions does so through Spark's UnsafeShuffleWriter, whose ShuffleExternalSorter buffers the
+serialized output in execution memory: its peak counts in the task's Peak Execution Memory, and a map task
+whose output outgrows the task's memory spills in the writer too (`cost.model._shuffle_sorter`, ADR-039).
 
 ## The portal and the one-command stack (built in Phase 7)
 
