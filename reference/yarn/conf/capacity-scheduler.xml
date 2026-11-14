@@ -1,8 +1,18 @@
 <?xml version="1.0"?>
 <configuration>
-  <property><name>yarn.scheduler.capacity.root.queues</name><value>default</value></property>
-  <property><name>yarn.scheduler.capacity.root.default.capacity</name><value>100</value></property>
+  <!-- Two queues, both elastic up to the whole cluster. Every reference job runs in `default`; only ref12
+       starts a small app in `ds`, whose guarantee makes the RM preempt containers of `default` (preemption:
+       yarn-site.xml). user-limit-factor 2.5 lets one user's app in `default` use 100 % of the cluster. -->
+  <property><name>yarn.scheduler.capacity.root.queues</name><value>default,ds</value></property>
+  <property><name>yarn.scheduler.capacity.root.default.capacity</name><value>40</value></property>
   <property><name>yarn.scheduler.capacity.root.default.maximum-capacity</name><value>100</value></property>
+  <property><name>yarn.scheduler.capacity.root.default.user-limit-factor</name><value>2.5</value></property>
+  <property><name>yarn.scheduler.capacity.root.ds.capacity</name><value>60</value></property>
+  <property><name>yarn.scheduler.capacity.root.ds.maximum-capacity</name><value>100</value></property>
+  <!-- Preemption (on in yarn-site.xml): a container is only preempted if it fits in total_preemption_per_round
+       x the cluster (FifoCandidatesSelector). Hadoop's 0.1 is 1.2 GB of this 12 GB NodeManager, less than one
+       2 GB executor container (a production cluster of 120 nodes has 10 % to spare): 0.5 here. -->
+  <property><name>yarn.resourcemanager.monitor.capacity.preemption.total_preemption_per_round</name><value>0.5</value></property>
   <!-- Cluster-mode drivers run in the AM container; allow AMs up to half the cluster. -->
   <property><name>yarn.scheduler.capacity.maximum-am-resource-percent</name><value>0.5</value></property>
   <property><name>yarn.scheduler.capacity.resource-calculator</name>

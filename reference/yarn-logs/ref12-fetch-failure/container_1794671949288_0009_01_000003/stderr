@@ -1,0 +1,761 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/14 16:06:47 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 6757@vm
+26/11/14 16:06:47 INFO SignalUtils: Registering signal handler for TERM
+26/11/14 16:06:47 INFO SignalUtils: Registering signal handler for HUP
+26/11/14 16:06:47 INFO SignalUtils: Registering signal handler for INT
+26/11/14 16:06:47 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/14 16:06:47 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/14 16:06:47 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/14 16:06:48 INFO SecurityManager: Changing view acls to: root
+26/11/14 16:06:48 INFO SecurityManager: Changing modify acls to: root
+26/11/14 16:06:48 INFO SecurityManager: Changing view acls groups to: 
+26/11/14 16:06:48 INFO SecurityManager: Changing modify acls groups to: 
+26/11/14 16:06:48 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/14 16:06:48 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:42263 after 89 ms (0 ms spent in bootstraps)
+26/11/14 16:06:48 INFO SecurityManager: Changing view acls to: root
+26/11/14 16:06:48 INFO SecurityManager: Changing modify acls to: root
+26/11/14 16:06:48 INFO SecurityManager: Changing view acls groups to: 
+26/11/14 16:06:48 INFO SecurityManager: Changing modify acls groups to: 
+26/11/14 16:06:48 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/14 16:06:48 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:42263 after 4 ms (0 ms spent in bootstraps)
+26/11/14 16:06:48 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/blockmgr-0ced65c1-dc91-4fa1-a74c-6892d5d3882d
+26/11/14 16:06:48 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/14 16:06:49 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:42263
+26/11/14 16:06:49 INFO ResourceUtils: ==============================================================
+26/11/14 16:06:49 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/14 16:06:49 INFO ResourceUtils: ==============================================================
+26/11/14 16:06:49 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/14 16:06:49 INFO Executor: Starting executor ID 2 on host localhost
+26/11/14 16:06:49 INFO Executor: OS info Linux, 6.18.44-fc-v470, amd64
+26/11/14 16:06:49 INFO Executor: Java version 17.0.21.0.3
+26/11/14 16:06:49 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 38533.
+26/11/14 16:06:49 INFO NettyBlockTransferService: Server created on localhost:38533
+26/11/14 16:06:49 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/14 16:06:49 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(2, localhost, 38533, None)
+26/11/14 16:06:49 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(2, localhost, 38533, None)
+26/11/14 16:06:49 INFO BlockManager: Initialized BlockManager: BlockManagerId(2, localhost, 38533, None)
+26/11/14 16:06:49 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/container_1794671949288_0009_01_000003/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/container_1794671949288_0009_01_000003/__app__.jar'
+26/11/14 16:06:49 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@4824df0c for default.
+26/11/14 16:06:53 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 0
+26/11/14 16:06:53 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 3
+26/11/14 16:06:53 INFO Executor: Running task 0.0 in stage 0.0 (TID 0)
+26/11/14 16:06:53 INFO Executor: Running task 3.0 in stage 0.0 (TID 3)
+26/11/14 16:06:53 INFO TorrentBroadcast: Started reading broadcast variable 0 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:06:53 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:40495 after 2 ms (0 ms spent in bootstraps)
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 741.6 MiB)
+26/11/14 16:06:53 INFO TorrentBroadcast: Reading broadcast variable 0 took 192 ms
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 28.0 KiB, free 741.6 MiB)
+26/11/14 16:06:55 INFO CodeGenerator: Code generated in 557.505207 ms
+26/11/14 16:06:55 INFO CodeGenerator: Code generated in 148.424103 ms
+26/11/14 16:06:55 INFO CodeGenerator: Code generated in 30.454564 ms
+26/11/14 16:07:07 INFO Executor: Finished task 3.0 in stage 0.0 (TID 3). 1901 bytes result sent to driver
+26/11/14 16:07:07 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 7
+26/11/14 16:07:07 INFO Executor: Running task 7.0 in stage 0.0 (TID 7)
+26/11/14 16:07:07 INFO Executor: Finished task 0.0 in stage 0.0 (TID 0). 1858 bytes result sent to driver
+26/11/14 16:07:07 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 9
+26/11/14 16:07:07 INFO Executor: Running task 9.0 in stage 0.0 (TID 9)
+26/11/14 16:07:16 INFO Executor: Finished task 7.0 in stage 0.0 (TID 7). 1858 bytes result sent to driver
+26/11/14 16:07:16 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 13
+26/11/14 16:07:16 INFO Executor: Running task 13.0 in stage 0.0 (TID 13)
+26/11/14 16:07:17 INFO Executor: Finished task 9.0 in stage 0.0 (TID 9). 1901 bytes result sent to driver
+26/11/14 16:07:17 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 17
+26/11/14 16:07:17 INFO Executor: Running task 17.0 in stage 0.0 (TID 17)
+26/11/14 16:07:25 INFO Executor: Finished task 17.0 in stage 0.0 (TID 17). 1901 bytes result sent to driver
+26/11/14 16:07:25 INFO Executor: Finished task 13.0 in stage 0.0 (TID 13). 1901 bytes result sent to driver
+26/11/14 16:07:25 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 19
+26/11/14 16:07:25 INFO Executor: Running task 12.1 in stage 0.0 (TID 19)
+26/11/14 16:07:25 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 20
+26/11/14 16:07:25 INFO Executor: Running task 6.1 in stage 0.0 (TID 20)
+26/11/14 16:07:31 INFO Executor: Finished task 12.1 in stage 0.0 (TID 19). 1901 bytes result sent to driver
+26/11/14 16:07:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 23
+26/11/14 16:07:31 INFO Executor: Running task 8.1 in stage 0.0 (TID 23)
+26/11/14 16:07:31 INFO Executor: Finished task 6.1 in stage 0.0 (TID 20). 1858 bytes result sent to driver
+26/11/14 16:07:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 24
+26/11/14 16:07:31 INFO Executor: Running task 18.0 in stage 0.0 (TID 24)
+26/11/14 16:07:39 INFO Executor: Finished task 18.0 in stage 0.0 (TID 24). 1858 bytes result sent to driver
+26/11/14 16:07:39 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 26
+26/11/14 16:07:39 INFO Executor: Running task 20.0 in stage 0.0 (TID 26)
+26/11/14 16:07:39 INFO Executor: Finished task 8.1 in stage 0.0 (TID 23). 1858 bytes result sent to driver
+26/11/14 16:07:39 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 27
+26/11/14 16:07:39 INFO Executor: Running task 21.0 in stage 0.0 (TID 27)
+26/11/14 16:07:46 INFO Executor: Finished task 20.0 in stage 0.0 (TID 26). 1858 bytes result sent to driver
+26/11/14 16:07:46 INFO Executor: Finished task 21.0 in stage 0.0 (TID 27). 1858 bytes result sent to driver
+26/11/14 16:07:48 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 36
+26/11/14 16:07:48 INFO Executor: Running task 0.0 in stage 4.0 (TID 36)
+26/11/14 16:07:48 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 39
+26/11/14 16:07:48 INFO Executor: Running task 3.0 in stage 4.0 (TID 39)
+26/11/14 16:07:48 INFO MapOutputTrackerWorker: Updating epoch to 3 and clearing cache
+26/11/14 16:07:48 INFO TorrentBroadcast: Started reading broadcast variable 2 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:07:48 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 104.0 KiB, free 741.5 MiB)
+26/11/14 16:07:48 INFO TorrentBroadcast: Reading broadcast variable 2 took 43 ms
+26/11/14 16:07:48 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 352.0 KiB, free 741.1 MiB)
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:42263)
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 12 (3.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 12 (3.7 MiB) remote blocks
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 12 (3.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 12 (3.7 MiB) remote blocks
+26/11/14 16:07:49 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:45789 after 13 ms (0 ms spent in bootstraps)
+26/11/14 16:07:49 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:39823 after 11 ms (0 ms spent in bootstraps)
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 106 ms
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 42 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 41.692957 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 21.090177 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 32.663384 ms
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:42263)
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 6 (18.2 KiB) non-empty blocks including 0 (0.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (18.2 KiB) remote blocks
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 6 (17.6 KiB) non-empty blocks including 0 (0.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (17.6 KiB) remote blocks
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 3 ms
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 5 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 11.783216 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 5.779958 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 6.379506 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 22.432597 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 11.769804 ms
+26/11/14 16:07:49 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:49 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:49 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:49 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:50 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:50 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:50 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:50 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:50 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:50 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:50 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:07:50 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:50 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:50 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:07:50 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:07:50 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:07:51 INFO CodecPool: Got brand-new compressor [.snappy]
+26/11/14 16:07:51 INFO CodecPool: Got brand-new compressor [.snappy]
+26/11/14 16:08:17 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000003_39' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000003
+26/11/14 16:08:17 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000003_39: Committed. Elapsed time: 18 ms.
+26/11/14 16:08:17 INFO Executor: Finished task 3.0 in stage 4.0 (TID 39). 7156 bytes result sent to driver
+26/11/14 16:08:17 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 42
+26/11/14 16:08:17 INFO Executor: Running task 6.0 in stage 4.0 (TID 42)
+26/11/14 16:08:17 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000000_36' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000000
+26/11/14 16:08:17 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000000_36: Committed. Elapsed time: 19 ms.
+26/11/14 16:08:17 INFO Executor: Finished task 0.0 in stage 4.0 (TID 36). 7113 bytes result sent to driver
+26/11/14 16:08:17 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 43
+26/11/14 16:08:17 INFO Executor: Running task 7.0 in stage 4.0 (TID 43)
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 12 (3.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 12 (3.7 MiB) remote blocks
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 28 ms
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Getting 24 (7.4 MiB) non-empty blocks including 12 (3.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 12 (3.7 MiB) remote blocks
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 8 ms
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Getting 6 (17.9 KiB) non-empty blocks including 0 (0.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (17.9 KiB) remote blocks
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 1 ms
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Getting 6 (17.9 KiB) non-empty blocks including 0 (0.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (17.9 KiB) remote blocks
+26/11/14 16:08:17 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 18 ms
+26/11/14 16:08:17 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:17 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:17 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:17 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:17 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:17 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:18 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:18 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:18 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:18 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:18 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:18 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:18 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:18 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:18 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:08:18 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:08:18 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:18 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:18 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:08:18 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:08:36 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000006_42' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000006
+26/11/14 16:08:36 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000006_42: Committed. Elapsed time: 26 ms.
+26/11/14 16:08:36 INFO Executor: Finished task 6.0 in stage 4.0 (TID 42). 7156 bytes result sent to driver
+26/11/14 16:08:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 48
+26/11/14 16:08:36 INFO Executor: Running task 9.1 in stage 4.0 (TID 48)
+26/11/14 16:08:36 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000007_43' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000007
+26/11/14 16:08:36 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000007_43: Committed. Elapsed time: 12 ms.
+26/11/14 16:08:36 INFO Executor: Finished task 7.0 in stage 4.0 (TID 43). 7156 bytes result sent to driver
+26/11/14 16:08:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 49
+26/11/14 16:08:36 INFO Executor: Running task 8.1 in stage 4.0 (TID 49)
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 12 (3.6 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 12 (3.7 MiB) remote blocks
+26/11/14 16:08:36 INFO TransportClientFactory: Found inactive connection to localhost/127.0.0.1:39823, creating a new one.
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 12 (3.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 12 (3.7 MiB) remote blocks
+26/11/14 16:08:36 INFO TransportClientFactory: Found inactive connection to localhost/127.0.0.1:39823, creating a new one.
+26/11/14 16:08:36 ERROR RetryingBlockTransferor: Exception while beginning fetch of 2 outstanding blocks 
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 ERROR RetryingBlockTransferor: Exception while beginning fetch of 2 outstanding blocks 
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:39823
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:39823
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:39823
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:39823
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 382 ms
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 415 ms
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Getting 6 (17.9 KiB) non-empty blocks including 0 (0.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (17.9 KiB) remote blocks
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 4 ms
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Getting 6 (17.6 KiB) non-empty blocks including 0 (0.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (17.6 KiB) remote blocks
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 5 ms
+26/11/14 16:08:36 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:36 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:36 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:36 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:36 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:36 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:36 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:36 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:36 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:36 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:36 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:36 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 50
+26/11/14 16:08:36 INFO Executor: Running task 12.0 in stage 4.0 (TID 50)
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 12 (3.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 12 (3.6 MiB) remote blocks
+26/11/14 16:08:36 INFO TransportClientFactory: Found inactive connection to localhost/127.0.0.1:39823, creating a new one.
+26/11/14 16:08:36 ERROR RetryingBlockTransferor: Exception while beginning fetch of 2 outstanding blocks 
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:39823
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 ERROR ShuffleBlockFetcherIterator: Failed to get block(s) from localhost:39823
+org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 12 ms
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Getting 6 (17.3 KiB) non-empty blocks including 0 (0.0 B) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 6 (17.3 KiB) remote blocks
+26/11/14 16:08:36 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 1 ms
+26/11/14 16:08:36 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:36 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:36 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:36 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:36 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:36 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 51
+26/11/14 16:08:36 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 52
+26/11/14 16:08:36 INFO Executor: Running task 1.0 in stage 2.1 (TID 52)
+26/11/14 16:08:36 INFO Executor: Running task 0.0 in stage 2.1 (TID 51)
+26/11/14 16:08:36 INFO MapOutputTrackerWorker: Updating epoch to 7 and clearing cache
+26/11/14 16:08:36 INFO TorrentBroadcast: Started reading broadcast variable 3 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:08:36 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 741.1 MiB)
+26/11/14 16:08:36 INFO TorrentBroadcast: Reading broadcast variable 3 took 12 ms
+26/11/14 16:08:36 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 28.0 KiB, free 741.1 MiB)
+26/11/14 16:08:42 ERROR CoarseGrainedExecutorBackend: RECEIVED SIGNAL TERM
+26/11/14 16:08:42 INFO MemoryStore: MemoryStore cleared
+26/11/14 16:08:42 INFO BlockManager: BlockManager stopped
+26/11/14 16:08:42 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/14 16:08:42 INFO ShutdownHookManager: Shutdown hook called

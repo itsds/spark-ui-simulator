@@ -1,0 +1,822 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/14 16:06:39 INFO SignalUtils: Registering signal handler for TERM
+26/11/14 16:06:39 INFO SignalUtils: Registering signal handler for HUP
+26/11/14 16:06:39 INFO SignalUtils: Registering signal handler for INT
+26/11/14 16:06:39 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/14 16:06:39 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/14 16:06:39 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/14 16:06:40 INFO ApplicationMaster: ApplicationAttemptId: appattempt_1794671949288_0009_000001
+26/11/14 16:06:40 INFO ApplicationMaster: Starting the user application in a separate Thread
+26/11/14 16:06:40 INFO ApplicationMaster: Waiting for spark context initialization...
+26/11/14 16:06:40 INFO SparkContext: Running Spark version 3.5.9
+26/11/14 16:06:40 INFO SparkContext: OS info Linux, 6.18.44-fc-v470, amd64
+26/11/14 16:06:40 INFO SparkContext: Java version 17.0.21.0.3
+26/11/14 16:06:41 INFO ResourceUtils: ==============================================================
+26/11/14 16:06:41 INFO ResourceUtils: No custom resources configured for spark.driver.
+26/11/14 16:06:41 INFO ResourceUtils: ==============================================================
+26/11/14 16:06:41 INFO SparkContext: Submitted application: ref12-fetch-failure
+26/11/14 16:06:41 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 2, script: , vendor: , memory -> name: memory, amount: 1536, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+26/11/14 16:06:41 INFO ResourceProfile: Limiting resource is cpus at 2 tasks per executor
+26/11/14 16:06:41 INFO ResourceProfileManager: Added ResourceProfile id: 0
+26/11/14 16:06:41 INFO SecurityManager: Changing view acls to: root
+26/11/14 16:06:41 INFO SecurityManager: Changing modify acls to: root
+26/11/14 16:06:41 INFO SecurityManager: Changing view acls groups to: 
+26/11/14 16:06:41 INFO SecurityManager: Changing modify acls groups to: 
+26/11/14 16:06:41 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/14 16:06:41 INFO Utils: Successfully started service 'sparkDriver' on port 42263.
+26/11/14 16:06:41 INFO SparkEnv: Registering MapOutputTracker
+26/11/14 16:06:41 INFO SparkEnv: Registering BlockManagerMaster
+26/11/14 16:06:41 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+26/11/14 16:06:41 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+26/11/14 16:06:41 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+26/11/14 16:06:41 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/blockmgr-5158d2bc-2c60-44ac-b409-af3e60aac42d
+26/11/14 16:06:41 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
+26/11/14 16:06:41 INFO SparkEnv: Registering OutputCommitCoordinator
+26/11/14 16:06:41 INFO JettyUtils: Start Jetty 0.0.0.0:0 for SparkUI
+26/11/14 16:06:41 INFO Utils: Successfully started service 'SparkUI' on port 33199.
+26/11/14 16:06:41 INFO ServerInfo: Adding filter to /: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:41 INFO YarnClusterScheduler: Created YarnClusterScheduler
+26/11/14 16:06:41 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 40495.
+26/11/14 16:06:41 INFO NettyBlockTransferService: Server created on 192.0.2.2:40495
+26/11/14 16:06:41 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/14 16:06:41 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, 192.0.2.2, 40495, None)
+26/11/14 16:06:41 INFO BlockManagerMasterEndpoint: Registering block manager 192.0.2.2:40495 with 1048.8 MiB RAM, BlockManagerId(driver, 192.0.2.2, 40495, None)
+26/11/14 16:06:41 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, 192.0.2.2, 40495, None)
+26/11/14 16:06:41 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, 192.0.2.2, 40495, None)
+26/11/14 16:06:42 INFO SingleEventLogFileWriter: Logging events to hdfs:/ref-logs/ref12-fetch-failure/application_1794671949288_0009_1.inprogress
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /jobs: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /jobs/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /jobs/job: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /jobs/job/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /stages: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /stages/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /stages/stage: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /stages/stage/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /stages/pool: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /stages/pool/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /storage: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /storage/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /storage/rdd: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /storage/rdd/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /environment: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /environment/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /executors: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /executors/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /executors/threadDump: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /executors/threadDump/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /executors/heapHistogram: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /executors/heapHistogram/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /static: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /api: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /jobs/job/kill: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /stages/stage/kill: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO ServerInfo: Adding filter to /metrics/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:42 INFO DefaultNoHARMFailoverProxyProvider: Connecting to ResourceManager at localhost/127.0.0.1:8030
+26/11/14 16:06:42 INFO YarnRMClient: Registering the ApplicationMaster
+26/11/14 16:06:42 INFO ApplicationMaster: Preparing Local resources
+26/11/14 16:06:42 INFO SecurityManager: Changing view acls to: root
+26/11/14 16:06:42 INFO SecurityManager: Changing modify acls to: root
+26/11/14 16:06:42 INFO SecurityManager: Changing view acls groups to: 
+26/11/14 16:06:42 INFO SecurityManager: Changing modify acls groups to: 
+26/11/14 16:06:42 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/14 16:06:42 INFO ApplicationMaster: 
+===============================================================================
+Default YARN executor launch context:
+  env:
+    CLASSPATH -> {{PWD}}<CPS>{{PWD}}/__spark_conf__<CPS>{{PWD}}/__spark_libs__/*<CPS>{{PWD}}/__spark_conf__/__hadoop_conf__
+    SPARK_YARN_STAGING_DIR -> hdfs://localhost:9000/user/root/.sparkStaging/application_1794671949288_0009
+    SPARK_USER -> root
+    PYTHONPATH -> {{PWD}}/__pyfiles__<CPS>{{PWD}}/pyspark.zip<CPS>{{PWD}}/py4j-0.10.9.7-src.zip
+    SPARK_PREFER_IPV6 -> false
+    PYSPARK_PYTHON -> /home/user/spark-ui-simulator/.venv/bin/python
+
+  command:
+    {{JAVA_HOME}}/bin/java \ 
+      -server \ 
+      -Xmx1536m \ 
+      '-Djava.net.preferIPv6Addresses=false' \ 
+      '-XX:+IgnoreUnrecognizedVMOptions' \ 
+      '--add-opens=java.base/java.lang=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.lang.invoke=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.io=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.net=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.nio=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.util=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.util.concurrent=ALL-UNNAMED' \ 
+      '--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED' \ 
+      '--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED' \ 
+      '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED' \ 
+      '--add-opens=java.base/sun.nio.cs=ALL-UNNAMED' \ 
+      '--add-opens=java.base/sun.security.action=ALL-UNNAMED' \ 
+      '--add-opens=java.base/sun.util.calendar=ALL-UNNAMED' \ 
+      '--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED' \ 
+      '-Djdk.reflect.useDirectMethodHandle=false' \ 
+      -Djava.io.tmpdir={{PWD}}/tmp \ 
+      '-Dspark.driver.port=42263' \ 
+      '-Dspark.ui.port=0' \ 
+      -Dspark.yarn.app.container.log.dir=<LOG_DIR> \ 
+      -XX:OnOutOfMemoryError='kill %p' \ 
+      org.apache.spark.executor.YarnCoarseGrainedExecutorBackend \ 
+      --driver-url \ 
+      spark://CoarseGrainedScheduler@192.0.2.2:42263 \ 
+      --executor-id \ 
+      <executorId> \ 
+      --hostname \ 
+      <hostname> \ 
+      --cores \ 
+      2 \ 
+      --app-id \ 
+      application_1794671949288_0009 \ 
+      --resourceProfileId \ 
+      0 \ 
+      1><LOG_DIR>/stdout \ 
+      2><LOG_DIR>/stderr
+
+  resources:
+    py4j-0.10.9.7-src.zip -> resource { scheme: "hdfs" host: "localhost" port: 9000 file: "/user/root/.sparkStaging/application_1794671949288_0009/py4j-0.10.9.7-src.zip" } size: 42424 timestamp: 1794672397437 type: FILE visibility: PRIVATE
+    __spark_conf__ -> resource { scheme: "hdfs" host: "localhost" port: 9000 file: "/user/root/.sparkStaging/application_1794671949288_0009/__spark_conf__.zip" } size: 245917 timestamp: 1794672397611 type: ARCHIVE visibility: PRIVATE
+    pyspark.zip -> resource { scheme: "hdfs" host: "localhost" port: 9000 file: "/user/root/.sparkStaging/application_1794671949288_0009/pyspark.zip" } size: 2437297 timestamp: 1794672397012 type: FILE visibility: PRIVATE
+    __spark_libs__ -> resource { scheme: "hdfs" host: "localhost" port: 9000 file: "/spark/spark-libs.zip" } size: 313712059 timestamp: 1794671966892 type: ARCHIVE visibility: PUBLIC
+    __pyfiles__/common.py -> resource { scheme: "hdfs" host: "localhost" port: 9000 file: "/user/root/.sparkStaging/application_1794671949288_0009/common.py" } size: 4068 timestamp: 1794672397462 type: FILE visibility: PRIVATE
+
+===============================================================================
+26/11/14 16:06:42 INFO YarnAllocator: Resource profile 0 doesn't exist, adding it
+26/11/14 16:06:42 INFO Configuration: resource-types.xml not found
+26/11/14 16:06:42 INFO ResourceUtils: Unable to find 'resource-types.xml'.
+26/11/14 16:06:42 INFO YarnSchedulerBackend$YarnSchedulerEndpoint: ApplicationMaster registered as NettyRpcEndpointRef(spark://YarnAM@192.0.2.2:42263)
+26/11/14 16:06:42 INFO YarnAllocator: Will request 3 executor container(s) for  ResourceProfile Id: 0, each with 2 core(s) and 1920 MB memory. with custom resources: <memory:1920, vCores:2>
+26/11/14 16:06:42 INFO YarnAllocator: Submitted 3 unlocalized container requests.
+26/11/14 16:06:42 INFO ApplicationMaster: Started progress reporter thread with (heartbeat : 3000, initial allocation : 200) intervals
+26/11/14 16:06:43 INFO YarnAllocator: Launching container container_1794671949288_0009_01_000002 on host localhost for executor with ID 1 for ResourceProfile Id 0
+26/11/14 16:06:43 INFO YarnAllocator: Received 1 containers from YARN, launching executors on 1 of them.
+26/11/14 16:06:45 INFO YarnAllocator: Launching container container_1794671949288_0009_01_000003 on host localhost for executor with ID 2 for ResourceProfile Id 0
+26/11/14 16:06:45 INFO YarnAllocator: Launching container container_1794671949288_0009_01_000004 on host localhost for executor with ID 3 for ResourceProfile Id 0
+26/11/14 16:06:45 INFO YarnAllocator: Received 2 containers from YARN, launching executors on 2 of them.
+26/11/14 16:06:46 INFO YarnSchedulerBackend$YarnDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (192.0.2.2:35688) with ID 1,  ResourceProfileId 0
+26/11/14 16:06:46 INFO BlockManagerMasterEndpoint: Registering block manager localhost:45789 with 741.6 MiB RAM, BlockManagerId(1, localhost, 45789, None)
+26/11/14 16:06:48 INFO YarnAllocator: Received 1 containers from YARN, launching executors on 0 of them.
+26/11/14 16:06:49 INFO YarnSchedulerBackend$YarnDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (192.0.2.2:59094) with ID 3,  ResourceProfileId 0
+26/11/14 16:06:49 INFO BlockManagerMasterEndpoint: Registering block manager localhost:43497 with 741.6 MiB RAM, BlockManagerId(3, localhost, 43497, None)
+26/11/14 16:06:49 INFO YarnSchedulerBackend$YarnDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (192.0.2.2:59104) with ID 2,  ResourceProfileId 0
+26/11/14 16:06:49 INFO YarnClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.8
+26/11/14 16:06:49 INFO YarnClusterScheduler: YarnClusterScheduler.postStartHook done
+26/11/14 16:06:49 INFO BlockManagerMasterEndpoint: Registering block manager localhost:38533 with 741.6 MiB RAM, BlockManagerId(2, localhost, 38533, None)
+26/11/14 16:06:50 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
+26/11/14 16:06:50 INFO SharedState: Warehouse path is 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/container_1794671949288_0009_01_000001/spark-warehouse'.
+26/11/14 16:06:50 INFO ServerInfo: Adding filter to /SQL: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:50 INFO ServerInfo: Adding filter to /SQL/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:50 INFO ServerInfo: Adding filter to /SQL/execution: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:50 INFO ServerInfo: Adding filter to /SQL/execution/json: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:50 INFO ServerInfo: Adding filter to /static/sql: org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter
+26/11/14 16:06:52 INFO CodeGenerator: Code generated in 168.032589 ms
+26/11/14 16:06:53 INFO DAGScheduler: Registering RDD 4 (parquet at NativeMethodAccessorImpl.java:0) as input to shuffle 0
+26/11/14 16:06:53 INFO DAGScheduler: Got map stage job 0 (parquet at NativeMethodAccessorImpl.java:0) with 24 output partitions
+26/11/14 16:06:53 INFO DAGScheduler: Final stage: ShuffleMapStage 0 (parquet at NativeMethodAccessorImpl.java:0)
+26/11/14 16:06:53 INFO DAGScheduler: Parents of final stage: List()
+26/11/14 16:06:53 INFO DAGScheduler: Missing parents: List()
+26/11/14 16:06:53 INFO CodeGenerator: Code generated in 22.223295 ms
+26/11/14 16:06:53 INFO DAGScheduler: Submitting ShuffleMapStage 0 (MapPartitionsRDD[4] at parquet at NativeMethodAccessorImpl.java:0), which has no missing parents
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 28.0 KiB, free 1048.8 MiB)
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 1048.8 MiB)
+26/11/14 16:06:53 INFO BlockManagerInfo: Added broadcast_0_piece0 in memory on 192.0.2.2:40495 (size: 13.3 KiB, free: 1048.8 MiB)
+26/11/14 16:06:53 INFO SparkContext: Created broadcast 0 from broadcast at DAGScheduler.scala:1611
+26/11/14 16:06:53 INFO DAGScheduler: Submitting 24 missing tasks from ShuffleMapStage 0 (MapPartitionsRDD[4] at parquet at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14))
+26/11/14 16:06:53 INFO YarnClusterScheduler: Adding task set 0.0 with 24 tasks resource profile 0
+26/11/14 16:06:53 INFO DAGScheduler: Registering RDD 8 (parquet at NativeMethodAccessorImpl.java:0) as input to shuffle 1
+26/11/14 16:06:53 INFO DAGScheduler: Got map stage job 1 (parquet at NativeMethodAccessorImpl.java:0) with 6 output partitions
+26/11/14 16:06:53 INFO DAGScheduler: Final stage: ShuffleMapStage 1 (parquet at NativeMethodAccessorImpl.java:0)
+26/11/14 16:06:53 INFO DAGScheduler: Parents of final stage: List()
+26/11/14 16:06:53 INFO DAGScheduler: Missing parents: List()
+26/11/14 16:06:53 INFO DAGScheduler: Submitting ShuffleMapStage 1 (MapPartitionsRDD[8] at parquet at NativeMethodAccessorImpl.java:0), which has no missing parents
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 14.5 KiB, free 1048.7 MiB)
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 7.0 KiB, free 1048.7 MiB)
+26/11/14 16:06:53 INFO BlockManagerInfo: Added broadcast_1_piece0 in memory on 192.0.2.2:40495 (size: 7.0 KiB, free: 1048.8 MiB)
+26/11/14 16:06:53 INFO SparkContext: Created broadcast 1 from broadcast at DAGScheduler.scala:1611
+26/11/14 16:06:53 INFO DAGScheduler: Submitting 6 missing tasks from ShuffleMapStage 1 (MapPartitionsRDD[8] at parquet at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(0, 1, 2, 3, 4, 5))
+26/11/14 16:06:53 INFO YarnClusterScheduler: Adding task set 1.0 with 6 tasks resource profile 0
+26/11/14 16:06:53 INFO TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0) (localhost, executor 2, partition 0, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:06:53 INFO TaskSetManager: Starting task 1.0 in stage 0.0 (TID 1) (localhost, executor 1, partition 1, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:06:53 INFO TaskSetManager: Starting task 2.0 in stage 0.0 (TID 2) (localhost, executor 3, partition 2, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:06:53 INFO TaskSetManager: Starting task 3.0 in stage 0.0 (TID 3) (localhost, executor 2, partition 3, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:06:53 INFO TaskSetManager: Starting task 4.0 in stage 0.0 (TID 4) (localhost, executor 1, partition 4, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:06:53 INFO TaskSetManager: Starting task 5.0 in stage 0.0 (TID 5) (localhost, executor 3, partition 5, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:06:53 INFO BlockManagerInfo: Added broadcast_0_piece0 in memory on localhost:45789 (size: 13.3 KiB, free: 741.6 MiB)
+26/11/14 16:06:53 INFO BlockManagerInfo: Added broadcast_0_piece0 in memory on localhost:38533 (size: 13.3 KiB, free: 741.6 MiB)
+26/11/14 16:06:53 INFO BlockManagerInfo: Added broadcast_0_piece0 in memory on localhost:43497 (size: 13.3 KiB, free: 741.6 MiB)
+26/11/14 16:07:06 INFO TaskSetManager: Starting task 6.0 in stage 0.0 (TID 6) (localhost, executor 3, partition 6, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:06 INFO TaskSetManager: Finished task 5.0 in stage 0.0 (TID 5) in 13292 ms on localhost (executor 3) (1/24)
+26/11/14 16:07:07 INFO TaskSetManager: Starting task 7.0 in stage 0.0 (TID 7) (localhost, executor 2, partition 7, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:07 INFO TaskSetManager: Finished task 3.0 in stage 0.0 (TID 3) in 13895 ms on localhost (executor 2) (2/24)
+26/11/14 16:07:07 INFO TaskSetManager: Starting task 8.0 in stage 0.0 (TID 8) (localhost, executor 3, partition 8, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:07 INFO TaskSetManager: Finished task 2.0 in stage 0.0 (TID 2) in 13966 ms on localhost (executor 3) (3/24)
+26/11/14 16:07:07 INFO TaskSetManager: Starting task 9.0 in stage 0.0 (TID 9) (localhost, executor 2, partition 9, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:07 INFO TaskSetManager: Finished task 0.0 in stage 0.0 (TID 0) in 14035 ms on localhost (executor 2) (4/24)
+26/11/14 16:07:07 INFO TaskSetManager: Starting task 10.0 in stage 0.0 (TID 10) (localhost, executor 1, partition 10, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:07 INFO TaskSetManager: Finished task 4.0 in stage 0.0 (TID 4) in 14426 ms on localhost (executor 1) (5/24)
+26/11/14 16:07:07 INFO TaskSetManager: Starting task 11.0 in stage 0.0 (TID 11) (localhost, executor 1, partition 11, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:07 INFO TaskSetManager: Finished task 1.0 in stage 0.0 (TID 1) in 14464 ms on localhost (executor 1) (6/24)
+26/11/14 16:07:15 INFO TaskSetManager: Starting task 12.0 in stage 0.0 (TID 12) (localhost, executor 3, partition 12, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:15 INFO TaskSetManager: Finished task 6.0 in stage 0.0 (TID 6) in 9320 ms on localhost (executor 3) (7/24)
+26/11/14 16:07:16 INFO TaskSetManager: Starting task 13.0 in stage 0.0 (TID 13) (localhost, executor 2, partition 13, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:16 INFO TaskSetManager: Finished task 7.0 in stage 0.0 (TID 7) in 9739 ms on localhost (executor 2) (8/24)
+26/11/14 16:07:16 INFO TaskSetManager: Starting task 14.0 in stage 0.0 (TID 14) (localhost, executor 1, partition 14, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:16 INFO TaskSetManager: Finished task 11.0 in stage 0.0 (TID 11) in 9178 ms on localhost (executor 1) (9/24)
+26/11/14 16:07:17 INFO TaskSetManager: Starting task 15.0 in stage 0.0 (TID 15) (localhost, executor 3, partition 15, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:17 INFO TaskSetManager: Finished task 8.0 in stage 0.0 (TID 8) in 9921 ms on localhost (executor 3) (10/24)
+26/11/14 16:07:17 INFO TaskSetManager: Starting task 16.0 in stage 0.0 (TID 16) (localhost, executor 1, partition 16, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:17 INFO TaskSetManager: Finished task 10.0 in stage 0.0 (TID 10) in 9693 ms on localhost (executor 1) (11/24)
+26/11/14 16:07:17 INFO TaskSetManager: Starting task 17.0 in stage 0.0 (TID 17) (localhost, executor 2, partition 17, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:17 INFO TaskSetManager: Finished task 9.0 in stage 0.0 (TID 9) in 10243 ms on localhost (executor 2) (12/24)
+26/11/14 16:07:21 INFO YarnSchedulerBackend$YarnDriverEndpoint: Disabling executor 3.
+26/11/14 16:07:21 INFO YarnAllocator: Completed container container_1794671949288_0009_01_000004 on host: localhost (state: COMPLETE, exit status: -102)
+26/11/14 16:07:21 INFO YarnAllocator: Container container_1794671949288_0009_01_000004 on host: localhost was preempted.
+26/11/14 16:07:21 INFO DAGScheduler: Executor lost: 3 (epoch 0)
+26/11/14 16:07:21 WARN YarnSchedulerBackend$YarnSchedulerEndpoint: Requesting driver to remove executor 3 for reason Container container_1794671949288_0009_01_000004 on host: localhost was preempted.
+26/11/14 16:07:21 INFO BlockManagerMasterEndpoint: Trying to remove executor 3 from BlockManagerMaster.
+26/11/14 16:07:21 INFO YarnAllocator: Will request 1 executor container(s) for  ResourceProfile Id: 0, each with 2 core(s) and 1920 MB memory. with custom resources: <memory:1920, vCores:2>
+26/11/14 16:07:21 INFO YarnAllocator: Submitted 1 unlocalized container requests.
+26/11/14 16:07:21 ERROR YarnClusterScheduler: Lost executor 3 on localhost: Container container_1794671949288_0009_01_000004 on host: localhost was preempted.
+26/11/14 16:07:21 INFO BlockManagerMasterEndpoint: Removing block manager BlockManagerId(3, localhost, 43497, None)
+26/11/14 16:07:21 INFO TaskSetManager: task 12.0 in stage 0.0 (TID 12) failed because while it was being computed, its executor exited for a reason unrelated to the task. Not counting this failure towards the maximum number of failures for the task.
+26/11/14 16:07:21 INFO TaskSetManager: task 15.0 in stage 0.0 (TID 15) failed because while it was being computed, its executor exited for a reason unrelated to the task. Not counting this failure towards the maximum number of failures for the task.
+26/11/14 16:07:21 INFO BlockManagerMaster: Removed 3 successfully in removeExecutor
+26/11/14 16:07:21 INFO BlockManagerMasterEndpoint: Trying to remove executor 3 from BlockManagerMaster.
+26/11/14 16:07:21 INFO DAGScheduler: Shuffle files lost for executor: 3 (epoch 0)
+26/11/14 16:07:21 INFO DAGScheduler: Resubmitted ShuffleMapTask(0, 8), so marking it as still running.
+26/11/14 16:07:21 INFO BlockManagerMaster: Removal of executor 3 requested
+26/11/14 16:07:21 INFO DAGScheduler: Resubmitted ShuffleMapTask(0, 2), so marking it as still running.
+26/11/14 16:07:21 INFO YarnSchedulerBackend$YarnDriverEndpoint: Asked to remove non-existent executor 3
+26/11/14 16:07:21 INFO DAGScheduler: Resubmitted ShuffleMapTask(0, 5), so marking it as still running.
+26/11/14 16:07:21 INFO DAGScheduler: Resubmitted ShuffleMapTask(0, 6), so marking it as still running.
+26/11/14 16:07:24 INFO TaskSetManager: Starting task 15.1 in stage 0.0 (TID 18) (localhost, executor 1, partition 15, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:24 INFO TaskSetManager: Finished task 14.0 in stage 0.0 (TID 14) in 7775 ms on localhost (executor 1) (9/24)
+26/11/14 16:07:25 INFO TaskSetManager: Finished task 17.0 in stage 0.0 (TID 17) in 7509 ms on localhost (executor 2) (10/24)
+26/11/14 16:07:25 INFO TaskSetManager: Starting task 12.1 in stage 0.0 (TID 19) (localhost, executor 2, partition 12, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:25 INFO TaskSetManager: Starting task 6.1 in stage 0.0 (TID 20) (localhost, executor 2, partition 6, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:25 INFO TaskSetManager: Finished task 13.0 in stage 0.0 (TID 13) in 8152 ms on localhost (executor 2) (11/24)
+26/11/14 16:07:25 INFO TaskSetManager: Starting task 5.1 in stage 0.0 (TID 21) (localhost, executor 1, partition 5, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:25 INFO TaskSetManager: Finished task 16.0 in stage 0.0 (TID 16) in 8030 ms on localhost (executor 1) (12/24)
+26/11/14 16:07:31 INFO TaskSetManager: Starting task 2.1 in stage 0.0 (TID 22) (localhost, executor 1, partition 2, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:31 INFO TaskSetManager: Finished task 15.1 in stage 0.0 (TID 18) in 6403 ms on localhost (executor 1) (13/24)
+26/11/14 16:07:31 INFO TaskSetManager: Starting task 8.1 in stage 0.0 (TID 23) (localhost, executor 2, partition 8, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:31 INFO TaskSetManager: Finished task 12.1 in stage 0.0 (TID 19) in 6075 ms on localhost (executor 2) (14/24)
+26/11/14 16:07:31 INFO TaskSetManager: Starting task 18.0 in stage 0.0 (TID 24) (localhost, executor 2, partition 18, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:31 INFO TaskSetManager: Finished task 6.1 in stage 0.0 (TID 20) in 6290 ms on localhost (executor 2) (15/24)
+26/11/14 16:07:31 INFO TaskSetManager: Starting task 19.0 in stage 0.0 (TID 25) (localhost, executor 1, partition 19, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:31 INFO TaskSetManager: Finished task 5.1 in stage 0.0 (TID 21) in 6473 ms on localhost (executor 1) (16/24)
+26/11/14 16:07:33 INFO YarnAllocator: Launching container container_1794671949288_0009_01_000006 on host localhost for executor with ID 4 for ResourceProfile Id 0
+26/11/14 16:07:33 INFO YarnAllocator: Received 1 containers from YARN, launching executors on 1 of them.
+26/11/14 16:07:38 INFO YarnSchedulerBackend$YarnDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (192.0.2.2:39954) with ID 4,  ResourceProfileId 0
+26/11/14 16:07:39 INFO TaskSetManager: Starting task 20.0 in stage 0.0 (TID 26) (localhost, executor 2, partition 20, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:39 INFO TaskSetManager: Finished task 18.0 in stage 0.0 (TID 24) in 7704 ms on localhost (executor 2) (17/24)
+26/11/14 16:07:39 INFO TaskSetManager: Starting task 21.0 in stage 0.0 (TID 27) (localhost, executor 2, partition 21, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:39 INFO TaskSetManager: Finished task 8.1 in stage 0.0 (TID 23) in 7944 ms on localhost (executor 2) (18/24)
+26/11/14 16:07:39 INFO BlockManagerMasterEndpoint: Registering block manager localhost:39823 with 741.6 MiB RAM, BlockManagerId(4, localhost, 39823, None)
+26/11/14 16:07:39 INFO TaskSetManager: Starting task 22.0 in stage 0.0 (TID 28) (localhost, executor 4, partition 22, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:39 INFO TaskSetManager: Starting task 23.0 in stage 0.0 (TID 29) (localhost, executor 4, partition 23, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:39 INFO BlockManagerInfo: Added broadcast_0_piece0 in memory on localhost:39823 (size: 13.3 KiB, free: 741.6 MiB)
+26/11/14 16:07:39 INFO TaskSetManager: Starting task 0.0 in stage 1.0 (TID 30) (localhost, executor 1, partition 0, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:39 INFO TaskSetManager: Finished task 2.1 in stage 0.0 (TID 22) in 8861 ms on localhost (executor 1) (19/24)
+26/11/14 16:07:39 INFO BlockManagerInfo: Added broadcast_1_piece0 in memory on localhost:45789 (size: 7.0 KiB, free: 741.6 MiB)
+26/11/14 16:07:40 INFO TaskSetManager: Starting task 1.0 in stage 1.0 (TID 31) (localhost, executor 1, partition 1, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:40 INFO TaskSetManager: Finished task 0.0 in stage 1.0 (TID 30) in 404 ms on localhost (executor 1) (1/6)
+26/11/14 16:07:40 INFO TaskSetManager: Starting task 2.0 in stage 1.0 (TID 32) (localhost, executor 1, partition 2, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:40 INFO TaskSetManager: Finished task 1.0 in stage 1.0 (TID 31) in 110 ms on localhost (executor 1) (2/6)
+26/11/14 16:07:40 INFO TaskSetManager: Finished task 2.0 in stage 1.0 (TID 32) in 75 ms on localhost (executor 1) (3/6)
+26/11/14 16:07:40 INFO TaskSetManager: Starting task 3.0 in stage 1.0 (TID 33) (localhost, executor 1, partition 3, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:40 INFO TaskSetManager: Starting task 4.0 in stage 1.0 (TID 34) (localhost, executor 1, partition 4, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:40 INFO TaskSetManager: Finished task 3.0 in stage 1.0 (TID 33) in 103 ms on localhost (executor 1) (4/6)
+26/11/14 16:07:40 INFO TaskSetManager: Starting task 5.0 in stage 1.0 (TID 35) (localhost, executor 1, partition 5, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:07:40 INFO TaskSetManager: Finished task 4.0 in stage 1.0 (TID 34) in 95 ms on localhost (executor 1) (5/6)
+26/11/14 16:07:40 INFO TaskSetManager: Finished task 5.0 in stage 1.0 (TID 35) in 129 ms on localhost (executor 1) (6/6)
+26/11/14 16:07:40 INFO YarnClusterScheduler: Removed TaskSet 1.0, whose tasks have all completed, from pool 
+26/11/14 16:07:40 INFO DAGScheduler: ShuffleMapStage 1 (parquet at NativeMethodAccessorImpl.java:0) finished in 47.581 s
+26/11/14 16:07:40 INFO DAGScheduler: looking for newly runnable stages
+26/11/14 16:07:40 INFO DAGScheduler: running: Set(ShuffleMapStage 0)
+26/11/14 16:07:40 INFO DAGScheduler: waiting: Set()
+26/11/14 16:07:40 INFO DAGScheduler: failed: Set()
+26/11/14 16:07:41 INFO TaskSetManager: Finished task 19.0 in stage 0.0 (TID 25) in 9236 ms on localhost (executor 1) (20/24)
+26/11/14 16:07:46 INFO TaskSetManager: Finished task 20.0 in stage 0.0 (TID 26) in 7090 ms on localhost (executor 2) (21/24)
+26/11/14 16:07:46 INFO TaskSetManager: Finished task 21.0 in stage 0.0 (TID 27) in 7255 ms on localhost (executor 2) (22/24)
+26/11/14 16:07:48 INFO TaskSetManager: Finished task 22.0 in stage 0.0 (TID 28) in 9343 ms on localhost (executor 4) (23/24)
+26/11/14 16:07:48 INFO TaskSetManager: Finished task 23.0 in stage 0.0 (TID 29) in 9343 ms on localhost (executor 4) (24/24)
+26/11/14 16:07:48 INFO YarnClusterScheduler: Removed TaskSet 0.0, whose tasks have all completed, from pool 
+26/11/14 16:07:48 INFO DAGScheduler: ShuffleMapStage 0 (parquet at NativeMethodAccessorImpl.java:0) finished in 55.409 s
+26/11/14 16:07:48 INFO DAGScheduler: looking for newly runnable stages
+26/11/14 16:07:48 INFO DAGScheduler: running: Set()
+26/11/14 16:07:48 INFO DAGScheduler: waiting: Set()
+26/11/14 16:07:48 INFO DAGScheduler: failed: Set()
+26/11/14 16:07:48 INFO ParquetUtils: Using default output committer for Parquet: org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:48 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:48 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:48 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:48 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:48 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:48 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:48 INFO CodeGenerator: Code generated in 24.073392 ms
+26/11/14 16:07:48 INFO CodeGenerator: Code generated in 9.200994 ms
+26/11/14 16:07:48 INFO CodeGenerator: Code generated in 7.999631 ms
+26/11/14 16:07:48 INFO SparkContext: Starting job: parquet at NativeMethodAccessorImpl.java:0
+26/11/14 16:07:48 INFO DAGScheduler: Got job 2 (parquet at NativeMethodAccessorImpl.java:0) with 24 output partitions
+26/11/14 16:07:48 INFO DAGScheduler: Final stage: ResultStage 4 (parquet at NativeMethodAccessorImpl.java:0)
+26/11/14 16:07:48 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 2, ShuffleMapStage 3)
+26/11/14 16:07:48 INFO DAGScheduler: Missing parents: List()
+26/11/14 16:07:48 INFO DAGScheduler: Submitting ResultStage 4 (MapPartitionsRDD[16] at parquet at NativeMethodAccessorImpl.java:0), which has no missing parents
+26/11/14 16:07:48 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 352.0 KiB, free 1048.4 MiB)
+26/11/14 16:07:48 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 104.0 KiB, free 1048.3 MiB)
+26/11/14 16:07:48 INFO BlockManagerInfo: Added broadcast_2_piece0 in memory on 192.0.2.2:40495 (size: 104.0 KiB, free: 1048.7 MiB)
+26/11/14 16:07:48 INFO SparkContext: Created broadcast 2 from broadcast at DAGScheduler.scala:1611
+26/11/14 16:07:48 INFO DAGScheduler: Submitting 24 missing tasks from ResultStage 4 (MapPartitionsRDD[16] at parquet at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14))
+26/11/14 16:07:48 INFO YarnClusterScheduler: Adding task set 4.0 with 24 tasks resource profile 0
+26/11/14 16:07:48 INFO TaskSetManager: Starting task 0.0 in stage 4.0 (TID 36) (localhost, executor 2, partition 0, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:07:48 INFO TaskSetManager: Starting task 1.0 in stage 4.0 (TID 37) (localhost, executor 4, partition 1, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:07:48 INFO TaskSetManager: Starting task 2.0 in stage 4.0 (TID 38) (localhost, executor 1, partition 2, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:07:48 INFO TaskSetManager: Starting task 3.0 in stage 4.0 (TID 39) (localhost, executor 2, partition 3, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:07:48 INFO TaskSetManager: Starting task 4.0 in stage 4.0 (TID 40) (localhost, executor 4, partition 4, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:07:48 INFO TaskSetManager: Starting task 5.0 in stage 4.0 (TID 41) (localhost, executor 1, partition 5, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:07:48 INFO BlockManagerInfo: Added broadcast_2_piece0 in memory on localhost:39823 (size: 104.0 KiB, free: 741.5 MiB)
+26/11/14 16:07:48 INFO BlockManagerInfo: Added broadcast_2_piece0 in memory on localhost:38533 (size: 104.0 KiB, free: 741.5 MiB)
+26/11/14 16:07:48 INFO BlockManagerInfo: Added broadcast_2_piece0 in memory on localhost:45789 (size: 104.0 KiB, free: 741.5 MiB)
+26/11/14 16:07:49 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 192.0.2.2:35688
+26/11/14 16:07:49 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 192.0.2.2:59104
+26/11/14 16:07:49 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 192.0.2.2:39954
+26/11/14 16:07:49 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 1 to 192.0.2.2:39954
+26/11/14 16:07:49 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 1 to 192.0.2.2:59104
+26/11/14 16:07:49 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 1 to 192.0.2.2:35688
+26/11/14 16:08:05 INFO BlockManagerInfo: Removed broadcast_0_piece0 on 192.0.2.2:40495 in memory (size: 13.3 KiB, free: 1048.7 MiB)
+26/11/14 16:08:05 INFO BlockManagerInfo: Removed broadcast_0_piece0 on localhost:39823 in memory (size: 13.3 KiB, free: 741.5 MiB)
+26/11/14 16:08:05 INFO BlockManagerInfo: Removed broadcast_0_piece0 on localhost:45789 in memory (size: 13.3 KiB, free: 741.5 MiB)
+26/11/14 16:08:05 INFO BlockManagerInfo: Removed broadcast_0_piece0 on localhost:38533 in memory (size: 13.3 KiB, free: 741.5 MiB)
+26/11/14 16:08:05 INFO BlockManagerInfo: Removed broadcast_1_piece0 on 192.0.2.2:40495 in memory (size: 7.0 KiB, free: 1048.7 MiB)
+26/11/14 16:08:05 INFO BlockManagerInfo: Removed broadcast_1_piece0 on localhost:45789 in memory (size: 7.0 KiB, free: 741.5 MiB)
+26/11/14 16:08:17 INFO TaskSetManager: Starting task 6.0 in stage 4.0 (TID 42) (localhost, executor 2, partition 6, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:17 INFO TaskSetManager: Finished task 3.0 in stage 4.0 (TID 39) in 28931 ms on localhost (executor 2) (1/24)
+26/11/14 16:08:17 INFO TaskSetManager: Starting task 7.0 in stage 4.0 (TID 43) (localhost, executor 2, partition 7, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:17 INFO TaskSetManager: Finished task 0.0 in stage 4.0 (TID 36) in 29040 ms on localhost (executor 2) (2/24)
+26/11/14 16:08:19 INFO TaskSetManager: Starting task 8.0 in stage 4.0 (TID 44) (localhost, executor 4, partition 8, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:19 INFO TaskSetManager: Finished task 4.0 in stage 4.0 (TID 40) in 30370 ms on localhost (executor 4) (3/24)
+26/11/14 16:08:19 INFO TaskSetManager: Starting task 9.0 in stage 4.0 (TID 45) (localhost, executor 4, partition 9, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:19 INFO TaskSetManager: Finished task 1.0 in stage 4.0 (TID 37) in 30725 ms on localhost (executor 4) (4/24)
+26/11/14 16:08:20 INFO TaskSetManager: Starting task 10.0 in stage 4.0 (TID 46) (localhost, executor 1, partition 10, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:20 INFO TaskSetManager: Finished task 5.0 in stage 4.0 (TID 41) in 31338 ms on localhost (executor 1) (5/24)
+26/11/14 16:08:20 INFO TaskSetManager: Starting task 11.0 in stage 4.0 (TID 47) (localhost, executor 1, partition 11, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:20 INFO TaskSetManager: Finished task 2.0 in stage 4.0 (TID 38) in 31343 ms on localhost (executor 1) (6/24)
+26/11/14 16:08:21 INFO YarnSchedulerBackend$YarnDriverEndpoint: Disabling executor 4.
+26/11/14 16:08:21 INFO DAGScheduler: Executor lost: 4 (epoch 3)
+26/11/14 16:08:21 INFO BlockManagerMasterEndpoint: Trying to remove executor 4 from BlockManagerMaster.
+26/11/14 16:08:21 INFO BlockManagerMasterEndpoint: Removing block manager BlockManagerId(4, localhost, 39823, None)
+26/11/14 16:08:21 INFO BlockManagerMaster: Removed 4 successfully in removeExecutor
+26/11/14 16:08:21 INFO DAGScheduler: Shuffle files lost for executor: 4 (epoch 3)
+26/11/14 16:08:21 INFO YarnAllocator: Completed container container_1794671949288_0009_01_000006 on host: localhost (state: COMPLETE, exit status: -102)
+26/11/14 16:08:21 INFO YarnAllocator: Container container_1794671949288_0009_01_000006 on host: localhost was preempted.
+26/11/14 16:08:21 ERROR YarnClusterScheduler: Lost executor 4 on localhost: Container container_1794671949288_0009_01_000006 on host: localhost was preempted.
+26/11/14 16:08:21 INFO TaskSetManager: task 8.0 in stage 4.0 (TID 44) failed because while it was being computed, its executor exited for a reason unrelated to the task. Not counting this failure towards the maximum number of failures for the task.
+26/11/14 16:08:21 WARN YarnSchedulerBackend$YarnSchedulerEndpoint: Requesting driver to remove executor 4 for reason Container container_1794671949288_0009_01_000006 on host: localhost was preempted.
+26/11/14 16:08:21 INFO TaskSetManager: task 9.0 in stage 4.0 (TID 45) failed because while it was being computed, its executor exited for a reason unrelated to the task. Not counting this failure towards the maximum number of failures for the task.
+26/11/14 16:08:21 INFO BlockManagerMaster: Removal of executor 4 requested
+26/11/14 16:08:21 INFO BlockManagerMasterEndpoint: Trying to remove executor 4 from BlockManagerMaster.
+26/11/14 16:08:21 INFO YarnSchedulerBackend$YarnDriverEndpoint: Asked to remove non-existent executor 4
+26/11/14 16:08:24 INFO YarnAllocator: Will request 1 executor container(s) for  ResourceProfile Id: 0, each with 2 core(s) and 1920 MB memory. with custom resources: <memory:1920, vCores:2>
+26/11/14 16:08:24 INFO YarnAllocator: Submitted 1 unlocalized container requests.
+26/11/14 16:08:36 INFO TaskSetManager: Starting task 9.1 in stage 4.0 (TID 48) (localhost, executor 2, partition 9, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:36 INFO TaskSetManager: Finished task 6.0 in stage 4.0 (TID 42) in 18389 ms on localhost (executor 2) (7/24)
+26/11/14 16:08:36 INFO TaskSetManager: Starting task 8.1 in stage 4.0 (TID 49) (localhost, executor 2, partition 8, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:36 INFO TaskSetManager: Finished task 7.0 in stage 4.0 (TID 43) in 18334 ms on localhost (executor 2) (8/24)
+26/11/14 16:08:36 INFO TaskSetManager: Starting task 12.0 in stage 4.0 (TID 50) (localhost, executor 2, partition 12, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:08:36 WARN TaskSetManager: Lost task 9.1 in stage 4.0 (TID 48) (localhost executor 2): FetchFailed(BlockManagerId(4, localhost, 39823, None), shuffleId=0, mapIndex=22, mapId=28, reduceId=9, message=
+org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.sort_addToSorter_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.smj_findNextJoinRows_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.execution.datasources.FileFormatWriter$.executeTask(FileFormatWriter.scala:385)
+	at org.apache.spark.sql.execution.datasources.WriteFilesExec.$anonfun$doExecuteWrite$1(WriteFiles.scala:100)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:893)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:893)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	... 14 more
+
+)
+26/11/14 16:08:36 INFO DAGScheduler: Marking ResultStage 4 (parquet at NativeMethodAccessorImpl.java:0) as failed due to a fetch failure from ShuffleMapStage 2 (parquet at NativeMethodAccessorImpl.java:0)
+26/11/14 16:08:36 INFO TaskSetManager: task 9.1 in stage 4.0 (TID 48) failed, but the task will not be re-executed (either because the task failed with a shuffle data fetch failure, so the previous stage needs to be re-run, or because a different copy of the task has already succeeded).
+26/11/14 16:08:36 INFO DAGScheduler: ResultStage 4 (parquet at NativeMethodAccessorImpl.java:0) failed in 47.957 s due to org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.sort_addToSorter_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.smj_findNextJoinRows_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.execution.datasources.FileFormatWriter$.executeTask(FileFormatWriter.scala:385)
+	at org.apache.spark.sql.execution.datasources.WriteFilesExec.$anonfun$doExecuteWrite$1(WriteFiles.scala:100)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:893)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:893)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	... 14 more
+
+26/11/14 16:08:36 INFO DAGScheduler: Resubmitting ShuffleMapStage 2 (parquet at NativeMethodAccessorImpl.java:0) and ResultStage 4 (parquet at NativeMethodAccessorImpl.java:0) due to fetch failure
+26/11/14 16:08:36 WARN TaskSetManager: Lost task 8.1 in stage 4.0 (TID 49) (localhost executor 2): FetchFailed(BlockManagerId(4, localhost, 39823, None), shuffleId=0, mapIndex=22, mapId=28, reduceId=8, message=
+org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.sort_addToSorter_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.smj_findNextJoinRows_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.execution.datasources.FileFormatWriter$.executeTask(FileFormatWriter.scala:385)
+	at org.apache.spark.sql.execution.datasources.WriteFilesExec.$anonfun$doExecuteWrite$1(WriteFiles.scala:100)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:893)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:893)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	... 14 more
+
+)
+26/11/14 16:08:36 INFO TaskSetManager: task 8.1 in stage 4.0 (TID 49) failed, but the task will not be re-executed (either because the task failed with a shuffle data fetch failure, so the previous stage needs to be re-run, or because a different copy of the task has already succeeded).
+26/11/14 16:08:36 WARN TaskSetManager: Lost task 12.0 in stage 4.0 (TID 50) (localhost executor 2): FetchFailed(BlockManagerId(4, localhost, 39823, None), shuffleId=0, mapIndex=22, mapId=28, reduceId=12, message=
+org.apache.spark.shuffle.FetchFailedException
+	at org.apache.spark.errors.SparkCoreErrors$.fetchFailedError(SparkCoreErrors.scala:437)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.throwFetchFailedException(ShuffleBlockFetcherIterator.scala:1239)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:971)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.next(ShuffleBlockFetcherIterator.scala:86)
+	at org.apache.spark.util.CompletionIterator.next(CompletionIterator.scala:29)
+	at scala.collection.Iterator$$anon$11.nextCur(Iterator.scala:486)
+	at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:492)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.util.CompletionIterator.hasNext(CompletionIterator.scala:31)
+	at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.sort_addToSorter_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage3.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.smj_findNextJoinRows_0$(Unknown Source)
+	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage5.processNext(Unknown Source)
+	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:43)
+	at scala.collection.Iterator$$anon$10.hasNext(Iterator.scala:460)
+	at org.apache.spark.sql.execution.datasources.FileFormatWriter$.executeTask(FileFormatWriter.scala:385)
+	at org.apache.spark.sql.execution.datasources.WriteFilesExec.$anonfun$doExecuteWrite$1(WriteFiles.scala:100)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2(RDD.scala:893)
+	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsInternal$2$adapted(RDD.scala:893)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:166)
+	at org.apache.spark.scheduler.Task.run(Task.scala:141)
+	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$4(Executor.scala:621)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:64)
+	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:61)
+	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:94)
+	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:624)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: org.apache.spark.ExecutorDeadException: [INTERNAL_ERROR_NETWORK] The relative remote executor(Id: 4), which maintains the block data to fetch is dead.
+	at org.apache.spark.network.netty.NettyBlockTransferService$$anon$2.createAndStart(NettyBlockTransferService.scala:141)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.transferAllOutstanding(RetryingBlockTransferor.java:173)
+	at org.apache.spark.network.shuffle.RetryingBlockTransferor.start(RetryingBlockTransferor.java:152)
+	at org.apache.spark.network.netty.NettyBlockTransferService.fetchBlocks(NettyBlockTransferService.scala:151)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.sendRequest(ShuffleBlockFetcherIterator.scala:374)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.send$1(ShuffleBlockFetcherIterator.scala:1209)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.fetchUpToMaxBytes(ShuffleBlockFetcherIterator.scala:1201)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.initialize(ShuffleBlockFetcherIterator.scala:715)
+	at org.apache.spark.storage.ShuffleBlockFetcherIterator.<init>(ShuffleBlockFetcherIterator.scala:194)
+	at org.apache.spark.shuffle.BlockStoreShuffleReader.read(BlockStoreShuffleReader.scala:73)
+	at org.apache.spark.sql.execution.ShuffledRowRDD.compute(ShuffledRowRDD.scala:232)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.ZippedPartitionsRDD2.compute(ZippedPartitionsRDD.scala:89)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:367)
+	at org.apache.spark.rdd.RDD.iterator(RDD.scala:331)
+	... 14 more
+
+)
+26/11/14 16:08:36 INFO TaskSetManager: task 12.0 in stage 4.0 (TID 50) failed, but the task will not be re-executed (either because the task failed with a shuffle data fetch failure, so the previous stage needs to be re-run, or because a different copy of the task has already succeeded).
+26/11/14 16:08:36 INFO DAGScheduler: Resubmitting failed stages
+26/11/14 16:08:36 INFO DAGScheduler: Submitting ShuffleMapStage 2 (MapPartitionsRDD[4] at parquet at NativeMethodAccessorImpl.java:0), which has no missing parents
+26/11/14 16:08:36 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 28.0 KiB, free 1048.3 MiB)
+26/11/14 16:08:36 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 1048.3 MiB)
+26/11/14 16:08:36 INFO BlockManagerInfo: Added broadcast_3_piece0 in memory on 192.0.2.2:40495 (size: 13.3 KiB, free: 1048.7 MiB)
+26/11/14 16:08:36 INFO SparkContext: Created broadcast 3 from broadcast at DAGScheduler.scala:1611
+26/11/14 16:08:36 INFO DAGScheduler: Submitting 2 missing tasks from ShuffleMapStage 2 (MapPartitionsRDD[4] at parquet at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(22, 23))
+26/11/14 16:08:36 INFO YarnClusterScheduler: Adding task set 2.1 with 2 tasks resource profile 0
+26/11/14 16:08:36 INFO TaskSetManager: Starting task 0.0 in stage 2.1 (TID 51) (localhost, executor 2, partition 22, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:36 INFO TaskSetManager: Starting task 1.0 in stage 2.1 (TID 52) (localhost, executor 2, partition 23, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:36 INFO BlockManagerInfo: Added broadcast_3_piece0 in memory on localhost:38533 (size: 13.3 KiB, free: 741.5 MiB)
+26/11/14 16:08:37 INFO TaskSetManager: Finished task 10.0 in stage 4.0 (TID 46) in 17673 ms on localhost (executor 1) (12/24)
+26/11/14 16:08:38 INFO TaskSetManager: Finished task 11.0 in stage 4.0 (TID 47) in 17947 ms on localhost (executor 1) (13/24)
+26/11/14 16:08:38 INFO YarnClusterScheduler: Removed TaskSet 4.0, whose tasks have all completed, from pool 
+26/11/14 16:08:42 INFO YarnAllocator: Completed container container_1794671949288_0009_01_000003 on host: localhost (state: COMPLETE, exit status: -102)
+26/11/14 16:08:42 INFO YarnAllocator: Container container_1794671949288_0009_01_000003 on host: localhost was preempted.
+26/11/14 16:08:42 WARN YarnSchedulerBackend$YarnSchedulerEndpoint: Requesting driver to remove executor 2 for reason Container container_1794671949288_0009_01_000003 on host: localhost was preempted.
+26/11/14 16:08:42 ERROR YarnClusterScheduler: Lost executor 2 on localhost: Container container_1794671949288_0009_01_000003 on host: localhost was preempted.
+26/11/14 16:08:42 INFO TaskSetManager: task 1.0 in stage 2.1 (TID 52) failed because while it was being computed, its executor exited for a reason unrelated to the task. Not counting this failure towards the maximum number of failures for the task.
+26/11/14 16:08:42 INFO TaskSetManager: task 0.0 in stage 2.1 (TID 51) failed because while it was being computed, its executor exited for a reason unrelated to the task. Not counting this failure towards the maximum number of failures for the task.
+26/11/14 16:08:42 INFO DAGScheduler: Executor lost: 2 (epoch 7)
+26/11/14 16:08:42 INFO BlockManagerMasterEndpoint: Trying to remove executor 2 from BlockManagerMaster.
+26/11/14 16:08:42 INFO BlockManagerMasterEndpoint: Removing block manager BlockManagerId(2, localhost, 38533, None)
+26/11/14 16:08:42 INFO TaskSetManager: Starting task 0.1 in stage 2.1 (TID 53) (localhost, executor 1, partition 22, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:42 INFO BlockManagerMaster: Removed 2 successfully in removeExecutor
+26/11/14 16:08:42 INFO DAGScheduler: Shuffle files lost for executor: 2 (epoch 7)
+26/11/14 16:08:42 INFO TaskSetManager: Starting task 1.1 in stage 2.1 (TID 54) (localhost, executor 1, partition 23, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:42 INFO BlockManagerInfo: Added broadcast_3_piece0 in memory on localhost:45789 (size: 13.3 KiB, free: 741.5 MiB)
+26/11/14 16:08:45 INFO YarnAllocator: Will request 1 executor container(s) for  ResourceProfile Id: 0, each with 2 core(s) and 1920 MB memory. with custom resources: <memory:1920, vCores:2>
+26/11/14 16:08:45 INFO YarnAllocator: Submitted 1 unlocalized container requests.
+26/11/14 16:08:48 INFO TaskSetManager: Finished task 1.1 in stage 2.1 (TID 54) in 6201 ms on localhost (executor 1) (1/2)
+26/11/14 16:08:49 INFO TaskSetManager: Finished task 0.1 in stage 2.1 (TID 53) in 6570 ms on localhost (executor 1) (2/2)
+26/11/14 16:08:49 INFO YarnClusterScheduler: Removed TaskSet 2.1, whose tasks have all completed, from pool 
+26/11/14 16:08:49 INFO DAGScheduler: ShuffleMapStage 2 (parquet at NativeMethodAccessorImpl.java:0) finished in 12.438 s
+26/11/14 16:08:49 INFO DAGScheduler: looking for newly runnable stages
+26/11/14 16:08:49 INFO DAGScheduler: running: Set()
+26/11/14 16:08:49 INFO DAGScheduler: waiting: Set(ResultStage 4)
+26/11/14 16:08:49 INFO DAGScheduler: failed: Set()
+26/11/14 16:08:49 INFO DAGScheduler: Resubmitting ShuffleMapStage 2 (parquet at NativeMethodAccessorImpl.java:0) because some of its tasks had failed: 0, 3, 6, 7, 8, 9, 12, 13, 17, 18, 20, 21
+26/11/14 16:08:49 INFO DAGScheduler: Submitting ShuffleMapStage 2 (MapPartitionsRDD[4] at parquet at NativeMethodAccessorImpl.java:0), which has no missing parents
+26/11/14 16:08:49 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 28.0 KiB, free 1048.3 MiB)
+26/11/14 16:08:49 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 1048.3 MiB)
+26/11/14 16:08:49 INFO BlockManagerInfo: Added broadcast_4_piece0 in memory on 192.0.2.2:40495 (size: 13.3 KiB, free: 1048.7 MiB)
+26/11/14 16:08:49 INFO SparkContext: Created broadcast 4 from broadcast at DAGScheduler.scala:1611
+26/11/14 16:08:49 INFO DAGScheduler: Submitting 12 missing tasks from ShuffleMapStage 2 (MapPartitionsRDD[4] at parquet at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(0, 3, 6, 7, 8, 9, 12, 13, 17, 18, 20, 21))
+26/11/14 16:08:49 INFO YarnClusterScheduler: Adding task set 2.2 with 12 tasks resource profile 0
+26/11/14 16:08:49 INFO TaskSetManager: Starting task 0.0 in stage 2.2 (TID 55) (localhost, executor 1, partition 0, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:49 INFO TaskSetManager: Starting task 1.0 in stage 2.2 (TID 56) (localhost, executor 1, partition 3, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:49 INFO BlockManagerInfo: Added broadcast_4_piece0 in memory on localhost:45789 (size: 13.3 KiB, free: 741.5 MiB)
+26/11/14 16:08:55 INFO TaskSetManager: Starting task 2.0 in stage 2.2 (TID 57) (localhost, executor 1, partition 6, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:55 INFO TaskSetManager: Finished task 0.0 in stage 2.2 (TID 55) in 6097 ms on localhost (executor 1) (1/12)
+26/11/14 16:08:55 INFO TaskSetManager: Starting task 3.0 in stage 2.2 (TID 58) (localhost, executor 1, partition 7, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:08:55 INFO TaskSetManager: Finished task 1.0 in stage 2.2 (TID 56) in 6184 ms on localhost (executor 1) (2/12)
+26/11/14 16:09:01 INFO TaskSetManager: Starting task 4.0 in stage 2.2 (TID 59) (localhost, executor 1, partition 8, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:01 INFO TaskSetManager: Finished task 2.0 in stage 2.2 (TID 57) in 5904 ms on localhost (executor 1) (3/12)
+26/11/14 16:09:01 INFO TaskSetManager: Starting task 5.0 in stage 2.2 (TID 60) (localhost, executor 1, partition 9, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:01 INFO TaskSetManager: Finished task 3.0 in stage 2.2 (TID 58) in 6011 ms on localhost (executor 1) (4/12)
+26/11/14 16:09:03 INFO YarnAllocator: Launching container container_1794671949288_0009_01_000007 on host localhost for executor with ID 5 for ResourceProfile Id 0
+26/11/14 16:09:03 INFO YarnAllocator: Received 1 containers from YARN, launching executors on 1 of them.
+26/11/14 16:09:07 INFO YarnSchedulerBackend$YarnDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (192.0.2.2:41122) with ID 5,  ResourceProfileId 0
+26/11/14 16:09:07 INFO BlockManagerMasterEndpoint: Registering block manager localhost:46531 with 741.6 MiB RAM, BlockManagerId(5, localhost, 46531, None)
+26/11/14 16:09:07 INFO TaskSetManager: Starting task 6.0 in stage 2.2 (TID 61) (localhost, executor 5, partition 12, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:07 INFO TaskSetManager: Starting task 7.0 in stage 2.2 (TID 62) (localhost, executor 5, partition 13, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:07 INFO BlockManagerInfo: Added broadcast_4_piece0 in memory on localhost:46531 (size: 13.3 KiB, free: 741.6 MiB)
+26/11/14 16:09:07 INFO TaskSetManager: Starting task 8.0 in stage 2.2 (TID 63) (localhost, executor 1, partition 17, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:07 INFO TaskSetManager: Finished task 4.0 in stage 2.2 (TID 59) in 6231 ms on localhost (executor 1) (5/12)
+26/11/14 16:09:07 INFO TaskSetManager: Starting task 9.0 in stage 2.2 (TID 64) (localhost, executor 1, partition 18, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:07 INFO TaskSetManager: Finished task 5.0 in stage 2.2 (TID 60) in 6427 ms on localhost (executor 1) (6/12)
+26/11/14 16:09:14 INFO TaskSetManager: Starting task 10.0 in stage 2.2 (TID 65) (localhost, executor 1, partition 20, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:14 INFO TaskSetManager: Finished task 8.0 in stage 2.2 (TID 63) in 6631 ms on localhost (executor 1) (7/12)
+26/11/14 16:09:14 INFO TaskSetManager: Starting task 11.0 in stage 2.2 (TID 66) (localhost, executor 1, partition 21, PROCESS_LOCAL, 9129 bytes) 
+26/11/14 16:09:14 INFO TaskSetManager: Finished task 9.0 in stage 2.2 (TID 64) in 6778 ms on localhost (executor 1) (8/12)
+26/11/14 16:09:15 INFO TaskSetManager: Finished task 6.0 in stage 2.2 (TID 61) in 8415 ms on localhost (executor 5) (9/12)
+26/11/14 16:09:16 INFO TaskSetManager: Finished task 7.0 in stage 2.2 (TID 62) in 8843 ms on localhost (executor 5) (10/12)
+26/11/14 16:09:20 INFO TaskSetManager: Finished task 10.0 in stage 2.2 (TID 65) in 6154 ms on localhost (executor 1) (11/12)
+26/11/14 16:09:20 INFO TaskSetManager: Finished task 11.0 in stage 2.2 (TID 66) in 6261 ms on localhost (executor 1) (12/12)
+26/11/14 16:09:20 INFO YarnClusterScheduler: Removed TaskSet 2.2, whose tasks have all completed, from pool 
+26/11/14 16:09:20 INFO DAGScheduler: ShuffleMapStage 2 (parquet at NativeMethodAccessorImpl.java:0) finished in 31.668 s
+26/11/14 16:09:21 INFO DAGScheduler: looking for newly runnable stages
+26/11/14 16:09:21 INFO DAGScheduler: running: Set()
+26/11/14 16:09:21 INFO DAGScheduler: waiting: Set(ResultStage 4)
+26/11/14 16:09:21 INFO DAGScheduler: failed: Set()
+26/11/14 16:09:21 INFO DAGScheduler: Submitting ResultStage 4 (MapPartitionsRDD[16] at parquet at NativeMethodAccessorImpl.java:0), which has no missing parents
+26/11/14 16:09:21 INFO OutputCommitCoordinator: Reusing state from previous attempt of stage 4.
+26/11/14 16:09:21 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 352.0 KiB, free 1047.9 MiB)
+26/11/14 16:09:21 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 104.1 KiB, free 1047.8 MiB)
+26/11/14 16:09:21 INFO BlockManagerInfo: Added broadcast_5_piece0 in memory on 192.0.2.2:40495 (size: 104.1 KiB, free: 1048.6 MiB)
+26/11/14 16:09:21 INFO SparkContext: Created broadcast 5 from broadcast at DAGScheduler.scala:1611
+26/11/14 16:09:21 INFO DAGScheduler: Submitting 14 missing tasks from ResultStage 4 (MapPartitionsRDD[16] at parquet at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23))
+26/11/14 16:09:21 INFO YarnClusterScheduler: Adding task set 4.1 with 14 tasks resource profile 0
+26/11/14 16:09:21 INFO TaskSetManager: Starting task 0.0 in stage 4.1 (TID 67) (localhost, executor 5, partition 8, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:21 INFO TaskSetManager: Starting task 1.0 in stage 4.1 (TID 68) (localhost, executor 1, partition 9, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:21 INFO TaskSetManager: Starting task 2.0 in stage 4.1 (TID 69) (localhost, executor 5, partition 12, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:21 INFO TaskSetManager: Starting task 3.0 in stage 4.1 (TID 70) (localhost, executor 1, partition 13, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:21 INFO BlockManagerInfo: Added broadcast_5_piece0 in memory on localhost:45789 (size: 104.1 KiB, free: 741.4 MiB)
+26/11/14 16:09:21 INFO BlockManagerInfo: Added broadcast_5_piece0 in memory on localhost:46531 (size: 104.1 KiB, free: 741.5 MiB)
+26/11/14 16:09:21 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 192.0.2.2:35688
+26/11/14 16:09:21 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 1 to 192.0.2.2:35688
+26/11/14 16:09:21 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 192.0.2.2:41122
+26/11/14 16:09:21 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 1 to 192.0.2.2:41122
+26/11/14 16:09:24 INFO YarnAllocator: Launching container container_1794671949288_0009_01_000008 on host localhost for executor with ID 6 for ResourceProfile Id 0
+26/11/14 16:09:24 INFO YarnAllocator: Received 1 containers from YARN, launching executors on 1 of them.
+26/11/14 16:09:29 INFO YarnSchedulerBackend$YarnDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (192.0.2.2:47826) with ID 6,  ResourceProfileId 0
+26/11/14 16:09:29 INFO BlockManagerMasterEndpoint: Registering block manager localhost:40615 with 741.6 MiB RAM, BlockManagerId(6, localhost, 40615, None)
+26/11/14 16:09:29 INFO TaskSetManager: Starting task 4.0 in stage 4.1 (TID 71) (localhost, executor 6, partition 14, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:29 INFO TaskSetManager: Starting task 5.0 in stage 4.1 (TID 72) (localhost, executor 6, partition 15, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:30 INFO BlockManagerInfo: Added broadcast_5_piece0 in memory on localhost:40615 (size: 104.1 KiB, free: 741.5 MiB)
+26/11/14 16:09:30 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 192.0.2.2:47826
+26/11/14 16:09:31 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 1 to 192.0.2.2:47826
+26/11/14 16:09:42 INFO TaskSetManager: Starting task 6.0 in stage 4.1 (TID 73) (localhost, executor 1, partition 16, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:42 INFO TaskSetManager: Finished task 3.0 in stage 4.1 (TID 70) in 21566 ms on localhost (executor 1) (1/14)
+26/11/14 16:09:43 INFO TaskSetManager: Starting task 7.0 in stage 4.1 (TID 74) (localhost, executor 1, partition 17, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:43 INFO TaskSetManager: Finished task 1.0 in stage 4.1 (TID 68) in 22309 ms on localhost (executor 1) (2/14)
+26/11/14 16:09:48 INFO TaskSetManager: Starting task 8.0 in stage 4.1 (TID 75) (localhost, executor 5, partition 18, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:48 INFO TaskSetManager: Finished task 2.0 in stage 4.1 (TID 69) in 27319 ms on localhost (executor 5) (3/14)
+26/11/14 16:09:48 INFO TaskSetManager: Starting task 9.0 in stage 4.1 (TID 76) (localhost, executor 5, partition 19, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:48 INFO TaskSetManager: Finished task 0.0 in stage 4.1 (TID 67) in 27878 ms on localhost (executor 5) (4/14)
+26/11/14 16:09:59 INFO TaskSetManager: Starting task 10.0 in stage 4.1 (TID 77) (localhost, executor 6, partition 20, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:59 INFO TaskSetManager: Finished task 4.0 in stage 4.1 (TID 71) in 29592 ms on localhost (executor 6) (5/14)
+26/11/14 16:09:59 INFO TaskSetManager: Starting task 11.0 in stage 4.1 (TID 78) (localhost, executor 6, partition 21, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:09:59 INFO TaskSetManager: Finished task 5.0 in stage 4.1 (TID 72) in 29612 ms on localhost (executor 6) (6/14)
+26/11/14 16:10:07 INFO TaskSetManager: Starting task 12.0 in stage 4.1 (TID 79) (localhost, executor 1, partition 22, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:10:07 INFO TaskSetManager: Finished task 7.0 in stage 4.1 (TID 74) in 24363 ms on localhost (executor 1) (7/14)
+26/11/14 16:10:08 INFO TaskSetManager: Starting task 13.0 in stage 4.1 (TID 80) (localhost, executor 1, partition 23, NODE_LOCAL, 9297 bytes) 
+26/11/14 16:10:08 INFO TaskSetManager: Finished task 6.0 in stage 4.1 (TID 73) in 26024 ms on localhost (executor 1) (8/14)
+26/11/14 16:10:12 INFO TaskSetManager: Finished task 9.0 in stage 4.1 (TID 76) in 24003 ms on localhost (executor 5) (9/14)
+26/11/14 16:10:13 INFO TaskSetManager: Finished task 8.0 in stage 4.1 (TID 75) in 24931 ms on localhost (executor 5) (10/14)
+26/11/14 16:10:19 INFO TaskSetManager: Finished task 11.0 in stage 4.1 (TID 78) in 19600 ms on localhost (executor 6) (11/14)
+26/11/14 16:10:20 INFO TaskSetManager: Finished task 10.0 in stage 4.1 (TID 77) in 21150 ms on localhost (executor 6) (12/14)
+26/11/14 16:10:25 INFO TaskSetManager: Finished task 12.0 in stage 4.1 (TID 79) in 18006 ms on localhost (executor 1) (13/14)
+26/11/14 16:10:26 INFO TaskSetManager: Finished task 13.0 in stage 4.1 (TID 80) in 18114 ms on localhost (executor 1) (14/14)
+26/11/14 16:10:26 INFO YarnClusterScheduler: Removed TaskSet 4.1, whose tasks have all completed, from pool 
+26/11/14 16:10:26 INFO DAGScheduler: ResultStage 4 (parquet at NativeMethodAccessorImpl.java:0) finished in 65.745 s
+26/11/14 16:10:26 INFO DAGScheduler: Job 2 is finished. Cancelling potential speculative or zombie tasks for this job
+26/11/14 16:10:26 INFO YarnClusterScheduler: Killing all running tasks in stage 4: Stage finished
+26/11/14 16:10:26 INFO DAGScheduler: Job 2 finished: parquet at NativeMethodAccessorImpl.java:0, took 158.049184 s
+26/11/14 16:10:26 INFO FileFormatWriter: Start to commit write Job 5bf09a10-50d8-4130-b3b1-b6cf618b466a.
+26/11/14 16:10:26 INFO FileFormatWriter: Write Job 5bf09a10-50d8-4130-b3b1-b6cf618b466a committed. Elapsed time: 168 ms.
+26/11/14 16:10:26 INFO FileFormatWriter: Finished processing stats for write job 5bf09a10-50d8-4130-b3b1-b6cf618b466a.
+26/11/14 16:10:26 INFO SparkContext: SparkContext is stopping with exitCode 0.
+26/11/14 16:10:26 INFO SparkUI: Stopped Spark web UI at http://192.0.2.2:33199
+26/11/14 16:10:26 INFO YarnClusterSchedulerBackend: Shutting down all executors
+26/11/14 16:10:26 INFO YarnSchedulerBackend$YarnDriverEndpoint: Asking each executor to shut down
+26/11/14 16:10:27 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+26/11/14 16:10:27 INFO MemoryStore: MemoryStore cleared
+26/11/14 16:10:27 INFO BlockManager: BlockManager stopped
+26/11/14 16:10:27 INFO BlockManagerMaster: BlockManagerMaster stopped
+26/11/14 16:10:27 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+26/11/14 16:10:27 INFO SparkContext: Successfully stopped SparkContext
+26/11/14 16:10:27 INFO ApplicationMaster: Final app status: SUCCEEDED, exitCode: 0
+26/11/14 16:10:27 INFO ApplicationMaster: Unregistering ApplicationMaster with SUCCEEDED
+26/11/14 16:10:27 INFO AMRMClientImpl: Waiting for application to be successfully unregistered.
+26/11/14 16:10:27 INFO ApplicationMaster: Deleting staging directory hdfs://localhost:9000/user/root/.sparkStaging/application_1794671949288_0009
+26/11/14 16:10:27 INFO ShutdownHookManager: Shutdown hook called
+26/11/14 16:10:27 INFO ShutdownHookManager: Deleting directory /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/spark-9e5549c8-e246-4e6d-a165-360f07d04784
+26/11/14 16:10:27 INFO ShutdownHookManager: Deleting directory /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/spark-9e5549c8-e246-4e6d-a165-360f07d04784/pyspark-028e7581-e1e9-483c-bc5d-5cce91b61b3c

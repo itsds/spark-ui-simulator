@@ -47,6 +47,8 @@ for job in "${JOBS[@]}"; do
       --conf spark.yarn.appMasterEnv.REF_MODE=yarn \
       --conf spark.yarn.appMasterEnv.REF_DATA=hdfs:///data/ref \
       --conf spark.yarn.appMasterEnv.REF_EVENTLOG_BASE=hdfs:///ref-logs \
+      --conf spark.yarn.appMasterEnv.REF_HADOOP_HOME="$HADOOP_HOME" \
+      --conf spark.yarn.appMasterEnv.REF_HADOOP_CONF_DIR="$HADOOP_CONF_DIR" \
       "$job.py" > "$ROOT/build/submit-$name.log" 2>&1 || [[ "$EXPECT_FAILED" == *" $job "* ]] || {
         echo "!! $name failed on YARN. Driver (AM) output:" >&2
         app="$(grep -oE 'application_[0-9]+_[0-9]+' "$ROOT/build/submit-$name.log" | head -1)"

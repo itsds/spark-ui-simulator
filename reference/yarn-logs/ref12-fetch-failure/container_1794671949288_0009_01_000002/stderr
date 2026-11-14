@@ -1,0 +1,770 @@
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+26/11/14 16:06:44 INFO CoarseGrainedExecutorBackend: Started daemon with process name: 6691@vm
+26/11/14 16:06:44 INFO SignalUtils: Registering signal handler for TERM
+26/11/14 16:06:44 INFO SignalUtils: Registering signal handler for HUP
+26/11/14 16:06:44 INFO SignalUtils: Registering signal handler for INT
+26/11/14 16:06:44 WARN Utils: Your hostname, vm resolves to a loopback address: 127.0.0.1; using 192.0.2.2 instead (on interface eth0)
+26/11/14 16:06:44 WARN Utils: Set SPARK_LOCAL_IP if you need to bind to another address
+26/11/14 16:06:45 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/11/14 16:06:45 INFO SecurityManager: Changing view acls to: root
+26/11/14 16:06:45 INFO SecurityManager: Changing modify acls to: root
+26/11/14 16:06:45 INFO SecurityManager: Changing view acls groups to: 
+26/11/14 16:06:45 INFO SecurityManager: Changing modify acls groups to: 
+26/11/14 16:06:45 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/14 16:06:45 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:42263 after 68 ms (0 ms spent in bootstraps)
+26/11/14 16:06:45 INFO SecurityManager: Changing view acls to: root
+26/11/14 16:06:45 INFO SecurityManager: Changing modify acls to: root
+26/11/14 16:06:45 INFO SecurityManager: Changing view acls groups to: 
+26/11/14 16:06:45 INFO SecurityManager: Changing modify acls groups to: 
+26/11/14 16:06:45 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: root; groups with view permissions: EMPTY; users with modify permissions: root; groups with modify permissions: EMPTY
+26/11/14 16:06:45 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:42263 after 8 ms (0 ms spent in bootstraps)
+26/11/14 16:06:46 INFO DiskBlockManager: Created local directory at /home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/blockmgr-c6f5e991-9329-42b1-ad8a-98e58aa81e75
+26/11/14 16:06:46 INFO MemoryStore: MemoryStore started with capacity 741.6 MiB
+26/11/14 16:06:46 INFO YarnCoarseGrainedExecutorBackend: Connecting to driver: spark://CoarseGrainedScheduler@192.0.2.2:42263
+26/11/14 16:06:46 INFO ResourceUtils: ==============================================================
+26/11/14 16:06:46 INFO ResourceUtils: No custom resources configured for spark.executor.
+26/11/14 16:06:46 INFO ResourceUtils: ==============================================================
+26/11/14 16:06:46 INFO YarnCoarseGrainedExecutorBackend: Successfully registered with driver
+26/11/14 16:06:46 INFO Executor: Starting executor ID 1 on host localhost
+26/11/14 16:06:46 INFO Executor: OS info Linux, 6.18.44-fc-v470, amd64
+26/11/14 16:06:46 INFO Executor: Java version 17.0.21.0.3
+26/11/14 16:06:46 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 45789.
+26/11/14 16:06:46 INFO NettyBlockTransferService: Server created on localhost:45789
+26/11/14 16:06:46 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+26/11/14 16:06:46 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(1, localhost, 45789, None)
+26/11/14 16:06:46 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(1, localhost, 45789, None)
+26/11/14 16:06:46 INFO BlockManager: Initialized BlockManager: BlockManagerId(1, localhost, 45789, None)
+26/11/14 16:06:46 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): 'file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/container_1794671949288_0009_01_000002/__app__.jar,file:/home/user/spark-ui-simulator/build/hadoop/nm-local/usercache/root/appcache/application_1794671949288_0009/container_1794671949288_0009_01_000002/__app__.jar'
+26/11/14 16:06:46 INFO Executor: Created or updated repl class loader org.apache.spark.util.MutableURLClassLoader@758b8efd for default.
+26/11/14 16:06:53 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 1
+26/11/14 16:06:53 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 4
+26/11/14 16:06:53 INFO Executor: Running task 4.0 in stage 0.0 (TID 4)
+26/11/14 16:06:53 INFO Executor: Running task 1.0 in stage 0.0 (TID 1)
+26/11/14 16:06:53 INFO TorrentBroadcast: Started reading broadcast variable 0 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:06:53 INFO TransportClientFactory: Successfully created connection to /192.0.2.2:40495 after 1 ms (0 ms spent in bootstraps)
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 741.6 MiB)
+26/11/14 16:06:53 INFO TorrentBroadcast: Reading broadcast variable 0 took 169 ms
+26/11/14 16:06:53 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 28.0 KiB, free 741.6 MiB)
+26/11/14 16:06:55 INFO CodeGenerator: Code generated in 569.580909 ms
+26/11/14 16:06:55 INFO CodeGenerator: Code generated in 26.237507 ms
+26/11/14 16:06:55 INFO CodeGenerator: Code generated in 35.717837 ms
+26/11/14 16:07:07 INFO Executor: Finished task 4.0 in stage 0.0 (TID 4). 1901 bytes result sent to driver
+26/11/14 16:07:07 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 10
+26/11/14 16:07:07 INFO Executor: Running task 10.0 in stage 0.0 (TID 10)
+26/11/14 16:07:07 INFO Executor: Finished task 1.0 in stage 0.0 (TID 1). 1901 bytes result sent to driver
+26/11/14 16:07:07 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 11
+26/11/14 16:07:07 INFO Executor: Running task 11.0 in stage 0.0 (TID 11)
+26/11/14 16:07:16 INFO Executor: Finished task 11.0 in stage 0.0 (TID 11). 1858 bytes result sent to driver
+26/11/14 16:07:16 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 14
+26/11/14 16:07:16 INFO Executor: Running task 14.0 in stage 0.0 (TID 14)
+26/11/14 16:07:17 INFO Executor: Finished task 10.0 in stage 0.0 (TID 10). 1858 bytes result sent to driver
+26/11/14 16:07:17 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 16
+26/11/14 16:07:17 INFO Executor: Running task 16.0 in stage 0.0 (TID 16)
+26/11/14 16:07:24 INFO Executor: Finished task 14.0 in stage 0.0 (TID 14). 1858 bytes result sent to driver
+26/11/14 16:07:24 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 18
+26/11/14 16:07:24 INFO Executor: Running task 15.1 in stage 0.0 (TID 18)
+26/11/14 16:07:25 INFO Executor: Finished task 16.0 in stage 0.0 (TID 16). 1858 bytes result sent to driver
+26/11/14 16:07:25 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 21
+26/11/14 16:07:25 INFO Executor: Running task 5.1 in stage 0.0 (TID 21)
+26/11/14 16:07:31 INFO Executor: Finished task 15.1 in stage 0.0 (TID 18). 1858 bytes result sent to driver
+26/11/14 16:07:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 22
+26/11/14 16:07:31 INFO Executor: Running task 2.1 in stage 0.0 (TID 22)
+26/11/14 16:07:31 INFO Executor: Finished task 5.1 in stage 0.0 (TID 21). 1858 bytes result sent to driver
+26/11/14 16:07:31 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 25
+26/11/14 16:07:31 INFO Executor: Running task 19.0 in stage 0.0 (TID 25)
+26/11/14 16:07:39 INFO Executor: Finished task 2.1 in stage 0.0 (TID 22). 1858 bytes result sent to driver
+26/11/14 16:07:39 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 30
+26/11/14 16:07:39 INFO Executor: Running task 0.0 in stage 1.0 (TID 30)
+26/11/14 16:07:39 INFO TorrentBroadcast: Started reading broadcast variable 1 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:07:39 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 7.0 KiB, free 741.6 MiB)
+26/11/14 16:07:40 INFO TorrentBroadcast: Reading broadcast variable 1 took 45 ms
+26/11/14 16:07:40 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 14.5 KiB, free 741.5 MiB)
+26/11/14 16:07:40 INFO CodeGenerator: Code generated in 130.597211 ms
+26/11/14 16:07:40 INFO CodeGenerator: Code generated in 41.472074 ms
+26/11/14 16:07:40 INFO Executor: Finished task 0.0 in stage 1.0 (TID 30). 1802 bytes result sent to driver
+26/11/14 16:07:40 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 31
+26/11/14 16:07:40 INFO Executor: Running task 1.0 in stage 1.0 (TID 31)
+26/11/14 16:07:40 INFO Executor: Finished task 1.0 in stage 1.0 (TID 31). 1759 bytes result sent to driver
+26/11/14 16:07:40 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 32
+26/11/14 16:07:40 INFO Executor: Running task 2.0 in stage 1.0 (TID 32)
+26/11/14 16:07:40 INFO Executor: Finished task 2.0 in stage 1.0 (TID 32). 1759 bytes result sent to driver
+26/11/14 16:07:40 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 33
+26/11/14 16:07:40 INFO Executor: Running task 3.0 in stage 1.0 (TID 33)
+26/11/14 16:07:40 INFO Executor: Finished task 3.0 in stage 1.0 (TID 33). 1759 bytes result sent to driver
+26/11/14 16:07:40 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 34
+26/11/14 16:07:40 INFO Executor: Running task 4.0 in stage 1.0 (TID 34)
+26/11/14 16:07:40 INFO Executor: Finished task 4.0 in stage 1.0 (TID 34). 1759 bytes result sent to driver
+26/11/14 16:07:40 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 35
+26/11/14 16:07:40 INFO Executor: Running task 5.0 in stage 1.0 (TID 35)
+26/11/14 16:07:40 INFO Executor: Finished task 5.0 in stage 1.0 (TID 35). 1759 bytes result sent to driver
+26/11/14 16:07:41 INFO Executor: Finished task 19.0 in stage 0.0 (TID 25). 1858 bytes result sent to driver
+26/11/14 16:07:48 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 38
+26/11/14 16:07:48 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 41
+26/11/14 16:07:48 INFO Executor: Running task 2.0 in stage 4.0 (TID 38)
+26/11/14 16:07:48 INFO MapOutputTrackerWorker: Updating epoch to 3 and clearing cache
+26/11/14 16:07:48 INFO TorrentBroadcast: Started reading broadcast variable 2 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:07:48 INFO Executor: Running task 5.0 in stage 4.0 (TID 41)
+26/11/14 16:07:48 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 104.0 KiB, free 741.4 MiB)
+26/11/14 16:07:48 INFO TorrentBroadcast: Reading broadcast variable 2 took 31 ms
+26/11/14 16:07:48 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 352.0 KiB, free 741.1 MiB)
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:42263)
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 24 (7.1 MiB) non-empty blocks including 10 (2.9 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 14 (4.2 MiB) remote blocks
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 10 (3.1 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 14 (4.3 MiB) remote blocks
+26/11/14 16:07:49 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:39823 after 9 ms (0 ms spent in bootstraps)
+26/11/14 16:07:49 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:38533 after 8 ms (0 ms spent in bootstraps)
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 71 ms
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 129 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 105.080744 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 60.385619 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 38.812949 ms
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:42263)
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/14 16:07:49 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 6 (18.2 KiB) non-empty blocks including 6 (18.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Getting 6 (17.3 KiB) non-empty blocks including 6 (17.3 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 1 ms
+26/11/14 16:07:49 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 1 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 40.085845 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 13.251146 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 9.267722 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 84.332404 ms
+26/11/14 16:07:49 INFO CodeGenerator: Code generated in 15.560344 ms
+26/11/14 16:07:49 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:49 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:49 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:49 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:50 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:50 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:50 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:07:50 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:07:50 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:07:51 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:51 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:51 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:07:51 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:51 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:07:51 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:07:51 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:07:51 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:07:51 INFO CodecPool: Got brand-new compressor [.snappy]
+26/11/14 16:07:51 INFO CodecPool: Got brand-new compressor [.snappy]
+26/11/14 16:08:20 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000005_41' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000005
+26/11/14 16:08:20 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000005_41: Committed. Elapsed time: 20 ms.
+26/11/14 16:08:20 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000002_38' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000002
+26/11/14 16:08:20 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000002_38: Committed. Elapsed time: 22 ms.
+26/11/14 16:08:20 INFO Executor: Finished task 5.0 in stage 4.0 (TID 41). 7156 bytes result sent to driver
+26/11/14 16:08:20 INFO Executor: Finished task 2.0 in stage 4.0 (TID 38). 7156 bytes result sent to driver
+26/11/14 16:08:20 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 46
+26/11/14 16:08:20 INFO Executor: Running task 10.0 in stage 4.0 (TID 46)
+26/11/14 16:08:20 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 47
+26/11/14 16:08:20 INFO Executor: Running task 11.0 in stage 4.0 (TID 47)
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 10 (3.1 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 14 (4.3 MiB) remote blocks
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 2 ms
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Getting 6 (17.3 KiB) non-empty blocks including 6 (17.3 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+26/11/14 16:08:20 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:20 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:20 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:20 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Getting 24 (7.4 MiB) non-empty blocks including 10 (3.1 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 14 (4.3 MiB) remote blocks
+26/11/14 16:08:20 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Started 2 remote fetches in 1 ms
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Getting 6 (18.2 KiB) non-empty blocks including 6 (18.2 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:08:20 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:20 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 4 ms
+26/11/14 16:08:20 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:20 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:20 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:20 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:08:20 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:08:20 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:08:20 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:20 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:20 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:08:20 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:20 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:08:20 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:08:20 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:08:20 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:08:37 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000010_46' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000010
+26/11/14 16:08:37 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000010_46: Committed. Elapsed time: 5 ms.
+26/11/14 16:08:37 INFO Executor: Finished task 10.0 in stage 4.0 (TID 46). 7113 bytes result sent to driver
+26/11/14 16:08:38 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000011_47' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000011
+26/11/14 16:08:38 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000011_47: Committed. Elapsed time: 9 ms.
+26/11/14 16:08:38 INFO Executor: Finished task 11.0 in stage 4.0 (TID 47). 7113 bytes result sent to driver
+26/11/14 16:08:42 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 53
+26/11/14 16:08:42 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 54
+26/11/14 16:08:42 INFO Executor: Running task 0.1 in stage 2.1 (TID 53)
+26/11/14 16:08:42 INFO Executor: Running task 1.1 in stage 2.1 (TID 54)
+26/11/14 16:08:42 INFO MapOutputTrackerWorker: Updating epoch to 7 and clearing cache
+26/11/14 16:08:42 INFO TorrentBroadcast: Started reading broadcast variable 3 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:08:42 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 741.1 MiB)
+26/11/14 16:08:42 INFO TorrentBroadcast: Reading broadcast variable 3 took 19 ms
+26/11/14 16:08:42 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 28.0 KiB, free 741.1 MiB)
+26/11/14 16:08:48 INFO Executor: Finished task 1.1 in stage 2.1 (TID 54). 1858 bytes result sent to driver
+26/11/14 16:08:49 INFO Executor: Finished task 0.1 in stage 2.1 (TID 53). 1858 bytes result sent to driver
+26/11/14 16:08:49 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 55
+26/11/14 16:08:49 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 56
+26/11/14 16:08:49 INFO Executor: Running task 0.0 in stage 2.2 (TID 55)
+26/11/14 16:08:49 INFO Executor: Running task 1.0 in stage 2.2 (TID 56)
+26/11/14 16:08:49 INFO MapOutputTrackerWorker: Updating epoch to 9 and clearing cache
+26/11/14 16:08:49 INFO TorrentBroadcast: Started reading broadcast variable 4 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:08:49 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 13.3 KiB, free 741.1 MiB)
+26/11/14 16:08:49 INFO TorrentBroadcast: Reading broadcast variable 4 took 14 ms
+26/11/14 16:08:49 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 28.0 KiB, free 741.1 MiB)
+26/11/14 16:08:55 INFO Executor: Finished task 0.0 in stage 2.2 (TID 55). 1858 bytes result sent to driver
+26/11/14 16:08:55 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 57
+26/11/14 16:08:55 INFO Executor: Running task 2.0 in stage 2.2 (TID 57)
+26/11/14 16:08:55 INFO Executor: Finished task 1.0 in stage 2.2 (TID 56). 1858 bytes result sent to driver
+26/11/14 16:08:55 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 58
+26/11/14 16:08:55 INFO Executor: Running task 3.0 in stage 2.2 (TID 58)
+26/11/14 16:09:01 INFO Executor: Finished task 2.0 in stage 2.2 (TID 57). 1858 bytes result sent to driver
+26/11/14 16:09:01 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 59
+26/11/14 16:09:01 INFO Executor: Running task 4.0 in stage 2.2 (TID 59)
+26/11/14 16:09:01 INFO Executor: Finished task 3.0 in stage 2.2 (TID 58). 1858 bytes result sent to driver
+26/11/14 16:09:01 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 60
+26/11/14 16:09:01 INFO Executor: Running task 5.0 in stage 2.2 (TID 60)
+26/11/14 16:09:07 INFO Executor: Finished task 4.0 in stage 2.2 (TID 59). 1858 bytes result sent to driver
+26/11/14 16:09:07 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 63
+26/11/14 16:09:07 INFO Executor: Running task 8.0 in stage 2.2 (TID 63)
+26/11/14 16:09:07 INFO Executor: Finished task 5.0 in stage 2.2 (TID 60). 1858 bytes result sent to driver
+26/11/14 16:09:07 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 64
+26/11/14 16:09:07 INFO Executor: Running task 9.0 in stage 2.2 (TID 64)
+26/11/14 16:09:14 INFO Executor: Finished task 8.0 in stage 2.2 (TID 63). 1901 bytes result sent to driver
+26/11/14 16:09:14 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 65
+26/11/14 16:09:14 INFO Executor: Running task 10.0 in stage 2.2 (TID 65)
+26/11/14 16:09:14 INFO Executor: Finished task 9.0 in stage 2.2 (TID 64). 1858 bytes result sent to driver
+26/11/14 16:09:14 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 66
+26/11/14 16:09:14 INFO Executor: Running task 11.0 in stage 2.2 (TID 66)
+26/11/14 16:09:20 INFO Executor: Finished task 10.0 in stage 2.2 (TID 65). 1858 bytes result sent to driver
+26/11/14 16:09:20 INFO Executor: Finished task 11.0 in stage 2.2 (TID 66). 1858 bytes result sent to driver
+26/11/14 16:09:21 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 68
+26/11/14 16:09:21 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 70
+26/11/14 16:09:21 INFO Executor: Running task 3.0 in stage 4.1 (TID 70)
+26/11/14 16:09:21 INFO Executor: Running task 1.0 in stage 4.1 (TID 68)
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Updating epoch to 10 and clearing cache
+26/11/14 16:09:21 INFO TorrentBroadcast: Started reading broadcast variable 5 with 1 pieces (estimated total size 4.0 MiB)
+26/11/14 16:09:21 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 104.1 KiB, free 741.0 MiB)
+26/11/14 16:09:21 INFO TorrentBroadcast: Reading broadcast variable 5 took 22 ms
+26/11/14 16:09:21 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 352.0 KiB, free 740.6 MiB)
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:42263)
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 0, fetching them
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 22 (6.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 2 (625.1 KiB) remote blocks
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 22 (6.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 2 (625.1 KiB) remote blocks
+26/11/14 16:09:21 INFO TransportClientFactory: Successfully created connection to localhost/127.0.0.1:46531 after 3 ms (0 ms spent in bootstraps)
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 7 ms
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 7 ms
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Don't have map outputs for shuffle 1, fetching them
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Doing the fetch; tracker endpoint = NettyRpcEndpointRef(spark://MapOutputTracker@192.0.2.2:42263)
+26/11/14 16:09:21 INFO MapOutputTrackerWorker: Got the map output locations
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Getting 6 (17.6 KiB) non-empty blocks including 6 (17.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Getting 6 (17.6 KiB) non-empty blocks including 6 (17.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:09:21 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+26/11/14 16:09:21 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:21 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:21 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:21 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:21 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:21 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:21 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:21 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:21 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:21 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:21 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:21 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:21 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:21 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:21 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:09:21 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:09:21 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:21 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:21 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:09:21 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:09:42 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000013_70' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000013
+26/11/14 16:09:42 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000013_70: Committed. Elapsed time: 8 ms.
+26/11/14 16:09:42 INFO Executor: Finished task 3.0 in stage 4.1 (TID 70). 7113 bytes result sent to driver
+26/11/14 16:09:42 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 73
+26/11/14 16:09:42 INFO Executor: Running task 6.0 in stage 4.1 (TID 73)
+26/11/14 16:09:42 INFO ShuffleBlockFetcherIterator: Getting 24 (7.4 MiB) non-empty blocks including 22 (6.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 2 (625.1 KiB) remote blocks
+26/11/14 16:09:42 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 5 ms
+26/11/14 16:09:42 INFO ShuffleBlockFetcherIterator: Getting 6 (17.6 KiB) non-empty blocks including 6 (17.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:09:42 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+26/11/14 16:09:42 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:42 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:42 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:42 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:42 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:42 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:42 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:42 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:42 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:09:42 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:09:43 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000009_68' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000009
+26/11/14 16:09:43 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000009_68: Committed. Elapsed time: 11 ms.
+26/11/14 16:09:43 INFO Executor: Finished task 1.0 in stage 4.1 (TID 68). 7113 bytes result sent to driver
+26/11/14 16:09:43 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 74
+26/11/14 16:09:43 INFO Executor: Running task 7.0 in stage 4.1 (TID 74)
+26/11/14 16:09:43 INFO ShuffleBlockFetcherIterator: Getting 24 (7.4 MiB) non-empty blocks including 22 (6.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 2 (625.1 KiB) remote blocks
+26/11/14 16:09:43 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 11 ms
+26/11/14 16:09:43 INFO ShuffleBlockFetcherIterator: Getting 6 (18.4 KiB) non-empty blocks including 6 (18.4 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:09:43 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 12 ms
+26/11/14 16:09:43 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:43 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:43 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:43 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:09:43 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:09:43 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:09:43 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:43 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:09:43 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:09:43 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:10:07 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000017_74' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000017
+26/11/14 16:10:07 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000017_74: Committed. Elapsed time: 18 ms.
+26/11/14 16:10:07 INFO Executor: Finished task 7.0 in stage 4.1 (TID 74). 7113 bytes result sent to driver
+26/11/14 16:10:07 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 79
+26/11/14 16:10:07 INFO Executor: Running task 12.0 in stage 4.1 (TID 79)
+26/11/14 16:10:07 INFO ShuffleBlockFetcherIterator: Getting 24 (7.4 MiB) non-empty blocks including 22 (6.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 2 (625.1 KiB) remote blocks
+26/11/14 16:10:07 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 5 ms
+26/11/14 16:10:07 INFO ShuffleBlockFetcherIterator: Getting 6 (18.5 KiB) non-empty blocks including 6 (18.5 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:10:07 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 0 ms
+26/11/14 16:10:07 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:10:07 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:10:07 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:10:07 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:10:07 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:10:07 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:10:07 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:10:07 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:10:07 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:10:07 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:10:08 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000016_73' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000016
+26/11/14 16:10:08 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000016_73: Committed. Elapsed time: 28 ms.
+26/11/14 16:10:08 INFO Executor: Finished task 6.0 in stage 4.1 (TID 73). 7113 bytes result sent to driver
+26/11/14 16:10:08 INFO YarnCoarseGrainedExecutorBackend: Got assigned task 80
+26/11/14 16:10:08 INFO Executor: Running task 13.0 in stage 4.1 (TID 80)
+26/11/14 16:10:08 INFO ShuffleBlockFetcherIterator: Getting 24 (7.3 MiB) non-empty blocks including 22 (6.7 MiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 2 (625.1 KiB) remote blocks
+26/11/14 16:10:08 INFO ShuffleBlockFetcherIterator: Started 1 remote fetches in 7 ms
+26/11/14 16:10:08 INFO ShuffleBlockFetcherIterator: Getting 6 (17.6 KiB) non-empty blocks including 6 (17.6 KiB) local and 0 (0.0 B) host-local and 0 (0.0 B) push-merged-local and 0 (0.0 B) remote blocks
+26/11/14 16:10:08 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 9 ms
+26/11/14 16:10:08 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:10:08 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:10:08 INFO SQLHadoopMapReduceCommitProtocol: Using user defined output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:10:08 INFO FileOutputCommitter: File Output Committer Algorithm version is 1
+26/11/14 16:10:08 INFO FileOutputCommitter: FileOutputCommitter skip cleanup _temporary folders under output directory:false, ignore cleanup failures: false
+26/11/14 16:10:08 INFO SQLHadoopMapReduceCommitProtocol: Using output committer class org.apache.parquet.hadoop.ParquetOutputCommitter
+26/11/14 16:10:08 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:10:08 INFO CodecConfig: Compression: SNAPPY
+26/11/14 16:10:08 INFO ParquetOutputFormat: ParquetRecordWriter [block size: 134217728b, row group padding size: 8388608b, validating: false]
+26/11/14 16:10:08 INFO ParquetWriteSupport: Initialized Parquet WriteSupport with Catalyst schema:
+{
+  "type" : "struct",
+  "fields" : [ {
+    "name" : "customer_id",
+    "type" : "long",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "id",
+    "type" : "long",
+    "nullable" : false,
+    "metadata" : { }
+  }, {
+    "name" : "digest",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "segment",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  }, {
+    "name" : "score",
+    "type" : "string",
+    "nullable" : true,
+    "metadata" : { }
+  } ]
+}
+and corresponding Parquet message type:
+message spark_schema {
+  optional int64 customer_id;
+  required int64 id;
+  optional binary digest (STRING);
+  optional binary segment (STRING);
+  optional binary score (STRING);
+}
+
+       
+26/11/14 16:10:25 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000022_79' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000022
+26/11/14 16:10:25 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000022_79: Committed. Elapsed time: 4 ms.
+26/11/14 16:10:25 INFO Executor: Finished task 12.0 in stage 4.1 (TID 79). 7113 bytes result sent to driver
+26/11/14 16:10:26 INFO FileOutputCommitter: Saved output of task 'attempt_202611141607482296967168894289847_0004_m_000023_80' to hdfs://localhost:9000/data/ref/ref12_enriched/_temporary/0/task_202611141607482296967168894289847_0004_m_000023
+26/11/14 16:10:26 INFO SparkHadoopMapRedUtil: attempt_202611141607482296967168894289847_0004_m_000023_80: Committed. Elapsed time: 4 ms.
+26/11/14 16:10:26 INFO Executor: Finished task 13.0 in stage 4.1 (TID 80). 7113 bytes result sent to driver
+26/11/14 16:10:26 INFO YarnCoarseGrainedExecutorBackend: Driver commanded a shutdown
+26/11/14 16:10:27 INFO YarnCoarseGrainedExecutorBackend: Driver from 192.0.2.2:42263 disconnected during shutdown
+26/11/14 16:10:27 INFO YarnCoarseGrainedExecutorBackend: Driver from 192.0.2.2:42263 disconnected during shutdown
+26/11/14 16:10:27 INFO MemoryStore: MemoryStore cleared
+26/11/14 16:10:27 INFO BlockManager: BlockManager stopped
+26/11/14 16:10:27 INFO ShutdownHookManager: Shutdown hook called
