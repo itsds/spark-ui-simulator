@@ -24,6 +24,11 @@
   driver posts them.
 * Write jobs create real files on the simulated HDFS (replica 1 on the writing
   executor's host), so later scans of them are planned from what was written.
+* Stage attempts: a stage runs again over its missing partitions. Without the external
+  shuffle service an executor's map output dies with it (YARN preemption, a kill): a
+  running map stage re-queues its finished tasks (Resubmitted), reduce tasks that still
+  had to fetch from it fail (FetchFailed), the stage attempt fails and the DAGScheduler
+  re-runs the lost map partitions, then the stage (ref12, ADR-044).
 
 Everything that happens is recorded with its simulated time; `engine.emit`
 turns the records into the event log.
@@ -44,6 +49,7 @@ from ..cost.model import StageContext, TaskEnv, TaskPlan, TaskResult, killed_met
 from ..environment import CLUSTER_SPARK_DEFAULTS, PySparkYarnApp, hadoop_defaults, spark_properties
 from ..eventlog import (
     SHUFFLE_READ_ACCUMS,
+    BlockManagerId,
     ExecutorLostFailure,
     ExecutorMetrics,
     IdAllocator,
@@ -51,6 +57,7 @@ from ..eventlog import (
     TaskMetrics,
 )
 from ..eventlog.ordering import scala_int_hashset_order
+from ..eventlog.reasons import FetchFailed
 from ..model.cluster import (
     Cluster,
     ClusterSpec,
@@ -127,6 +134,7 @@ class AppSpec:
     # Fault injection (sparksim.scenario.faults): inputs of the simulation, never its outputs.
     native_memory_per_task: int = 0  # bytes of native memory each running task holds in its container
     executor_kills: tuple[ExecutorKill, ...] = ()
+    preemptions: tuple[Preemption, ...] = ()
     # YARN application attempt (`run_attempts`): a failed attempt that isn't the last is followed by the next
     # one, with the same submission, cluster and data (`data_seed`) and its own randomness (`seed`).
     attempt: int = 1
@@ -144,6 +152,17 @@ class ExecutorKill:
 
     executor: str
     at_ms: int
+
+
+@dataclass(frozen=True)
+class Preemption:
+    """Another queue's app needs its guaranteed share back: from `at_ms` after the application started, the
+    CapacityScheduler's preemption policy takes `containers` of this app's executor containers (the youngest
+    first, never the AM), and the queue has no room for replacements until `until_ms`."""
+
+    at_ms: int
+    containers: int
+    until_ms: int
 
 
 # --------------------------------------------------------------------------- records
@@ -181,12 +200,21 @@ class TaskRecord:
     exec_metrics: ExecutorMetrics = field(default_factory=ExecutorMetrics)
     sql: list[tuple[int, int]] = field(default_factory=list)  # SQL metric (accumulator id, update)
     task_attempt: int = 0  # TaskInfo.Attempt (retries of the same index)
-    failure: ExecutorLostFailure | None = None  # set when its executor was lost while it ran
+    failure: ExecutorLostFailure | FetchFailed | None = None  # its executor was lost, or a shuffle fetch failed
     speculative: bool = False  # TaskInfo.Speculative: a copy launched by speculation
     killed: str | None = None  # TaskKilled reason when the attempt was killed
     kill_reqs: list[tuple[int, str]] = field(default_factory=list)  # (driver asked at, reason)
     killed_metrics: TaskMetrics | None = None  # what the killed attempt reported (None: it had finished)
     interrupted: bool = False  # the kill interrupted its I/O ("Executor interrupted and killed")
+    partition: int = -1  # TaskInfo.Partition ID (the index in a retry attempt's task set differs)
+    resubmitted: bool = False  # a finished map task whose output died with its executor (no shuffle service)
+    fetch_retry: bool = False  # its failed fetch was retried once (the request was in flight at the death)
+    extra_fetch: tuple | None = None  # FetchFailed: (exchange, join side, dead executor, at, variant, blocks)
+    success_accums: list | None = None  # the Accumulables its Success TaskEnd listed (a Resubmitted repeats them)
+
+    def __post_init__(self):
+        if self.partition < 0:
+            self.partition = self.index
 
     @property
     def duration(self) -> int:
@@ -229,6 +257,24 @@ class StageRecord:
     failure: str | None = None  # StageInfo.failureReason: the stage was aborted or cancelled
     abort_tid: int | None = None  # the lost attempt whose failure aborted it (spark.task.maxFailures)
     native_funcs: list = field(default_factory=list)  # functions it evaluates that hold memory outside the heap
+    # Stage attempts (DAGScheduler). `run.stages[id]` is the stage's first record: attempt 0, or the skipped
+    # stage a job re-created; every submitted attempt has its own record (`run.attempts_of`).
+    partitions: list[int] | None = None  # task index -> partition (None: all, in order)
+    base: StageRecord | None = None  # the stage's first record (None: this is it)
+    orig: StageRecord | None = None  # a re-created stage: the map stage that first wrote its shuffle
+    next_attempt: int = 0  # on the base: Stage.nextAttemptId
+    finished: set[int] = field(default_factory=set)  # on the base of a result stage: partitions its job finished
+    running: bool = False  # on the base: in runningStages
+    job: JobRecord | None = None  # on the base: the job it runs for
+    fetch_failed: bool = False  # this attempt failed with a FetchFailed
+    full_tasks: int = 0  # on the base: the stage's partitions
+
+    def part(self, index: int) -> int:
+        return index if self.partitions is None else self.partitions[index]
+
+    @property
+    def root(self) -> StageRecord:
+        return self.base or self
 
 
 @dataclass
@@ -243,6 +289,10 @@ class JobRecord:
     done: Signal | None = None
     failure: str | None = None  # JobFailed's exception message
     cancelled: bool = False  # failed by cancellation (handleJobCancellation), not by its own stage
+    waiting: list = field(default_factory=list)  # stages waiting for their parents (waitingStages)
+    missing_parents: list[int] = field(default_factory=list)  # parents the final stage waited for at submission
+    on_done: object = None  # the job's success handler (map output stats, broadcast, AQE)
+    qrec: object = None  # the SQL execution it belongs to
 
 
 @dataclass
@@ -389,6 +439,15 @@ class AppRun:
         # NodeManager localization of the dist resources: hosts that have them, hosts downloading them (until)
         self.localized: set[str] = set(spec.localized_hosts) | {self.am_host.name}
         self._localizing: dict[str, int] = {}
+        # Without the external shuffle service an executor's shuffle files die with it (ref12): the stage
+        # attempts the DAGScheduler submitted, outputs it unregistered (where a stale map-status cache still
+        # points), the fetch failures it was told about, and the stages waiting for ResubmitFailedStages.
+        self.stage_attempts: dict[tuple[int, int], StageRecord] = {}
+        self.lost_outputs: dict[tuple[str, int], tuple[Executor, int | None, int]] = {}  # -> (executor, tid, at)
+        self._fetch_reasons: dict[int, FetchFailed] = {}
+        self._failed_stages: list[StageRecord] = []
+        self._resubmit_at: int | None = None
+        self.fetch_rng = substream(seed, "fetch-failures")
 
     def localization_done(self, host: Host, t: int) -> int:
         """When a container launched on `host` at `t` can start: after its NodeManager has localized the app's
@@ -449,6 +508,8 @@ class AppRun:
             self.dynalloc.start()
         for k in self.spec.executor_kills:
             self.sim.at(self.t0 + k.at_ms, self._sigkill, k)
+        for p in self.spec.preemptions:
+            self.sim.at(self.t0 + p.at_ms, self._preempt_round, p, p.containers)
         self.sim.spawn(self._driver())
         self.sim.run()
         assert self.app_end is not None, "driver program did not finish"
@@ -530,7 +591,7 @@ class AppRun:
             exec_mem += rec.result.exec_memory * min(1.0, frac / 0.7)
             fetching += rec.result.fetching
             running += 1
-            for f in self.stages[rec.stage_id].native_funcs:  # mapped pages the task's lookups have touched
+            for f in self.stage_rec(rec.stage_id, rec.attempt).native_funcs:  # mapped pages its lookups touched
                 if f.native_scope == "task":
                     native += f.native_bytes * min(1.0, frac / cal.UDF_NATIVE_RAMP)
         for f, since in ex.extra.get("native_opened", {}).items():  # one per JVM, open from its first task on
@@ -582,9 +643,14 @@ class AppRun:
         if self.stopping:
             return
         ex.exit_at = self.sim.now
-        self.rm.container_exited(ex, ex.exit_at)
+        if not ex.extra.get("preempted"):  # a preempted container: the RM completed it itself
+            self.rm.container_exited(ex, ex.exit_at)
         if ex.id in self.sched.executors:  # the driver notices the dropped RPC connection
-            self.sim.after(self.rng.randint(2, 15), self._driver_disconnected, ex)
+            gap = self.rng.randint(2, 15)
+            ex.extra["dag_lost_at"] = self.sim.now + gap
+            self.sim.after(gap, self._driver_disconnected, ex)
+        if not self.ess_enabled:  # its shuffle files are gone with it: fetches that hadn't reached it fail
+            self._doom_fetches(ex)
 
     def _driver_disconnected(self, ex: Executor) -> None:
         """DriverEndpoint.onDisconnected → disableExecutor → executorLost(LossReasonPending): the block
@@ -595,21 +661,24 @@ class AppRun:
         self.allocator.pending_loss.add(ex.id)
         self.yarn_log.append((self.sim.now, "driver_disconnected", ex))
         self._record("block_manager_removed", ex)
+        if not self.ess_enabled:  # DAGScheduler.handleExecutorLost(fileLost = true) right away (ref12)
+            self._lose_map_outputs(ex)
 
     def _executor_loss_reason(self, ex: Executor, reason: str, by_app: bool, released: bool) -> None:
         """RemoveExecutor(reason) reaches the driver: fail the running tasks, post ExecutorRemoved."""
         if self.stopping or ex.id not in self.sched.executors:
             return
-        self.epoch += 1  # DAGScheduler.handleExecutorLost
-        if not self.ess_enabled and any(e.map_executor and ex.id in e.map_executor
-                                        for e in self.exchanges.values()):
-            raise NotImplementedError(
-                f"executor {ex.id} lost its shuffle files: without spark.shuffle.service.enabled this needs "
-                "FetchFailed / stage retry handling, which is not modelled yet")
+        if self.ess_enabled:
+            self.epoch += 1  # (kept for the scenarios generated with it; Spark moves the epoch only for lost files)
+        elif ex.id not in self.sched.disabled:  # the reason came before the dropped connection (a preemption)
+            self.yarn_log.append((self.sim.now, "dag_executor_lost", ex))
+            self._record("block_manager_removed", ex)
+            self._lose_map_outputs(ex)
         ex.removed_reason = "Executor killed by driver." if released else reason
         ex.exit_caused_by_app = by_app
         self._loss_reason = (ex, reason, by_app)
-        lost = self.sched.remove_executor(ex.id, counts_as_failure=by_app and not released)
+        lost = self.sched.remove_executor(ex.id, counts_as_failure=by_app and not released,
+                                          resubmit_maps=not self.ess_enabled)
         self.yarn_log.append((self.sim.now, "executor_lost", (ex, reason, by_app, released, lost)))
         ex.removed_at = self.sim.now + self.rng.randint(1, 4)
         self._record("executor_removed", (ex, ex.removed_reason), t=ex.removed_at)
@@ -617,6 +686,271 @@ class AppRun:
             self._record("executor_removed", (ex, ex.removed_reason), t=ex.removed_at + 1)
         if self.dynalloc is not None:
             self.dynalloc.executor_removed(ex)
+
+    # ------------------------------------------------------------------ YARN preemption (CapacityScheduler)
+
+    def _preempt_round(self, p: Preemption, remaining: int) -> None:
+        """ProportionalCapacityPreemptionPolicy, every 3 s: it marks this app's youngest executor containers
+        (never the AM), a natural_termination_factor (0.2) share of what is still to reclaim and at least one,
+        and kills each 15 s after marking it (max_wait_before_kill). Spark ignores the PreemptionMessage."""
+        if self.stopping or remaining <= 0:
+            return
+        self.rm.blocked_until = max(self.rm.blocked_until, self.t0 + p.until_ms)
+        alive = sorted((e for e in self.allocator.running.values()
+                        if e.exit_at is None and e.nm_kill_at is None and "preempt_marked" not in e.extra),
+                       key=lambda e: -e.container_n)
+        k = min(len(alive), max(1, math.ceil(cal.PREEMPTION_NATURAL_TERMINATION * remaining)))
+        for ex in alive[:k]:
+            ex.extra["preempt_marked"] = self.sim.now
+            self.sim.after(cal.PREEMPTION_MAX_WAIT_MS, self._preempt_kill, ex, p)
+        if remaining - k > 0 and len(alive) > k:
+            self.sim.after(cal.PREEMPTION_INTERVAL_MS, self._preempt_round, p, remaining - k)
+
+    def _preempt_kill(self, ex: Executor, p: Preemption) -> None:
+        """The RM kills the container (exit status -102, PREEMPTED) and hands its memory to the other queue; the
+        AM hears of it at its next allocate call, the NodeManager stops it at its next heartbeat (SIGTERM)."""
+        if self.stopping or ex.exit_at is not None or ex.nm_kill_at is not None:
+            return
+        now = self.sim.now
+        ex.extra["preempted"] = now
+        ex.exit_status = -102
+        ex.diagnostics = "Container preempted by scheduler"
+        self.yarn_log.append((now, "rm_preempted", ex))
+        self.rm.preempted(ex, now)
+        self.sim.at(self.t0 + p.until_ms, self.rm.release, ex.host.name)  # the other app is done by then
+        self.sim.at(self.rm.next_heartbeat(ex.host.name, now), self._nm_stop_preempted, ex)
+
+    def _nm_stop_preempted(self, ex: Executor) -> None:
+        if self.stopping or ex.nm_kill_at is not None or ex.exit_at is not None:
+            return
+        now = self.sim.now
+        ex.nm_kill_at = now
+        self.yarn_log.append((now, "nm_stop", ex))
+        self.sim.at(now + self.rng.randint(*cal.JVM_SIGTERM_EXIT_MS), self._jvm_exit, ex)
+
+    # ------------------------------------------------------------------ lost shuffle files (no ESS)
+
+    def _lose_map_outputs(self, ex: Executor) -> None:
+        """`removeExecutorAndUnregisterOutputs(fileLost = true)`: "Executor lost: N (epoch E)", the map outputs it
+        served are unregistered ("Shuffle files lost for executor"), the MapOutputTracker epoch moves."""
+        if ex.extra.get("outputs_lost"):
+            return
+        ex.extra["outputs_lost"] = True
+        ex.extra["loss_epoch"] = self.epoch
+        now = self.sim.now
+        n = 0
+        for name, xch in self.exchanges.items():
+            tids = {m: xch.map_tid[m] for m, e in enumerate(xch.map_executor) if e == ex.id}
+            for m in xch.remove_outputs_on_executor(ex.id):
+                self.lost_outputs[(name, m)] = (ex, tids[m], now)
+                n += 1
+        self.yarn_log.append((now, "shuffle_files_lost", (ex, self.epoch, n)))
+        self.epoch += 1
+
+    def _source_windows(self, st: StageRecord, rec: TaskRecord) -> list[tuple[str, int, int, int, int]]:
+        """(exchange, first reducer, end reducer, window start, window end) per shuffle source: when the task
+        reads it. A sort or aggregation below the output consumes its whole input first; the sources fill one
+        after the other (the join's streamed side first), each for its share of the bytes (ShuffleBlockFetcher-
+        Iterator sends its requests in random order within that time)."""
+        res = rec.result
+        start = rec.launch + max(1, int(res.scheduler_delay_ms * 0.3)) + res.deserialize_ms
+        scale = res.wall_per_cpu_ms
+        read_ms = sum(s.cpu_ns / 1e6 * scale + s.io_ms + s.fetch_wait_ms for s in res.sources)
+        fill = 0.0
+        for op in res.trace:
+            fill += (op.cpu_ns + op.spill_cpu_ns) / 1e6 * scale + op.spill_ms
+            if op.kind in ("smj", "final_agg", "agg"):
+                break
+        span = max(1.0, min(float(res.run_ms), read_ms + fill))
+        reads = st.plans[rec.partition].reads
+        sizes = [max(1, s.stats.bytes) if s.stats is not None else 1 for s in res.sources if s.stats is not None]
+        sizes = sizes if len(sizes) == len(reads) else [1] * len(reads)
+        total = float(sum(sizes))
+        out, at = [], float(start)
+        for (name, a, b), sz in zip(reads, sizes, strict=True):
+            w = span * sz / total
+            out.append((name, a, b, int(at), int(at + w)))
+            at += w
+        return out
+
+    def _blocks_from(self, name: str, a: int, b: int, eid: str, stale_before: int | None = None) -> list[int]:
+        """Map indices of exchange `name` with records for reducers [a, b) whose output `eid` served: still
+        registered there, or (a stale map-status cache fetched before `stale_before`) unregistered from it."""
+        xch = self.exchanges[name]
+        rows = xch.records[:, a:b].sum(axis=1)
+        out = []
+        for m in range(xch.num_maps):
+            if rows[m] <= 0:
+                continue
+            if xch.map_executor[m] == eid:
+                out.append(m)
+            elif xch.map_executor[m] is None:
+                lost = self.lost_outputs.get((name, m))
+                if lost is not None and lost[0].id == eid and (stale_before is None or stale_before < lost[2]):
+                    out.append(m)
+        return out
+
+    def _doom_fetches(self, dead: Executor) -> None:
+        """`dead`'s JVM exited: a running reduce task that still had to fetch blocks it served fails. A request
+        sent after the death meets a closed port and the driver confirms the executor is dead; one in flight
+        dies with a connection reset and is retried after spark.shuffle.io.retryWait (ref05, ref12)."""
+        now = self.sim.now
+        for eid, running in list(self.sched.running.items()):
+            if eid == dead.id:
+                continue
+            for a in list(running.values()):
+                rec = self.task_records[a.task_id]
+                st = self.stage_rec(rec.stage_id, rec.attempt)
+                if st.spec is None or not st.spec.shuffle_inputs or a.task_id in self._fetch_reasons:
+                    continue
+                cached = a.executor.extra.get("statuses", {})
+                for name, lo, hi, w0, w1 in self._source_windows(st, rec):
+                    blocks = self._blocks_from(name, lo, hi, dead.id, cached.get(name))
+                    if not blocks:
+                        continue
+                    t_req = int(w0 + self.fetch_rng.random() * max(1, w1 - w0))
+                    req = self._request(name, lo, hi, blocks)
+                    if t_req + req[1] < now:
+                        continue  # it had its blocks before the executor died
+                    variant = "retry" if t_req <= now else self._variant(rec, name, t_req, w0, w1)
+                    self._schedule_fetch_failure(st, a, rec, name, lo, blocks[0], dead, t_req, variant, req[0])
+                    break
+
+    def _request(self, name: str, lo: int, hi: int, blocks: list[int]) -> tuple[int, int]:
+        """(blocks, ms in flight) of the first FetchRequest to an executor: blocks up to
+        spark.reducer.maxSizeInFlight / 5 (ShuffleBlockFetcherIterator.createFetchRequests)."""
+        xch = self.exchanges[name]
+        sizes = xch.bytes[blocks, lo:hi].sum(axis=1)
+        n, total = 0, 0
+        for b in sizes.tolist():
+            if n and total + b > cal.FETCH_REQUEST_BYTES:
+                break
+            n, total = n + 1, total + b
+        return n, max(2, int(total / (cal.FETCH_STREAM_MBPS * MiB) * 1000))
+
+    def _variant(self, rec: TaskRecord, name: str, t_req: int, w0: int, w1: int) -> str:
+        """`init`: the request was in the iterator's first batch (spark.reducer.maxSizeInFlight of the task's
+        remote bytes); `next`: one sent while the task consumed its blocks."""
+        src = next((s for s in rec.result.sources if s.stats is not None
+                    and getattr(s.node, "name", None) == name), None)
+        remote = src.stats.remote_bytes if src is not None else 0
+        first = 1.0 if remote <= 0 else min(1.0, cal.MAX_BYTES_IN_FLIGHT / remote)
+        return "init" if t_req - w0 <= first * max(1, w1 - w0) else "next"
+
+    def _check_fetches(self, st: StageRecord, a: Launch, rec: TaskRecord) -> None:
+        """A reduce task launched after an executor's shuffle files died. MapOutputTrackerWorker: a task of a
+        newer epoch clears the executor's map-status cache; a cached shuffle still points at the dead executor
+        (FetchFailed: ExecutorDeadException), a fresh fetch finds the output missing (MetadataFetchFailed)."""
+        ex = a.executor
+        cache = ex.extra.setdefault("statuses", {})
+        if st.epoch > ex.extra.get("status_epoch", -1):
+            cache.clear()
+            ex.extra["status_epoch"] = st.epoch
+        for name in st.spec.shuffle_inputs:
+            cache.setdefault(name, a.launch_time)
+        for name, lo, hi, w0, w1 in self._source_windows(st, rec):
+            xch = self.exchanges[name]
+            rows = xch.records[:, lo:hi].sum(axis=1)
+            dead: dict[str, list[int]] = {}
+            for m in range(xch.num_maps):
+                if rows[m] <= 0:
+                    continue
+                e = xch.map_executor[m]
+                if e is None:
+                    lost = self.lost_outputs.get((name, m))
+                    if lost is None or cache[name] >= lost[2]:
+                        raise NotImplementedError(
+                            f"task {a.task_id} of stage {st.stage_id}.{st.attempt} fetched fresh map statuses of "
+                            f"{name} with output {m} missing: MetadataFetchFailedException is not modelled yet")
+                    if lost[0].exit_at is not None:
+                        dead.setdefault(lost[0].id, []).append(m)
+                elif self.executor_by_id[e].exit_at is not None:  # died, the driver doesn't know yet
+                    dead.setdefault(e, []).append(m)
+            if dead:
+                eid, blocks = min(dead.items(), key=lambda kv: kv[1][0])
+                t_req = int(w0 + self.fetch_rng.random() * max(1, w1 - w0))
+                variant = self._variant(rec, name, t_req, w0, w1)
+                self._schedule_fetch_failure(st, a, rec, name, lo, blocks[0], self.executor_by_id[eid], t_req,
+                                             variant, self._request(name, lo, hi, blocks)[0])
+                return
+
+    def _schedule_fetch_failure(self, st: StageRecord, a: Launch, rec: TaskRecord, name: str, reduce_id: int,
+                                map_index: int, dead: Executor, t_req: int, variant: str, n_blocks: int) -> None:
+        """The task's request to `dead` fails: at once (`createAndStart` asks the driver, the executor is dead:
+        ExecutorDeadException), or for a request in flight at the death, after the retry wait. The task thread
+        reaches the failure in its results queue a little later and throws FetchFailedException."""
+        from .fetchfail import fetch_failed_message, join_side
+
+        if variant == "retry":
+            t_fail = self.sim.now + cal.SHUFFLE_RETRY_WAIT_MS + self.fetch_rng.randint(*cal.FETCH_FAILURE_MS)
+        else:
+            t_fail = max(t_req, self.sim.now) + self.fetch_rng.randint(*cal.FETCH_FAILURE_MS)
+        if t_fail >= a.finish_time:
+            return
+        xch = self.exchanges[name]
+        lost = self.lost_outputs.get((name, map_index))
+        map_tid = xch.map_tid[map_index] if xch.map_executor[map_index] == dead.id else (lost[1] if lost else -1)
+        bm = BlockManagerId(dead.id, dead.host.name, dead.block_manager_port)
+        side = join_side(st.plan_root, name)
+        msg = fetch_failed_message(st, side, dead.id, variant)
+        self._fetch_reasons[a.task_id] = FetchFailed(bm, xch.shuffle_id, map_tid, map_index, reduce_id, msg)
+        rec.fetch_retry = variant == "retry"
+        rec.extra_fetch = (name, side, dead, max(t_req, self.sim.now) if variant != "retry" else self.sim.now,
+                           variant, n_blocks)
+        self.sched.fail_fetch(a, t_fail)
+
+    def _on_resubmitted(self, st: StageRecord, a: Launch) -> None:
+        """`TaskSetManager.executorLost`: a finished map task's output died with its executor; its second
+        TaskEnd (Resubmitted) re-queues it ("Resubmitted ShuffleMapTask(S, P), so marking it as still running")."""
+        rec = self.task_records[a.task_id]
+        rec.resubmitted = True
+        self._record("task_resubmitted", rec)
+        self.yarn_log.append((self.sim.now, "resubmitted", rec))
+
+    def _on_fetch_failed(self, st: StageRecord, a: Launch) -> None:
+        """`DAGScheduler.handleTaskCompletion(FetchFailed)`: the first one of the latest attempt fails the stage
+        attempt (StageCompleted with the message), the stage and the map stage go to failedStages and
+        ResubmitFailedStages comes 200 ms later; later ones of that attempt are handled the same way minus the
+        resubmission, each moving the MapOutputTracker epoch (ref12: 4 -> 7 after three)."""
+        rec = self.task_records[a.task_id]
+        reason = self._fetch_reasons.pop(a.task_id)
+        rec.finish = self.sim.now
+        rec.failure = reason
+        rec.sql = []
+        self._record("task_end", rec)
+        base = st.root
+        name = rec.extra_fetch[0]
+        map_base = next(self.stages[p] for p in base.parent_ids if self.stages[p].exchange == name)
+        latest = st.attempt == base.next_attempt - 1
+        first = latest and not st.fetch_failed
+        if latest:
+            self.epoch += 1
+        if first:
+            st.fetch_failed = True
+            st.failure = reason.message
+            base.running = False
+            st.completed = self.sim.now + self.rng.randint(*cal.FETCH_FAIL_STAGE_MS)
+            self._record("stage_completed", st, t=st.completed)
+            if len([r for r in self.attempts_of(base) if r.fetch_failed]) >= cal.MAX_CONSECUTIVE_STAGE_ATTEMPTS:
+                raise NotImplementedError(f"stage {base.stage_id} failed {cal.MAX_CONSECUTIVE_STAGE_ATTEMPTS} times "
+                                          "on fetch failures: the job abort is not modelled for this path")
+            for s in (base, map_base):
+                if s not in self._failed_stages:
+                    self._failed_stages.append(s)
+            if self._resubmit_at is None:
+                self._resubmit_at = self.sim.now + cal.RESUBMIT_TIMEOUT_MS
+                self.sim.at(self._resubmit_at, self._resubmit_failed_stages)
+        self.yarn_log.append((self.sim.now, "fetch_failed", (rec, reason, first, latest, st, map_base)))
+
+    def _resubmit_failed_stages(self) -> None:
+        """ResubmitFailedStages: every failed stage again (their missing parents first), by first job."""
+        self._resubmit_at = None
+        failed, self._failed_stages = self._failed_stages, []
+        if self.stopping:
+            return
+        self.yarn_log.append((self.sim.now, "resubmit_failed_stages", list(failed)))
+        for s in sorted(failed, key=lambda s: (s.job.job_id, s.stage_id)):
+            self._submit_stage(s, s.job)
 
     def _dynalloc_target(self, target: int, old: int, backlogged: bool, delta: int = 0) -> None:
         self.yarn_log.append((self.sim.now, "da_target", (target, old, backlogged, delta)))
@@ -719,7 +1053,8 @@ class AppRun:
                 f"query {q.description!r}: its write job failed. FileFormatWriter's 'Aborting job' path (the "
                 "committer's abortJob, the error log) has no real reference yet (ref10 fails in a map stage)")
         stage = self.stages[self.jobs[-1].final_stage]
-        files = [t.result.output_file for t in stage.tasks if t.ok and t.result.output_file]
+        files = [t.result.output_file for a in self.attempts_of(stage) for t in a.tasks
+                 if t.ok and t.result.output_file]
         commit = int(cal.JOB_COMMIT_FIXED_MS + len(files) * cal.JOB_COMMIT_MS_PER_FILE * self.rng.uniform(0.85, 1.2))
         yield commit
         cmd = aqe.root.current
@@ -809,7 +1144,7 @@ class AppRun:
         plan_root = qstage.plan if qstage is not None else aqe.root.current
 
         # Re-create the stages of every shuffle this stage depends on (they were cleaned up when their own
-        # map-stage jobs finished): new ids, ancestors first, all skipped since their outputs are available.
+        # map-stage jobs finished): new ids, ancestors first; skipped when their outputs are available.
         recreated: list[StageRecord] = []
 
         def recreate(exchange: str) -> int:
@@ -817,7 +1152,8 @@ class AppRun:
             parents = [recreate(x) for x in orig.spec.shuffle_inputs]
             sid = self.stage_ids.next()
             rec = StageRecord(sid, 0, orig.name, orig.details, orig.num_tasks, orig.rdds, parents,
-                              "ShuffleMapTask", qi, orig.spec, skipped=True, exchange=exchange)
+                              "ShuffleMapTask", qi, orig.spec, skipped=True, exchange=exchange, orig=orig,
+                              full_tasks=orig.num_tasks)
             self.stages[sid] = rec
             recreated.append(rec)
             return sid
@@ -829,60 +1165,165 @@ class AppRun:
 
         props = self._job_properties(q, qi, stage, spec)
         job = JobRecord(job_id, qi, now, stage_ids, stage.stage_id, props, done=self.sim.signal())
+        for r in [stage, *recreated]:
+            r.job = job
+        if not self.ess_enabled:  # outputs lost since their map stage finished: those stages run first
+            job.missing_parents = [r.stage_id for r in recreated
+                                   if r.parent_ids == [] and self.exchanges[r.exchange].missing()]
         self.jobs.append(job)
         self._record("job_start", job)
 
         materialized = self.sim.signal()
         stage.props = {**props, "resource.executor.cores": str(self.spec.sizing.cores)}
 
-        def submit_stage():
-            stage.submitted = self.sim.now
-            stage.accum_base = self.accum_ids.take(35).start
-            stage.epoch = self.epoch
-            nodes = sum(1 for _ in plan_root.walk()) if plan_root is not None else 4
-            piece = 3_600 + nodes * 2_900 + (90_000 if isinstance(spec.sink, WriteSink) else 0)
-            piece = int(piece * self.bc_rng.uniform(0.93, 1.07))
-            stage.task_binary_bc = self._new_broadcast("task_binary", piece, int(piece * self.bc_rng.uniform(2.3, 3.4)),
-                                                       "broadcast at DAGScheduler.scala:1611")
-            self._record("stage_submitted", stage)
-            ts = TaskSet(stage.stage_id, 0, job_id, [p.preferred for p in stage.plans],
-                         on_launch=lambda a, st=stage: self._on_launch(st, a),
-                         on_finish=lambda a, st=stage: self._on_finish(st, a),
-                         on_fail=lambda a, st=stage: self._on_fail(st, a),
-                         on_kill=lambda a, st=stage: self._on_kill(st, a),
-                         records_of=self._records_read,
-                         on_abort=lambda i, a, st=stage: self._task_set_aborted(st, job, qrec, i, a),
-                         on_removed=lambda st=stage: self.yarn_log.append((self.sim.now, "taskset_removed", st)))
-            stage.taskset = ts
-            ts.done = self.sim.signal()
-            ts.done.wait(lambda: self.sim.after(self._jitter(cal.STAGE_COMPLETE_DELAY_MS), stage_completed))
-            self.sched.submit(ts)
-            if self.dynalloc is not None:
-                self.dynalloc.stage_submitted()
-
-        def stage_completed():
-            stage.completed = self.sim.now
-            self._record("stage_completed", stage)
-            self.sim.after(self._jitter(cal.JOB_END_DELAY_MS), job_ended)
-
-        def job_ended():
-            job.completed = self.sim.now
-            if stage.task_type == "ResultTask":  # "Cancelling potential speculative or zombie tasks for this job"
-                self.sched.kill_all(stage.taskset, "Stage finished")
-            self._record("job_end", job)
-            job.done.fire()
+        def job_succeeded():
             if spec.is_broadcast:
                 self._broadcast_built(qrec, stage, job, spec, materialized)
             else:
                 if qstage is not None:
                     ex = self.exchanges[spec.sink.exchange]
-                    size = sum(t.result.sink_rows * t.result.sink_row_bytes for t in stage.tasks if t.ok)
+                    done = [t for a in self.attempts_of(stage) for t in a.tasks if t.ok and not t.resubmitted]
+                    size = sum(t.result.sink_rows * t.result.sink_row_bytes for t in done)
                     self.stage_stats[spec.sink.exchange] = (size, int(ex.records.sum()))
                     self.epoch += 1  # DAGScheduler: mapOutputTracker.incrementEpoch() after a map stage
                 materialized.fire()
 
-        self.sim.after(self._jitter(cal.JOB_TO_STAGE_MS), submit_stage)
+        job.on_done = job_succeeded
+        job.qrec = qrec
+        self.sim.after(self._jitter(cal.JOB_TO_STAGE_MS), self._submit_stage, stage, job)
         return materialized
+
+    # ------------------------------------------------------------------ stages (DAGScheduler)
+
+    def attempts_of(self, stage: StageRecord) -> list[StageRecord]:
+        """Every submitted attempt of `stage`'s stage, in submission order."""
+        base = stage.root
+        return [r for (sid, _a), r in sorted(self.stage_attempts.items()) if sid == base.stage_id]
+
+    def stage_rec(self, stage_id: int, attempt: int) -> StageRecord:
+        """The record of one stage attempt (attempt 0 of a never re-run stage: `run.stages[id]`)."""
+        return self.stage_attempts.get((stage_id, attempt)) or self.stages[stage_id]
+
+    def all_stage_records(self) -> list[StageRecord]:
+        """Every record that ran tasks or was listed (skipped stages included), attempts in order."""
+        out = list(self.stages.values())
+        out += [r for r in self.stage_attempts.values() if r.base is not None]
+        return out
+
+    def _available(self, st: StageRecord) -> bool:
+        """ShuffleMapStage.isAvailable: every map partition has a registered output."""
+        return st.exchange is not None and not self.exchanges[st.exchange].missing()
+
+    def _submit_stage(self, base: StageRecord, job: JobRecord) -> None:
+        """`DAGScheduler.submitStage`: its missing parents first (it waits), else its missing tasks. Every
+        available parent is skipped, which bumps its next attempt to 1 (`increaseAttemptIdOnFirstSkip`)."""
+        if base.running or base in job.waiting or self.stopping or job.completed is not None:
+            return
+        parents = [self.stages[p] for p in base.parent_ids]
+        missing = [] if self.ess_enabled else sorted((p for p in parents if not self._available(p)),
+                                                     key=lambda p: p.stage_id)
+        for p in parents:
+            if p not in missing and p.next_attempt == 0:
+                p.next_attempt = 1
+        if missing:
+            job.waiting.append(base)
+            for p in missing:
+                self._submit_stage(p, job)
+            return
+        self._submit_missing_tasks(base, job)
+
+    def _submit_missing_tasks(self, base: StageRecord, job: JobRecord) -> None:
+        """`DAGScheduler.submitMissingTasks`: a new stage attempt over the partitions still to compute."""
+        if base.task_type == "ShuffleMapTask" and base.base is None and base.orig is None and base.next_attempt == 0:
+            parts = None  # the stage's first attempt (its own record): every partition
+        elif base.task_type == "ShuffleMapTask":
+            parts = self.exchanges[base.exchange].missing()
+        else:
+            parts = None if base.next_attempt == 0 else [p for p in range(base.full_tasks or base.num_tasks)
+                                                          if p not in base.finished]
+        attempt = base.next_attempt
+        base.next_attempt += 1
+        if attempt == 0 and base.orig is None:
+            stage = base  # the record the job created
+            base.full_tasks = base.full_tasks or base.num_tasks
+        else:
+            src = base.orig or base
+            stage = StageRecord(base.stage_id, attempt, base.name, base.details,
+                                len(parts) if parts is not None else src.num_tasks, src.rdds, base.parent_ids,
+                                base.task_type, base.query, src.spec, plans=src.plans, ctx=src.ctx,
+                                exchange=base.exchange, top_scope=src.top_scope, plan_root=src.plan_root,
+                                scan_bcs=list(src.scan_bcs), native_funcs=list(src.native_funcs), partitions=parts,
+                                base=base)
+            stage.props = {**job.props, "resource.executor.cores": str(self.spec.sizing.cores)}
+            self.stage_rng.setdefault(base.stage_id, substream(self.spec.seed, f"tasks/{base.stage_id}"))
+            self.stage_nprng.setdefault(base.stage_id, numpy_rng(self.world_seed, f"blocks/{base.stage_id}"))
+        base.running = True
+        self.stage_attempts[(base.stage_id, attempt)] = stage
+        stage.submitted = self.sim.now
+        stage.accum_base = self.accum_ids.take(35).start
+        stage.epoch = self.epoch
+        plan_root = stage.plan_root
+        spec = stage.spec
+        nodes = sum(1 for _ in plan_root.walk()) if plan_root is not None else 4
+        piece = 3_600 + nodes * 2_900 + (90_000 if isinstance(spec.sink, WriteSink) else 0)
+        piece = int(piece * self.bc_rng.uniform(0.93, 1.07))
+        stage.task_binary_bc = self._new_broadcast("task_binary", piece, int(piece * self.bc_rng.uniform(2.3, 3.4)),
+                                                   "broadcast at DAGScheduler.scala:1611")
+        self._record("stage_submitted", stage)
+        qrec = job.qrec
+        preferred = [stage.plans[stage.part(i)].preferred for i in range(stage.num_tasks)]
+        ts = TaskSet(stage.stage_id, attempt, job.job_id, preferred,
+                     on_launch=lambda a, st=stage: self._on_launch(st, a),
+                     on_finish=lambda a, st=stage: self._on_finish(st, a),
+                     on_fail=lambda a, st=stage: self._on_fail(st, a),
+                     on_kill=lambda a, st=stage: self._on_kill(st, a),
+                     records_of=self._records_read,
+                     on_abort=lambda i, a, st=stage: self._task_set_aborted(st, job, qrec, i, a),
+                     on_removed=lambda st=stage: self.yarn_log.append((self.sim.now, "taskset_removed", st)),
+                     on_resubmitted=lambda a, st=stage: self._on_resubmitted(st, a),
+                     on_fetch_failed=lambda a, st=stage: self._on_fetch_failed(st, a),
+                     shuffle_map=stage.task_type == "ShuffleMapTask")
+        stage.taskset = ts
+        ts.done = self.sim.signal()
+        ts.done.wait(lambda: self.sim.after(self._jitter(cal.STAGE_COMPLETE_DELAY_MS), self._stage_completed,
+                                            stage, job))
+        self.sched.submit(ts)
+        if self.dynalloc is not None:
+            self.dynalloc.stage_submitted()
+
+    def _stage_completed(self, stage: StageRecord, job: JobRecord) -> None:
+        """Every task of the attempt succeeded: markStageAsFinished; a map stage whose outputs were lost
+        meanwhile resubmits itself, an available one releases its waiting children or ends its job."""
+        base = stage.root
+        stage.completed = self.sim.now
+        base.running = False
+        self._record("stage_completed", stage)
+        if stage.task_type == "ShuffleMapTask" and not self._available(base):
+            self.epoch += 1  # processShuffleMapStageCompletion
+            missing = self.exchanges[base.exchange].missing()
+            self.yarn_log.append((self.sim.now, "map_stage_missing", (base, missing)))
+            self._submit_stage(base, job)
+            return
+        if base.stage_id != job.final_stage:
+            if stage.task_type == "ShuffleMapTask":
+                self.epoch += 1
+            # submitWaitingChildStages: every waiting child of this stage is submitted again, which waits once
+            # more (and resubmits them) if other parents lost outputs meanwhile
+            for w in sorted((w for w in job.waiting if base.stage_id in w.parent_ids), key=lambda w: w.stage_id):
+                job.waiting.remove(w)
+                self._submit_stage(w, job)
+            return
+        if stage.task_type == "ResultTask" and len(base.finished) < base.full_tasks:
+            return  # some partitions still to come (a retry attempt)
+        self.sim.after(self._jitter(cal.JOB_END_DELAY_MS), self._job_ended, stage, job)
+
+    def _job_ended(self, stage: StageRecord, job: JobRecord) -> None:
+        job.completed = self.sim.now
+        if stage.task_type == "ResultTask":  # "Cancelling potential speculative or zombie tasks for this job"
+            self.sched.kill_all(stage.taskset, "Stage finished")
+        self._record("job_end", job)
+        job.done.fire()
+        job.on_done()
 
     # ------------------------------------------------------------------ failed jobs (DAGScheduler)
 
@@ -1054,6 +1495,8 @@ class AppRun:
                 continue
             by_exec: dict[str, float] = {}
             for m, v in enumerate(seg.tolist()):
+                if ex.map_executor[m] is None:  # lost with its executor (no shuffle service)
+                    continue
                 by_exec[ex.map_executor[m]] = by_exec.get(ex.map_executor[m], 0.0) + v
             for eid, v in by_exec.items():
                 if v / total >= 0.2:
@@ -1082,7 +1525,7 @@ class AppRun:
     # ------------------------------------------------------------------ tasks
 
     def _on_launch(self, st: StageRecord, a: Launch) -> int:
-        plan = st.plans[a.index]
+        plan = st.plans[st.part(a.index)]
         ex = a.executor
         if plan.scan is not None:
             prefs = plan.preferred
@@ -1108,7 +1551,7 @@ class AppRun:
         touched = SHUFFLE_READ_ACCUMS if st.spec.shuffle_inputs else frozenset()
         rec = TaskRecord(st.stage_id, st.attempt, a.index, a.task_id, ex, LOCALITY_NAMES[a.locality],
                          a.launch_time, a.launch_time + res.duration_ms, st.task_type, res, touched,
-                         task_attempt=a.attempt, speculative=a.speculative)
+                         task_attempt=a.attempt, speculative=a.speculative, partition=st.part(a.index))
         rec.sql = sqlm.task_updates(st.plan_root, res)
         for f in st.native_funcs:  # an executor-wide resource: opened by the first task that needs it
             if f.native_scope == "executor":
@@ -1120,6 +1563,8 @@ class AppRun:
         self._record("task_start", rec, t=a.launch_time)
         if self.dynalloc is not None:
             self.dynalloc.task_started(ex.id)
+        if not self.ess_enabled and st.spec.shuffle_inputs:
+            self._check_fetches(st, a, rec)
         return res.duration_ms
 
     def _on_fail(self, st: StageRecord, a: Launch) -> None:
@@ -1175,13 +1620,27 @@ class AppRun:
         if self.dynalloc is not None:
             self.dynalloc.task_ended(a.executor.id)
         ex = a.executor
+        part = rec.partition
+        base = st.root
         if st.exchange is not None:
-            self.exchanges[st.exchange].commit(a.index, ex.id, ex.host.name)
+            self.exchanges[st.exchange].commit(part, ex.id, ex.host.name, a.task_id)
+        elif st.task_type == "ResultTask":  # the job's finished partitions (a zombie attempt's count too)
+            if part in base.finished:
+                raise NotImplementedError(
+                    f"partition {part} of stage {st.stage_id} finished twice (attempt {st.attempt}): the "
+                    "OutputCommitCoordinator's TaskCommitDenied is not modelled")
+            base.finished.add(part)
+            newer = [r for r in self.attempts_of(base) if r.attempt > st.attempt and r.partitions is not None
+                     and part in r.partitions]
+            if newer:
+                raise NotImplementedError(
+                    f"a zombie task of stage {st.stage_id}.{st.attempt} finished partition {part} after attempt "
+                    f"{newer[0].attempt} took it over (TaskCommitDenied / markPartitionCompleted not modelled)")
         sink = st.spec.sink
         if isinstance(sink, WriteSink) and rec.result.output_file:
             size, rows = rec.result.output_file
-            self.hdfs.write(f"{sink.path}/{self._part_name(st, a.index)}", size, rows, writer=ex.host.name,
-                            row_group_bytes=sink.row_group_bytes, clustered=self._clustering(st, a.index))
+            self.hdfs.write(f"{sink.path}/{self._part_name(st, part)}", size, rows, writer=ex.host.name,
+                            row_group_bytes=sink.row_group_bytes, clustered=self._clustering(st, part))
         self._record("task_end", rec)
 
     def _clustering(self, st: StageRecord, index: int) -> tuple[str, float] | None:
@@ -1194,6 +1653,7 @@ class AppRun:
         return key.name, self.exchanges[name].key_fraction(a, b)
 
     def _part_name(self, st: StageRecord, index: int) -> str:
+        st = st.root  # every attempt of the write writes under the same job UUID
         if not hasattr(st, "_job_uuid"):
             st._job_uuid = uuid.UUID(int=substream(self.spec.seed, f"jobuuid/{st.stage_id}").getrandbits(128),
                                      version=4)

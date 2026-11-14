@@ -1030,8 +1030,181 @@ S03 = {
 }
 
 
+# ---------------------------------------------------------------------------- scenario 12 (fetch failures)
+
+
+def _attempts(c: Ctx) -> list[dict]:
+    return sorted((s for s in c.stages if s["status"] != "SKIPPED"), key=lambda s: (s["stageId"], s["attemptId"]))
+
+
+def _failed_stage(c: Ctx) -> dict:
+    return next(s for s in c.stages if s["status"] == "FAILED")
+
+
+def _errors(c: Ctx, s: dict) -> collections.Counter:
+    """The task table's Errors column of one stage attempt, by failure kind."""
+    out: collections.Counter = collections.Counter()
+    for t in c.tasks(s["stageId"], s["attemptId"]):
+        msg = t.get("errorMessage") or ""
+        if msg:
+            out[msg.split("(", 1)[0].split(" ", 1)[0]] += 1
+    return out
+
+
+def _job_with_failed_stage(c: Ctx) -> str:
+    good, bad = c.runs["last_good"], c
+    st = _failed_stage(bad)
+    job = next(j for j in bad.get("jobs") if st["stageId"] in j["stageIds"])
+    ref = next(j for j in good.get("jobs") if j["jobId"] == job["jobId"])
+
+    def dur(j):
+        return _ts(j["completionTime"]) - _ts(j["submissionTime"])
+    return (f"job {job['jobId']}: {fmt_duration(dur(ref))} → {fmt_duration(dur(job))}, "
+            f"{job['numFailedStages']} failed stage, {job['numSkippedStages']} skipped")
+
+
+def _failed_stage_row(c: Ctx) -> str:
+    st = _failed_stage(c)
+    err = _errors(c, st)
+    return (f"stage {st['stageId']} attempt {st['attemptId']} FAILED: {st['numCompleteTasks']:,} of "
+            f"{st['numTasks']:,} tasks succeeded, {err['FetchFailed']} FetchFailed, "
+            f"{err['ExecutorLostFailure']} ExecutorLostFailure; "
+            f"{st['failureReason'].splitlines()[0]}")
+
+
+def _retry_attempts(c: Ctx) -> str:
+    """Every stage that ran more than once (or ran though its job listed it as skipped), by attempt."""
+    by: dict[int, list[dict]] = {}
+    for s in _attempts(c):
+        by.setdefault(s["stageId"], []).append(s)
+    skipped = {s["stageId"] for s in c.stages if s["status"] == "SKIPPED"}
+    rows = []
+    for sid, atts in sorted(by.items()):
+        if len(atts) > 1 or sid in skipped or atts[0]["attemptId"] > 0:
+            rows.append(f"{sid}: " + " + ".join(f"{a['attemptId']}:{a['numTasks']:,}" for a in atts))
+    return "; ".join(rows)
+
+
+def _map_stage_losses(c: Ctx) -> str:
+    """The events map stage: the History Server counts a Resubmitted TaskEnd as a failed task of the stage but keeps
+    the task's row as SUCCESS; the AM log names each one ("Resubmitted ShuffleMapTask(S, P)")."""
+    st = max((s for s in _attempts(c) if s["attemptId"] == 0 and s["shuffleWriteBytes"] > 0),
+             key=lambda s: s["numTasks"])
+    err = _errors(c, st)
+    resub = len(re.findall(rf"INFO DAGScheduler: Resubmitted ShuffleMapTask\({st['stageId']}, \d+\), so marking it "
+                           r"as still running\.", _driver_stderr(c)))
+    return (f"stage {st['stageId']}: {st['numCompleteTasks']:,} succeeded for {st['numTasks']:,} partitions, "
+            f"{st['numFailedTasks']} failed: {err['ExecutorLostFailure']} ExecutorLostFailure in the task table, "
+            f"{resub} \"Resubmitted ShuffleMapTask({st['stageId']}, …)\" in the AM log")
+
+
+def _first_fetch_failure(c: Ctx) -> dict:
+    st = _failed_stage(c)
+    tasks = [t for t in c.tasks(st["stageId"], st["attemptId"])
+             if (t.get("errorMessage") or "").startswith("FetchFailed")]
+    return min(tasks, key=lambda t: (_ts(t["launchTime"]) + t["duration"], t["taskId"]))
+
+
+def _fetch_failed_task(c: Ctx) -> str:
+    t = _first_fetch_failure(c)
+    head = t["errorMessage"].split(", message=", 1)[0]
+    return f"task {t['index']}.{t['attempt']} (TID {t['taskId']}) on executor {t['executorId']}: {head}"
+
+
+def _dead_executor_of(c: Ctx) -> dict:
+    eid = re.search(r"BlockManagerId\((\d+),", _first_fetch_failure(c)["errorMessage"]).group(1)
+    return next(e for e in c.get("allexecutors") if e["id"] == eid)
+
+
+def _the_dead_executor(c: Ctx) -> str:
+    e = _dead_executor_of(c)
+    return f"executor {e['id']} ({_host(e)}), removed {e['removeTime'][11:19]}: {e['removeReason']}"
+
+
+def _preempted(c: Ctx) -> str:
+    execs = [e for e in c.get("allexecutors") if e["id"] != "driver"]
+    dead = [e for e in execs if not e["isActive"]]
+    pre = [e for e in dead if e["removeReason"].endswith("was preempted.")]
+    times = sorted(e["removeTime"][11:19] for e in pre)
+    return (f"{len(execs)} executors, {len(dead)} dead, {len(pre)} \"was preempted.\" "
+            f"({times[0]}–{times[-1]}), no replacement")
+
+
+def _shuffle_service(c: Ctx) -> str:
+    env = c.get("environment")
+    spark = dict(env["sparkProperties"])
+    hadoop = dict(env["hadoopProperties"])
+    return (f"spark.shuffle.service.enabled={spark.get('spark.shuffle.service.enabled', '(not set)')}; "
+            f"yarn.nodemanager.aux-services={hadoop['yarn.nodemanager.aux-services']}; "
+            f"yarn.resourcemanager.scheduler.monitor.enable={hadoop['yarn.resourcemanager.scheduler.monitor.enable']}")
+
+
+def _same_conf_both(c: Ctx) -> str:
+    good = dict(c.runs["last_good"].get("environment")["sparkProperties"])
+    bad = dict(c.get("environment")["sparkProperties"])
+    skip = ("spark.app.", "spark.yarn.app.", "spark.driver.host", "spark.driver.port", "spark.ui.",
+            "spark.org.apache.hadoop.yarn.server.webproxy")
+    diff = sorted(k for k in set(good) | set(bad) if good.get(k) != bad.get(k) and not k.startswith(skip))
+    return f"{len(diff)} differences: " + ", ".join(diff) if diff else "same submit options"
+
+
+def _last_good_health(c: Ctx) -> str:
+    g = c.runs["last_good"]
+    execs = [e for e in g.get("allexecutors") if e["id"] != "driver"]
+    failed = sum(s["numFailedTasks"] for s in g.stages)
+    retries = sum(1 for s in g.stages if s["attemptId"] > 0)
+    return (f"{len(execs)} executors, {sum(1 for e in execs if not e['isActive'])} dead, {failed} failed tasks, "
+            f"{retries} stage retries")
+
+
+def _driver_stderr(c: Ctx) -> str:
+    d = next(e for e in c.get("allexecutors") if e["id"] == "driver")
+    return html.unescape(_stderr(d))
+
+
+def _am_fetch_lines(c: Ctx) -> str:
+    err = _driver_stderr(c)
+    eid = _dead_executor_of(c)["id"]
+    lost = re.search(rf"INFO DAGScheduler: (Shuffle files lost for executor: {eid} \(epoch \d+\))", err).group(1)
+    resub = re.search(r"INFO DAGScheduler: (Resubmitting ShuffleMapStage \d+ \([^)]*\) and ResultStage \d+ "
+                      r"\([^)]*\) due to fetch failure)", err).group(1)
+    pre = len(re.findall(r"INFO YarnAllocator: Completed container \S+ on host: \S+ \(state: COMPLETE, exit "
+                         r"status: -102\)", err))
+    return f"{pre} containers with exit status -102; {lost}; {resub}"
+
+
+def _executor_dead_log(c: Ctx) -> str:
+    t = _first_fetch_failure(c)
+    e = next(x for x in c.get("allexecutors") if x["id"] == t["executorId"])
+    err = html.unescape(_stderr(e))
+    dead = _dead_executor_of(c)
+    m = re.search(r"ERROR RetryingBlockTransferor: Exception while beginning fetch of (\d+) outstanding blocks.*?\n"
+                  r"(org\.apache\.spark\.ExecutorDeadException: [^\n]*)", err)
+    n = len(re.findall(rf"ERROR ShuffleBlockFetcherIterator: Failed to get block\(s\) from {re.escape(_host(dead))}",
+                       err))
+    return f"{m.group(2)} ({m.group(1)} outstanding blocks; {n} \"Failed to get block(s)\" lines in this log)"
+
+
+S12 = {
+    "E1": lambda c: f"{_app_duration(c.runs['last_good'])} → {_app_duration(c)}",
+    "E2": _job_with_failed_stage,
+    "E3": _failed_stage_row,
+    "E4": _retry_attempts,
+    "E5": _map_stage_losses,
+    "E6": _fetch_failed_task,
+    "E7": _the_dead_executor,
+    "E8": _preempted,
+    "E9": _shuffle_service,
+    "E10": _same_conf_both,
+    "E11": _last_good_health,
+    "E12": _am_fetch_lines,
+    "E13": _executor_dead_log,
+}
+
+
 EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02,
-            "03-memory-overhead-kills": S03, "05-missed-broadcast-join": S05, "09-bad-node-straggler": S09}
+            "03-memory-overhead-kills": S03, "05-missed-broadcast-join": S05, "09-bad-node-straggler": S09,
+            "12-fetch-failure-stage-retry": S12}
 
 
 # ---------------------------------------------------------------------------- solution.md

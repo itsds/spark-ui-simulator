@@ -494,3 +494,53 @@ what was done, what's next, gotchas.
 - **Still open:** FileFormatWriter's "Aborting job" path (a write job that fails) and a running broadcast job
   cancelled by a failed query are refused (no real reference); mappings of finished tasks lingering until GC;
   the AM's executor-failure limit for non-pmem exits; `ExceptionFailure` tasks.
+
+## 2026-11-14 — Phase 10: Scenario 12 (fetch failure / stage retry), YARN preemption, stage attempts
+
+- **Done:**
+  - Real reference `ref12-fetch-failure` (ADR-043): the reference cluster's CapacityScheduler has two elastic
+    queues (`default` 40 %, `ds` 60 %) and the preemption monitor; the job's driver starts a distributed-shell app in
+    `ds` during its map stage and again during its write stage, YARN preempts the job's youngest executors. Settled
+    with it and the 3.5.9 bytecode (EVENT_LOG_FORMAT.md §6.5): exit -102 / "was preempted." (INFO, not the app's
+    fault); without the shuffle service the map outputs go on the dropped connection; Resubmitted and
+    ExecutorLostFailure in `taskInfos` (Scala `mutable.HashMap`) order (`ordering.scala_long_hashmap_order`, all 23
+    multi-task losses of the reference logs); FetchFailed with ExecutorDeadException, not retried; the failed
+    attempt's zombie successes count; a skipped stage's first run is attempt 1 (`increaseAttemptIdOnFirstSkip`);
+    one epoch increment per handled FetchFailed.
+  - Engine (ADR-044): stage attempts over missing partitions (`run.stage_attempts`, `attempts_of`, `stage_rec`,
+    `TaskRecord.partition`), missing parents and `submitWaitingChildStages`, a map stage that resubmits itself,
+    `Resubmitted` TaskEnds, `TaskScheduler.fail_fetch` (zombie task set), `_doom_fetches` / `_check_fetches`,
+    `ResubmitFailedStages` after 200 ms, `engine/fetchfail.py` (FetchFailed messages and executor error lines from
+    the stage's plan and RDD lineage: `init` / `next` / `retry`), the `yarn_preemption` fault (policy rounds, kill
+    after 15 s, youngest first, no grants until `until`), driver and executor log lines. The simulated yarn-site has
+    `yarn.resourcemanager.scheduler.monitor.enable=true`: the only byte that changes in the shuffle-service runs
+    (checked on Scenario 00: event log differs only in EnvironmentUpdate, container logs identical).
+  - Scenario 12 (ADR-045): the job without the shuffle service since a 2026-10-13 workaround (DATA-4127), the ML
+    queue's retraining moved into its window (ML-2290): 10 of 40 executors preempted in two waves, no replacements;
+    5.5 → 7.6 min, 707 Resubmitted, stage 5 attempt 0 failed on 43 FetchFailed, stages 3 (attempts 1, 2), 4 (0–2),
+    5 (attempt 1, 1,220 tasks). Ticket (BI asks about corrupt data; the channel suggests more retries / timeouts /
+    executors), 7 hints, solution with 13 evidence values (`scripts/evidence.py` S12, `tests/test_scenario12_hs.py`);
+    `tests/test_scenario12.py` checks the causes, the Spark details against ref12 and the fix (shuffle service on:
+    5.8 min with the same preemptions).
+  - Docs: ROADMAP, SCENARIOS, README, ARCHITECTURE, EVENT_LOG_FORMAT (§6.5, §8, §9), CLAUDE.md layout, ADR-043–045.
+  - `uv run pytest`: 305 passed (~11 min, integration included); ruff clean.
+- **Next:** 06 (partition pruning failure: the planner keeps `PartitionFilters: []` when the filter casts the
+  partition column; a multi-day table).
+- **Gotchas:**
+  - The reference YARN NodeManager holds port 8042: stop the cluster (`reference/yarn/cluster.sh stop`) before the
+    nm-logs mock, or every log link answers with the real NodeManager's page.
+  - YARN only preempts a container that fits in `total_preemption_per_round` x the cluster; on the 12 GB reference
+    node 0.1 is less than one 2 GB container (0.5 there). A preempting app's demand must outlive the 15 s
+    `max_wait_before_kill`, or nothing is killed.
+  - AQE's map stages of a write job are named after the write's call site (`parquet at NativeMethodAccessorImpl.java:0`),
+    not `$anonfun$withThreadLocalCaptured$1`.
+  - The History Server keeps a Resubmitted task's row as SUCCESS but counts it as a failed task of the stage and the
+    executor: a stage can show more succeeded tasks than partitions, and more failures than its task table lists.
+  - Applying Spark's HashMap order to lost tasks with the shuffle service on changes Scenario 03's trajectory (a task
+    fails 4 times elsewhere): kept the task-id order there for now (ADR-044).
+  - The harness required branch `claude/clever-curie-nmrktq`.
+- **Still open:** MetadataFetchFailedException (a fresh map-status fetch with a missing output) and
+  TaskCommitDenied (a zombie and a retry writing the same partition) are refused; FetchFailed in stages other than a
+  write after a sort-merge join (aggregations, map stages) has no verified stack; `spark.stage.maxConsecutiveAttempts`;
+  the epoch / lost-task order with the shuffle service; "Getting N blocks" lines use the final map output locations;
+  push-based shuffle; executor decommissioning.

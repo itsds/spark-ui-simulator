@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING
 
 from ..cost import calibration as cal
 from ..cost.model import page_size
+from ..engine import fetchfail as ff
+from ..eventlog.reasons import FetchFailed
 from ..model.workload import ScanSource, ShuffleSource, WriteSink
 from ..rng import substream
 from ..sql import nodes as sqln
@@ -49,6 +51,7 @@ class _State:
     decompressors: int = 0
     compressors: int = 0
     connections: set[str] = field(default_factory=set)
+    resets: set[str] = field(default_factory=set)  # dead executors whose connection reset was logged
     echo: list | None = None  # what the driver logs in reaction (block updates, map status requests)
     threads: dict[int, int] = field(default_factory=dict)  # task id → id of the task launch thread running it
     opened: set = field(default_factory=set)  # executor-wide UDF resources opened so far (sql.expr.Func)
@@ -286,6 +289,40 @@ class _Until:
             self.log.raw(t, text)
 
 
+def _fetch_failure_lines(log: ContainerLog, tk: TaskRecord, st: _State) -> None:
+    """A request to a dead executor (`engine.fetchfail`; ref12, ref05): sent after its death, the driver confirms
+    it is dead at once; in flight at its death, the connection resets and the request is retried after 5 s.
+    `ShuffleBlockFetcherIterator`'s listener then logs every block of the request."""
+    _name_, side, dead, t, variant, n = tk.extra_fetch
+    stage = tk.stage_rec
+    addr = f"{dead.host.name}/{dead.host.ip}:{dead.block_manager_port}"
+    stack = ff.executor_dead_stack(stage, side, dead.id, variant)
+    if variant == "retry":
+        reset = "java.net.SocketException: Connection reset\n" + "\n".join(f"\tat {f}" for f in ff.CONNECTION_RESET)
+        if dead.id not in st.resets:
+            st.resets.add(dead.id)
+            log.warn(t, "TransportChannelHandler", f"Exception in connection from {addr}")
+            log.raw(t, reset)
+            log.error(t, "TransportResponseHandler", f"Still have 1 requests outstanding when connection from {addr} "
+                      "is closed")
+        log.error(t, "OneForOneBlockFetcher", "Failed while starting block fetches")
+        log.raw(t, reset)
+        log.info(t, "RetryingBlockTransferor", f"Retrying fetch (1/3) for {n} outstanding blocks after "
+                 f"{cal.SHUFFLE_RETRY_WAIT_MS} ms")
+        t += cal.SHUFFLE_RETRY_WAIT_MS
+        log.info(t, "TransportClientFactory", f"Found inactive connection to {addr}, creating a new one.")
+        log.error(t, "RetryingBlockTransferor", f"Exception while beginning fetch of {n} outstanding blocks (after 1 "
+                  "retries)")
+    else:
+        log.info(t, "TransportClientFactory", f"Found inactive connection to {addr}, creating a new one.")
+        log.error(t, "RetryingBlockTransferor", f"Exception while beginning fetch of {n} outstanding blocks ")
+    log.raw(t, stack)
+    for _ in range(n):
+        log.error(t, "ShuffleBlockFetcherIterator", f"Failed to get block(s) from {dead.host.name}:"
+                  f"{dead.block_manager_port}")
+        log.raw(t, stack)
+
+
 def _kill_lines(log: ContainerLog, tk: TaskRecord, rng: random.Random) -> int:
     """`Executor.killTask` per kill request ("trying to kill", the latest reason wins), then the task thread's
     exit: TaskKilledException ("Executor killed") or an interrupted call ("Executor interrupted and killed")
@@ -305,6 +342,10 @@ def _name(tk: TaskRecord) -> str:
 
 def _task_body(log: ContainerLog, run: AppRun, ex: Executor, w: _Work, st: _State, rng: random.Random) -> None:
     tk = w.tk
+    if isinstance(tk.failure, FetchFailed):  # its shuffle read failed: its work stops there, no "Finished"
+        _task_work(_Until(log, tk.finish - 1), run, ex, w, st, rng, finished=False)
+        _fetch_failure_lines(log, tk, st)
+        return
     if tk.killed is not None and tk.killed_metrics is not None:  # killed while running: cut its work short
         _task_work(_Until(log, _kill_lines(log, tk, rng) - 1), run, ex, w, st, rng, finished=False)
         return
@@ -318,7 +359,7 @@ def _task_work(log, run: AppRun, ex: Executor, w: _Work, st: _State, rng: random
     res = tk.result
     t, run_end = w.work_start, w.run_end
     spec = stage.spec
-    plan = stage.plans[tk.index]
+    plan = stage.plans[tk.partition]
     span = max(1, run_end - t)
     for src in spec.sources:
         if isinstance(src, ScanSource) and plan.scan is not None:
@@ -626,15 +667,22 @@ def executor_stderr(run: AppRun, ex: Executor, echo: list | None = None) -> str:
     if ex.exit_at is not None:  # the JVM stops logging task work once SIGTERM arrives, or dies with SIGKILL
         log.cutoff = ex.nm_kill_at if ex.nm_kill_at is not None else ex.exit_at
     barrier: dict[int, int] = {}
-    work = [_task_header(log, run, ex, run.stages[tk.stage_id], tk, st, barrier, rng) for tk in tasks]
+    for tk in tasks:
+        tk.stage_rec = run.stage_rec(tk.stage_id, tk.attempt)
+    work = [_task_header(log, run, ex, tk.stage_rec, tk, st, barrier, rng) for tk in tasks]
     for w in sorted(work, key=lambda w: (w.work_start, w.tk.task_id)):
         _task_body(log, run, ex, w, st, rng)
     if ex.nm_kill_at is not None:
         t = ex.nm_kill_at
         log.cutoff = None
         log.error(t, "CoarseGrainedExecutorBackend", "RECEIVED SIGNAL TERM")
-        log.info(t + rng.randint(2, 30), "DiskBlockManager", "Shutdown hook called")
-        log.info(t + rng.randint(30, 80), "ShutdownHookManager", "Shutdown hook called")
+        if run.ess_enabled:
+            log.info(t + rng.randint(2, 30), "DiskBlockManager", "Shutdown hook called")
+            log.info(t + rng.randint(30, 80), "ShutdownHookManager", "Shutdown hook called")
+        else:  # the executor's own block manager stops (ref10, ref12: no shuffle service)
+            log.info(t + rng.randint(2, 20), "MemoryStore", "MemoryStore cleared")
+            log.info(t + rng.randint(20, 40), "BlockManager", "BlockManager stopped")
+            log.info(t + rng.randint(40, 80), "ShutdownHookManager", "Shutdown hook called")
     elif ex.exit_at is not None:
         pass  # SIGKILL: no signal handler, no shutdown hooks; the log just stops
     else:

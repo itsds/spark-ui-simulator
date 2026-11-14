@@ -73,6 +73,7 @@ engine/  runtime.py   the driver: executors register, one AdaptiveExecution per 
                       over-allocation), Spark's YarnAllocator loop (200 ms doubling to 3 s), container launch,
                       NodeManager memory monitor (pmem kill, Hadoop diagnostics), completed containers → reasons
          dynalloc.py  ExecutorAllocationManager + ExecutorMonitor (backlog ramp-up 1,2,4,8…, idle timeout)
+         fetchfail.py FetchFailed messages and fetch-error log lines from a stage's plan and RDD lineage
          emit.py      heartbeat-sampled executor metrics; events via Timeline + DriverLedger
 model/   memory.py    container RSS: committed heap (G1 growth) + native footprint vs the container size
 ```
@@ -181,8 +182,12 @@ what upstream wrote.
 - Environment tab: the full Hadoop 3.3.6 configuration (~1,000 keys) with the
   production site files, the cluster's spark-defaults, JDK 17 system properties
   and the real Spark 3.5.9 classpath.
-- Not yet: lost shuffle files without the shuffle service (FetchFailed, stage
-  retry), node-local container requests, preemption, queue limits, app attempt 2.
+- Without the external shuffle service (`spark.shuffle.service.enabled=false`) an executor's map output dies with
+  it: Resubmitted map tasks, FetchFailed (ExecutorDeadException), the failed stage attempt, the DAGScheduler's stage
+  attempts over the missing partitions (a skipped stage's first run is attempt 1), as in ref12 (ADR-043/044).
+- YARN preemption (`yarn_preemption` fault): the CapacityScheduler's policy takes the app's youngest containers in
+  rounds (exit status -102, "was preempted.", not the app's fault), and the queue has no room for replacements.
+- Not yet: node-local container requests, queue limits and the RM's queue view, push-based shuffle.
 
 ## Scenario packaging (built in Phase 6)
 

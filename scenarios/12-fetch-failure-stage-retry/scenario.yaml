@@ -1,0 +1,75 @@
+# Scenario 12: the nightly enrichment is slow on some nights, and the Spark UI shows failed stages and
+# FetchFailedException. Two things together: since the NodeManager upgrade of 2026-10-13 the job runs without
+# the external shuffle service (a workaround added that night and never removed), so every executor serves its
+# own shuffle files; and since 2026-11-10 the ML platform's nightly retraining in queue `ml` starts while this
+# job runs. The `etl` queue borrows idle capacity at night; when `ml` claims its guaranteed share, the
+# CapacityScheduler preempts the youngest containers of the queue over its share: ours. A preempted executor's
+# shuffle files die with it: finished map tasks re-run (Resubmitted), reduce tasks that still had to fetch
+# from it fail (FetchFailed), and the DAGScheduler re-runs the lost map partitions and then the reduce stage.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 12-fetch-failure-stage-retry
+id: 12-fetch-failure-stage-retry
+title: "Failed stages and FetchFailedException on some nights"
+difficulty: medium
+topics: [fetch failures, stage retries, external shuffle service, YARN preemption, executor loss, Resubmitted]
+summary: >-
+  The clickstream enrichment finishes every night, but on some nights it is two minutes late, and the Spark UI
+  shows a failed stage, FetchFailedException and stages with several attempts. The data team asks whether the
+  data is corrupt and whether the shuffle timeouts should be raised. Find out what happened last night, why
+  only on some nights, and what to change.
+
+job:                                          # the same job and cluster as 00
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377          # the active RM (rm1) started 2026-10-13 14:35 UTC
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # the Airflow task's spark-submit
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false
+    # DATA-4127, 2026-10-13 02:40: after the NodeManager upgrade the spark_shuffle aux service did not come up
+    # on six nodes and executors failed with "Unable to register with external shuffle server". The on-call
+    # engineer added this to get the run through ("we don't use dynamic allocation anyway"). Still there.
+    spark.shuffle.service.enabled: false
+
+runs:
+  last_good:
+    label: "Last good run: 2026-11-09 (dt=2026-11-08)"
+    app_seq: 49279
+    seed: 20261108
+    started_at: "2026-11-09T02:10:06.735Z"
+    params: {dt: "2026-11-08"}
+    # The shuffle service was already off; nothing else ran in the `ml` queue that night.
+  incident:
+    label: "Incident run: 2026-11-14 (dt=2026-11-13)"
+    app_seq: 50187
+    seed: 20261113
+    started_at: "2026-11-14T02:10:07.218Z"
+    params: {dt: "2026-11-13"}
+    faults:
+      # ML-2290: since 2026-11-10 the ctr-model nightly retraining starts at 02:13 in queue `ml` (guaranteed
+      # 30 % of the cluster), after its features are ready. `etl` (guaranteed 25 %) runs well above its share at
+      # night. The retraining first loads its features (~6 of our containers' worth), then ramps up its
+      # training executors: YARN preempts this app's youngest containers in two waves and the queue has no room
+      # for replacements until the retraining is done (~03:30).
+      - type: yarn_preemption
+        queue: ml
+        at: 3m20s
+        containers: 6
+        until: 80m
+        note: the feature load, during the events map stage (stage 2)
+      - type: yarn_preemption
+        queue: ml
+        at: 4m50s
+        containers: 4
+        until: 80m
+        note: the training executors' ramp-up, during the write of events_enriched (stage 5)

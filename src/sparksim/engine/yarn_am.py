@@ -80,6 +80,8 @@ class ResourceManager:
         self.ask = 0  # outstanding containers the RM still tries to place for us
         self.next_n = 2  # container numbers per app attempt; 000001 is the AM
         self.completed: list[Completed] = []
+        # Another queue reclaimed its guaranteed share (preemption): nothing is granted to us before this.
+        self.blocked_until = 0
 
     def next_heartbeat(self, host: str, t: int) -> int:
         """First NodeManager heartbeat strictly after `t`."""
@@ -97,7 +99,7 @@ class ResourceManager:
             t, i, h = heapq.heappop(heap)
             if t > t_to:
                 break
-            if self.free[h.name] >= self.mb and h.name not in self.excluded:
+            if t >= self.blocked_until and self.free[h.name] >= self.mb and h.name not in self.excluded:
                 self.free[h.name] -= self.mb
                 self.ask -= 1
                 out.append((t, h, self.next_n))
@@ -107,6 +109,11 @@ class ResourceManager:
 
     def container_exited(self, ex: Executor, t_exit: int) -> None:
         self.completed.append(Completed(ex, self.next_heartbeat(ex.host.name, t_exit)))
+
+    def preempted(self, ex: Executor, t: int) -> None:
+        """The scheduler killed the container itself (PREEMPTED): the AM sees it completed at its next allocate
+        call; its memory went to the other queue's app (`release` gives it back when that app is done)."""
+        self.completed.append(Completed(ex, t))
 
     def release(self, host: str) -> None:
         self.free[host] += self.mb
@@ -248,7 +255,8 @@ class YarnAllocator:
     def _completed(self, ex: Executor) -> None:
         """`processCompletedContainers` for one of our executors' containers."""
         now = self.run.sim.now
-        self.rm.release(ex.host.name)
+        if not ex.extra.get("preempted"):
+            self.rm.release(ex.host.name)
         if ex.container_id in self.released:
             self.released.discard(ex.container_id)
             reason, by_app = f"Container {ex.container_id} exited from explicit termination request.", False

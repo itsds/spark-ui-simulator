@@ -56,6 +56,7 @@ from ..eventlog import (
 )
 from ..eventlog.events import Event
 from ..eventlog.ordering import java_properties, java_properties_order
+from ..eventlog.reasons import Resubmitted
 from ..eventlog.timeline import Timeline
 from ..rng import substream
 from ..yarn import container_attributes, container_log_urls, unified_memory_max
@@ -70,7 +71,7 @@ MiB = 1024 * 1024
 
 def sample_executor_metrics(run: AppRun) -> None:
     by_exec: dict[str, list[TaskRecord]] = {}
-    for st in run.stages.values():
+    for st in run.all_stage_records():
         for t in st.tasks:
             by_exec.setdefault(t.executor.id, []).append(t)
     interval = cal.HEARTBEAT_INTERVAL_MS
@@ -217,6 +218,11 @@ def build_events(run: AppRun) -> list[Event]:
             tl.add(t, TaskStart(tk.stage_id, tk.attempt, _task_info(tk)))
         elif kind == "task_end":
             tl.add(t, _task_end(ledger, obj))
+        elif kind == "task_resubmitted":  # the same TaskInfo as its success, no metrics (ref10, ref12)
+            tk = obj
+            tl.add(t, lambda tk=tk: TaskEnd(tk.stage_id, tk.attempt, tk.task_type, Resubmitted(),
+                                            _task_info(tk, tk.finish, tk.success_accums),
+                                            ExecutorMetrics(jvm_heap_memory=-1), None))
         elif kind == "stage_completed":
             tl.add(t, _completed(ledger, obj))
         elif kind == "job_end":
@@ -249,7 +255,7 @@ def _executor_resources(run: AppRun) -> dict[str, ExecutorResourceRequest]:
 
 def _task_info(tk: TaskRecord, finish: int = 0, accums=None) -> TaskInfo:
     ended = bool(finish)
-    return TaskInfo(tk.task_id, tk.index, tk.task_attempt, tk.index, tk.launch, tk.executor.id,
+    return TaskInfo(tk.task_id, tk.index, tk.task_attempt, tk.partition, tk.launch, tk.executor.id,
                     tk.executor.host.name, tk.locality, speculative=tk.speculative, finish_time=finish,
                     failed=ended and tk.failure is not None, killed=ended and tk.killed is not None,
                     accumulables=accums or [])
@@ -305,6 +311,7 @@ def _task_end(ledger: DriverLedger, tk: TaskRecord):
     def make():
         m = tk.result.metrics
         accums = ledger.task_end(tk.stage_id, tk.attempt, Success(), m, touched=tk.touched, external=tk.sql)
+        tk.success_accums = accums
         return TaskEnd(tk.stage_id, tk.attempt, tk.task_type, Success(), _task_info(tk, tk.finish, accums),
                        tk.exec_metrics, m)
     return make
