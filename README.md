@@ -46,7 +46,7 @@ Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 | 03 | YARN memoryOverhead container kills ✅ [`scenarios/03-memory-overhead-kills`](scenarios/03-memory-overhead-kills/ticket.md) |
 | 04 | Small files / tiny tasks |
 | 05 | Missed broadcast join ✅ [`scenarios/05-missed-broadcast-join`](scenarios/05-missed-broadcast-join/ticket.md) |
-| 06 | Partition pruning failure |
+| 06 | Partition pruning failure ✅ [`scenarios/06-partition-pruning-failure`](scenarios/06-partition-pruning-failure/ticket.md) |
 | 07 | Exploding join (duplicate keys) |
 | 08 | GC pressure |
 | 09 | Bad-node straggler ✅ [`scenarios/09-bad-node-straggler`](scenarios/09-bad-node-straggler/ticket.md) |

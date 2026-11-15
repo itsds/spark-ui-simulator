@@ -1202,9 +1202,164 @@ S12 = {
 }
 
 
+# ---------------------------------------------------------------------------- scenario 06 (partition pruning)
+
+
+def _events_scan(c: Ctx) -> dict:
+    """The events scan of the enrichment query: the Scan node with "number of partitions read" that is not
+    the customers' or the page catalog's (both unpartitioned)."""
+    return next(n for n in _nodes(c, 0, "Scan parquet ") if any(m["name"] == "number of partitions read"
+                                                                 for m in n["metrics"]))
+
+
+def _events_filter(c: Ctx) -> dict:
+    """The Filter right above the events scan (the plan graph's edges: child → parent)."""
+    q = _sql(c, 0)
+    scan = _events_scan(c)
+    parent = next(e["toId"] for e in q["edges"] if e["fromId"] == scan["nodeId"])
+    while True:
+        node = next(n for n in q["nodes"] if n["nodeId"] == parent)
+        if node["nodeName"] == "Filter":
+            return node
+        parent = next(e["toId"] for e in q["edges"] if e["fromId"] == parent)
+
+
+def _job_of_stage(c: Ctx, sid: int) -> dict:
+    return next(j for j in c.get("jobs") if sid in j["stageIds"])
+
+
+def _scan_job(c: Ctx) -> str:
+    g = c.runs["last_good"]
+    jg, jb = _job_of_stage(g, 2), _job_of_stage(c, 2)
+    return (f"job {jb['jobId']}: {fmt_duration(_job_ms(g, jg['jobId']))} → {fmt_duration(_job_ms(c, jb['jobId']))}; "
+            f"the other jobs {fmt_duration(_other_jobs_ms(g, jg['jobId']))} → "
+            f"{fmt_duration(_other_jobs_ms(c, jb['jobId']))}")
+
+
+def _other_jobs_ms(c: Ctx, job_id: int) -> float:
+    return sum(_job_ms(c, j["jobId"]) for j in c.get("jobs") if j["jobId"] != job_id)
+
+
+def _scan_stage(c: Ctx) -> str:
+    g = c.runs["last_good"]
+
+    def row(x: Ctx) -> str:
+        s = x.stage(2)
+        return f"{s['numTasks']:,} tasks, {fmt_bytes(s['inputBytes'])} / {s['inputRecords']:,} records in"
+
+    return f"{row(g)} → {row(c)}"
+
+
+def _scan_stage_summary(c: Ctx) -> str:
+    """Stage 2's Summary Metrics, median: input size and shuffle write records per task."""
+    g = c.runs["last_good"]
+
+    def med(x: Ctx) -> tuple[str, int]:
+        q = x.get("stages/2/0/taskSummary", quantiles="0.5")
+        return fmt_bytes_js(q["inputMetrics"]["bytesRead"][0]), int(q["shuffleWriteMetrics"]["writeRecords"][0])
+
+    (gi, gw), (bi, bw) = med(g), med(c)
+    return f"median input {gi} → {bi}, median shuffle write records {gw:,} → {bw:,}"
+
+
+def _scan_node(c: Ctx) -> str:
+    """The events Scan node's driver metrics: partitions read / files read / size of files read."""
+    def row(x: Ctx) -> str:
+        n = _events_scan(x)
+        parts = _metric(n, "number of partitions read")
+        return (f"{parts} partition{'' if parts == '1' else 's'} / {_metric(n, 'number of files read')} files / "
+                f"{_metric(n, 'size of files read')}")
+
+    return f"{row(c.runs['last_good'])} → {row(c)}"
+
+
+def _scan_to_filter(x: Ctx) -> str:
+    scan, filt = _rows(_events_scan(x)), _rows(_events_filter(x))
+    return f"{scan:,} → {filt:,} rows ({filt / scan:.1%} kept)"
+
+
+def _plan_block(x: Ctx, n: int) -> str:
+    desc = x.get("sql/0", details="true", planDescription="true")["planDescription"]
+    return desc.split(f"\n({n}) ", 1)[1].split("\n\n", 1)[0]
+
+
+def _scan_details(c: Ctx) -> str:
+    """The events scan's block in the query's Details (formatted explain), incident: what it lists and pushes."""
+    block = _plan_block(c, 1)
+    loc = re.search(r"Location: (InMemoryFileIndex \[[^\]]*\])", block).group(1)
+    pushed = re.search(r"PushedFilters: \[([^\]]*)\]", block).group(1)
+    ranges = ", ".join(p for p in pushed.split(", ") if p.startswith(("GreaterThan", "LessThan")))
+    part = re.search(r"PartitionFilters: (\[[^\]]*\])", block)
+    return f"{loc}; PartitionFilters: {part.group(1) if part else 'none'}; PushedFilters include {ranges}"
+
+
+def _last_good_scan_details(c: Ctx) -> str:
+    block = _plan_block(c.runs["last_good"], 1)
+    loc = re.search(r"Location: (InMemoryFileIndex \[[^\]]*\])", block).group(1)
+    part = re.search(r"PartitionFilters: (\[[^\]]*\])", block)
+    return f"{loc}; PartitionFilters: {part.group(1) if part else 'none'}"
+
+
+def _derived_dt(c: Ctx) -> str:
+    """The Project above the events scan's Filter (formatted explain, final plan): the dt the job writes."""
+    block = _plan_block(c, 4)
+    return re.search(r"(cast\(event_ts#\d+ as date\) AS dt#\d+)", block).group(1)
+
+
+def _pruning_log(c: Ctx) -> str:
+    """The driver's log: the root listing, FileSourceStrategy's partition filters, and whether anything was
+    pruned (`InMemoryFileIndex: Selected N partitions out of M`)."""
+    def scan_lines(x: Ctx) -> tuple[str, str, int]:
+        err = _driver_stderr(x)
+        took = re.search(r"INFO InMemoryFileIndex: (It took \d+ ms to list leaf files for 1 paths\.)", err).group(1)
+        prune = re.search(r"INFO DataSourceStrategy: (Pruning directories with: [^\n]*)", err).group(1)
+        return took, prune.rstrip(), len(re.findall(r"INFO InMemoryFileIndex: Selected \d+ partitions", err))
+
+    (gt, _, _), (bt, bp, bs) = scan_lines(c.runs["last_good"]), scan_lines(c)
+    took_good = re.search(r"\d+ ms", gt).group(0)
+    prune = f"\"{bp}\" with nothing after it" if bp.endswith(":") else f"\"{bp}\""
+    selected = "no" if bs == 0 else str(bs)
+    return f"\"{bt}\" (last good: {took_good}); {prune}; {selected} \"Selected … partitions\" line"
+
+
+def _days_read(c: Ctx) -> str:
+    """One stage-2 executor's stderr: the partition directories its tasks read files of."""
+    e = next(x for x in c.get("allexecutors") if x["id"] == "1")
+    err = html.unescape(_stderr(e))
+    days = sorted(set(re.findall(r"INFO FileScanRDD: Reading File path: \S+/web\.db/events/dt=([\d-]+)/", err)))
+    return f"executor 1 read files of {len(days)} dt partitions ({days[0]} … {days[-1]})"
+
+
+def _written(c: Ctx) -> str:
+    def rows(x: Ctx) -> int:
+        (w,) = _nodes(x, 0, "Execute InsertIntoHadoopFsRelationCommand")
+        return int(_metric(w, "number of output rows").replace(",", ""))
+
+    g, b = rows(c.runs["last_good"]), rows(c)
+    return f"{g:,} → {b:,} rows"
+
+
+S06 = {
+    "E1": lambda c: f"{_app_duration(c.runs['last_good'])} → {_app_duration(c)}",
+    "E2": _scan_job,
+    "E3": _scan_stage,
+    "E4": _scan_stage_summary,
+    "E5": _scan_node,
+    "E6": _scan_to_filter,
+    "E7": lambda c: _scan_to_filter(c.runs["last_good"]),
+    "E8": _scan_details,
+    "E9": _last_good_scan_details,
+    "E10": _derived_dt,
+    "E11": _same_conf_both,
+    "E12": _pruning_log,
+    "E13": _days_read,
+    "E14": _written,
+}
+
+
 EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02,
             "03-memory-overhead-kills": S03, "05-missed-broadcast-join": S05, "09-bad-node-straggler": S09,
-            "12-fetch-failure-stage-retry": S12}
+            "06-partition-pruning-failure": S06, "12-fetch-failure-stage-retry": S12}
 
 
 # ---------------------------------------------------------------------------- solution.md

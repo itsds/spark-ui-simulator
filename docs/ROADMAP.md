@@ -204,8 +204,8 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
 | ✅ | 05 Missed broadcast join | done (ADR-038, ADR-039) |
 | ✅ | 03 YARN memoryOverhead kills | done (ADR-040, ADR-041, ADR-042) |
 | ✅ | 12 Fetch failure / stage retry | done (ADR-043, ADR-044, ADR-045) |
-| **next** | **06 Partition pruning failure** | the planner keeps `PartitionFilters: []` when the filter casts the partition column; a multi-day table |
-| 4 | 07 Exploding join | duplicate keys on the dimension side (`unique_right=False`): join output rows ≫ input |
+| ✅ | 06 Partition pruning failure | done (ADR-046, ADR-047, ADR-048) |
+| **next** | **07 Exploding join** | duplicate keys on the dimension side (`unique_right=False`): join output rows ≫ input |
 | 5 | 04 Small files / tiny tasks | an input of ~120k small files; check the event log size and the HS heap (1 GiB default) |
 | 6 | 15 Skewed / small-file output | `repartition(col)` in the DataFrame DSL, skewed write tasks, output file counts |
 | 7 | 13 Missing cache / recomputation | a workload reusing a DataFrame; cache / persist, RDD blocks, the Storage tab (ref04 has it for real) |
@@ -261,6 +261,21 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
         `_doom_fetches` / `_check_fetches` (request times in the read window; immediate, `next()` or retried after
         5 s), `ResubmitFailedStages` after 200 ms, `engine/fetchfail.py` (messages and executor lines from the
         plan), the `yarn_preemption` fault and the RM's blocked grants; driver and executor log lines
+- [x] 06 Partition pruning failure (`06-partition-pruning-failure`, ADR-048): DATA-4398 attributes late mobile events
+      to their event day with `withColumn("dt", F.to_date("event_ts")).where(F.col("dt") == DT)` on the events
+      table's root (workload param `events_read`): the filter is on a column that shadows the partition column, so
+      Spark prunes nothing: 8 partitions, 31,640 files, 8.6 TiB, 38,285 scan tasks, the Filter keeps 12.5 %;
+      5.6 → 15 min; 14 evidence values (`tests/test_scenario06_hs.py`); the fix (a `dt` range first: 5.6 min) and a
+      non-fix (`maxPartitionBytes=1g`: 15 min) verified
+  - [x] Checked on real Spark 3.5.9 (local run, `reference/local/partition_pruning.py` + `.txt`, ADR-046): casting
+        the partition column still prunes (the backlog's cause was a myth); the shadowing filter is pushed as an
+        `event_ts` range (`UnwrapCastInBinaryComparison`) that INT96 files can't use; the scan outputs every
+        partition column; a Project's explain Output is its project list; the driver's scan-planning INFO lines
+  - [x] Simulator (ADR-046, ADR-047): partitioned input tables (`TablePartition`, `arrival_lag`), `with_column`,
+        filters pushed through Projects and joins, the date-cast unwrap, partition filters evaluated on each
+        directory (`selected_partitions`), per-partition filter pass rates, scan metrics over the selected
+        directories, unmodelled row-group skipping refused; driver log lines `It took … to list leaf files`,
+        `Pruning directories with:`, `Pushed Filters` / `Post-Scan Filters`, `Selected N partitions out of M`
 - [ ] the rest, in the order above
 
 ## Backlog (later)

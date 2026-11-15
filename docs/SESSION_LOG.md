@@ -544,3 +544,50 @@ what was done, what's next, gotchas.
   write after a sort-merge join (aggregations, map stages) has no verified stack; `spark.stage.maxConsecutiveAttempts`;
   the epoch / lost-task order with the shuffle service; "Getting N blocks" lines use the final map output locations;
   push-based shuffle; executor decommissioning.
+
+## 2026-11-15 — Phase 10: Scenario 06 (partition pruning failure), partitioned tables, scan-planning driver lines
+
+- **Done:**
+  - PR #14 (Scenario 12) merged; this session did Scenario 06, next in the roadmap's order.
+  - Checked on real Spark 3.5.9 first (ADR-046), with a local PySpark run over tiny tables with the production schemas:
+    `reference/local/partition_pruning.py` and its output `partition_pruning.txt` (a new folder for local-mode
+    checks; `reference/event-logs` stays YARN-only). The backlog's cause was a myth: casting the partition column
+    still prunes. What fails is a filter on a column that shadows it (`withColumn("dt", F.to_date("event_ts"))`):
+    Spark pushes it as an `event_ts` range (`UnwrapCastInBinaryComparison`) with no partition filter. INT96 files skip
+    no row group with it; `TIMESTAMP_MICROS` files skip row groups but are all opened. The scan outputs every
+    partition column. A Project's explain `Output` is its project list, which the simulator got wrong in every
+    scenario (fixed, ADR-047). At INFO the driver logs the listing, `Pruning directories with:`, Pushed / Post-Scan
+    Filters and `Selected N partitions out of M` (now simulated for every scan).
+  - Simulator (ADR-046): partitioned input tables (`TablePartition`, `arrival_lag`; the first partition is drawn
+    like the old single directory, so existing runs stay byte-identical), `DataFrame.with_column`, `where()` through
+    Projects and joins, `unwrap_date_cast`, CollapseProject over aliases, partition-filter evaluation per directory
+    (`AppRun.selected_partitions`, `expr.eval_predicate`), per-partition filter pass rates (`partition_selectivity` →
+    `Op.by_partition`), scan metrics / splits / listing over the selected or listed directories,
+    `Table.timestamp_type` + a refusal of row-group skipping we don't model. The planner reproduces real Spark's
+    plan text for the path read, the shadowing read and the fix line for line.
+  - Scenario 06 (ADR-048): DATA-4398 (2026-10-20) reads the events root with the shadowing `dt` (workload param
+    `events_read: event_date`). Last good 2026-10-20 (app 45702, 5.6 min), incident 2026-10-22 (app 46071, 15 min):
+    8 partitions, 31,640 files, 8.6 TiB, 38,285 scan tasks, the Filter keeps 12.5 %. Ticket (HDFS ops + analytics;
+    the channel: "PushedFilters has the range", bigger splits, DPP, "never cast a partition column"), 8 hints,
+    solution with 14 evidence values (`scripts/evidence.py` S06, `tests/test_scenario06_hs.py`), side by side, the
+    late-events design problem, interview answer. `tests/test_scenario06.py`: causes, plans vs the real capture, the
+    myth, the refusal, symptoms, driver lines, the fix (5.6 min, same rows) and a non-fix (`maxPartitionBytes=1g`,
+    15 min). Screenshots of the SQL page reviewed.
+  - Docs: ROADMAP, SCENARIOS, README, ARCHITECTURE, EVENT_LOG_FORMAT (§5.4 "Partitioned scans"), CLAUDE.md layout
+    (`reference/local/`), ADR-046–048.
+  - `uv run pytest`: 321 passed (~12 min, integration included); ruff clean; `sparksim up` + `scripts/stack_check.py`
+    pass for Scenarios 06 and 00. Scenario 00's event log is byte-identical to `main` apart from the Project explain fix.
+- **Next:** 07 (exploding join: duplicate keys on the dimension side, `unique_right=False`; join output rows ≫ input).
+- **Gotchas:**
+  - Check the backlog's "cause" against real Spark before building it: 06's "cast of the partition column" prunes
+    fine in 3.5.9. `reference/local/partition_pruning.py` runs in ~1 min with PySpark's local mode: `source
+    scripts/env.sh; unset JAVA_TOOL_OPTIONS`, and give it an **absolute** output path (a relative `file://` URI
+    fails with "Wrong FS").
+  - The History Server's "Details" is the *final* AQE plan: its operator numbers differ from the initial plan's
+    (the events scan is `(1)`, the Project with the derived `dt` `(4)`); `SQLExecutionStart` has the initial one.
+  - Scenario 06's incident log is 205 MB (42,538 tasks) and generates in ~45 s; the HS replays it in seconds with
+    its default 1 GiB heap. Scenario 04 (120k tasks) will be ~3x that.
+  - The harness required branch `claude/magical-lovelace-xj08fj`.
+- **Still open:** catalog tables (`spark.table`, `PrunedInMemoryFileIndex`, metastore partition pruning),
+  partition discovery's listing job above 32 directories, dynamic partition pruning, Parquet row-group skipping by
+  statistics or dictionaries (refused), the partition order of a root's listing (sorted, not Spark's HashMap order).
