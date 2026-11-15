@@ -284,8 +284,62 @@ def source_filter(e: Expr) -> str | None:
         return f"Not({inner})" if inner else None
     if isinstance(e, BinaryOp) and e.source_filter:
         if isinstance(e.left, Attr) and isinstance(e.right, Lit):
-            return f"{e.source_filter}({e.left.name},{e.right})"
+            value = str(e.right)
+            if e.right.dtype == "timestamp" and "." not in value:  # java.sql.Timestamp.toString
+                value += ".0"
+            return f"{e.source_filter}({e.left.name},{value})"
     return None
+
+
+# --------------------------------------------------------------------------- rewrites
+
+
+def with_children(e: Expr, children: list[Expr]) -> Expr:
+    """A copy of `e` over new children (in `children()` order)."""
+    import dataclasses
+
+    if not e.children():
+        return e
+    if isinstance(e, BinaryOp):
+        return dataclasses.replace(e, left=children[0], right=children[1])
+    if isinstance(e, (IsNotNull, Not, Cast, Alias)):
+        return dataclasses.replace(e, child=children[0])
+    if isinstance(e, Func):
+        it = iter(children)
+        return dataclasses.replace(e, args=tuple(next(it) if isinstance(a, Expr) else a for a in e.args))
+    raise TypeError(f"no rewrite for {type(e).__name__}")
+
+
+def substitute(e: Expr, aliases: dict[int, Expr]) -> Expr:
+    """Replace attributes by the expressions a Project computes them with (`PushPredicateThroughNonJoin`'s
+    `replaceAlias` when a filter moves below a Project; `CollapseProject` when two Projects merge)."""
+    if isinstance(e, Attr):
+        return aliases.get(e.expr_id, e)
+    kids = e.children()
+    if not kids:
+        return e
+    return with_children(e, [substitute(c, aliases) for c in kids])
+
+
+def _next_day(d: str) -> str:
+    import datetime as _dt
+
+    return (_dt.date.fromisoformat(d) + _dt.timedelta(days=1)).isoformat()
+
+
+def unwrap_date_cast(e: Expr) -> list[Expr]:
+    """`UnwrapCastInBinaryComparison.unwrapDateToTimestamp` (Spark 3.5): a comparison of a timestamp column cast
+    to date with a date literal becomes a range on the timestamp itself (the casts of the bounds folded to
+    literals in the session time zone, UTC here), e.g. `cast(ts as date) = 2026-10-21` →
+    `ts >= 2026-10-21 00:00:00`, `ts < 2026-10-22 00:00:00` (checked on 3.5.9: reference/local/)."""
+    if not (isinstance(e, BinaryOp) and isinstance(e.left, Cast) and e.left.dtype == "date"
+            and e.left.child.dtype == "timestamp" and isinstance(e.right, Lit) and e.right.dtype == "date"
+            and e.right.value is not None and e.op in ("=", ">", ">=", "<", "<=")):
+        return [e]
+    ts, day = e.left.child, str(e.right.value)
+    start, end = Lit(f"{day} 00:00:00", "timestamp"), Lit(f"{_next_day(day)} 00:00:00", "timestamp")
+    return {"=": [ts.ge(start), ts.lt(end)], ">": [ts.ge(end)], ">=": [ts.ge(start)],
+            "<": [ts.lt(start)], "<=": [ts.lt(end)]}[e.op]
 
 
 def null_intolerant_refs(e: Expr) -> list[Attr]:
@@ -294,9 +348,60 @@ def null_intolerant_refs(e: Expr) -> list[Attr]:
         return null_intolerant_refs(e.child)
     if isinstance(e, Attr) and e.dtype == "boolean":
         return [e]
-    if isinstance(e, BinaryOp) and e.source_filter:
-        return [a for a in (e.left, e.right) if isinstance(a, Attr)]
+    if isinstance(e, BinaryOp) and e.source_filter:  # a comparison; a Cast of a column is null-intolerant too
+        out = []
+        for side in (e.left, e.right):
+            while isinstance(side, Cast):
+                side = side.child
+            if isinstance(side, Attr):
+                out.append(side)
+        return out
     return []
+
+
+_INTEGRAL = {"tinyint", "smallint", "int", "bigint"}
+
+
+def eval_predicate(e: Expr, bound: dict[int, str | None]) -> bool:
+    """Evaluate a partition predicate on one partition's values (`InterpretedPredicate` over the partition
+    row in `PartitioningAwareFileIndex.prunePartitions`): attribute id -> the directory's value as written
+    (`None`: `__HIVE_DEFAULT_PARTITION__`). SQL's three-valued logic: a null result does not select."""
+    return _eval(e, bound) is True
+
+
+def _eval(e: Expr, b: dict[int, str | None]):
+    if isinstance(e, Attr):
+        if e.expr_id not in b:
+            raise ValueError(f"{e} is not a partition column")
+        v = b[e.expr_id]
+        return None if v in (None, "__HIVE_DEFAULT_PARTITION__") else _typed(v, e.dtype)
+    if isinstance(e, Lit):
+        return None if e.value is None else _typed(e.value, e.dtype)
+    if isinstance(e, IsNotNull):
+        return _eval(e.child, b) is not None
+    if isinstance(e, Not):
+        v = _eval(e.child, b)
+        return None if v is None else not v
+    if isinstance(e, Cast):
+        v = _eval(e.child, b)
+        return None if v is None else _typed(str(v), e.dtype)
+    if isinstance(e, BinaryOp):
+        left, right = _eval(e.left, b), _eval(e.right, b)
+        if e.op == "AND":
+            if left is False or right is False:
+                return False
+            return None if left is None or right is None else True
+        if left is None or right is None:
+            return None
+        ops = {"=": left == right, ">=": left >= right, "<=": left <= right, ">": left > right, "<": left < right}
+        if e.op in ops:
+            return ops[e.op]
+    raise NotImplementedError(f"partition pruning: cannot evaluate {e}")
+
+
+def _typed(v, dtype: str):
+    """Partition values compare as their column type: integers numerically, dates (ISO) and strings as text."""
+    return int(v) if dtype in _INTEGRAL else str(v)
 
 
 # --------------------------------------------------------------------------- aggregates

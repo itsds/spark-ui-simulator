@@ -446,6 +446,8 @@ def _spill_group(trace: list[OpTrace], ix: list[int], available: float) -> None:
 
 def _apply(op: Op, rows: int, row_bytes, ctx: StageContext, plan: TaskPlan) -> int:
     """Output rows of one operator for this task."""
+    if op.kind == "filter" and op.by_partition:
+        return _partition_filtered(op, rows, plan)
     if op.kind in ("filter", "bhj"):
         return round(rows * op.selectivity)
     if op.kind == "partial_agg":
@@ -457,6 +459,20 @@ def _apply(op: Op, rows: int, row_bytes, ctx: StageContext, plan: TaskPlan) -> i
         groups = round(op.groups.distinct * float(shares[start:end].sum()))
         return min(groups, rows)
     return rows
+
+
+def _partition_filtered(op: Op, rows: int, plan: TaskPlan) -> int:
+    """A filter directly over the scan whose pass rate depends on the partition each file is stored in: the
+    rows of each file of the split times its partition's share, times the uniform selectivity."""
+    assert plan.scan is not None and rows == plan.scan.rows, "a per-partition filter must sit on the scan"
+    share = dict(op.by_partition)
+    kept = 0.0
+    for pf in plan.scan.files:
+        part = pf.file.path.rsplit("/", 2)[-2]
+        if part not in share:
+            raise ValueError(f"filter: no partition selectivity for {part} ({pf.file.path})")
+        kept += pf.rows * share[part]
+    return round(kept * op.selectivity)
 
 
 def _groups_in_task(op: Op, plan: TaskPlan) -> float:

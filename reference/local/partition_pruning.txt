@@ -1,0 +1,780 @@
+=== enrich path
+== Physical Plan ==
+AdaptiveSparkPlan (18)
++- Project (17)
+   +- SortMergeJoin Inner (16)
+      :- Sort (10)
+      :  +- Exchange (9)
+      :     +- Project (8)
+      :        +- BroadcastHashJoin Inner BuildRight (7)
+      :           :- Project (3)
+      :           :  +- Filter (2)
+      :           :     +- Scan parquet  (1)
+      :           +- BroadcastExchange (6)
+      :              +- Filter (5)
+      :                 +- Scan parquet  (4)
+      +- Sort (15)
+         +- Exchange (14)
+            +- Project (13)
+               +- Filter (12)
+                  +- Scan parquet  (11)
+
+
+(1) Scan parquet 
+Output [12]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, page_url#7, device#11, country#14, is_bot#16, revenue#20, dt#24]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events/dt=2026-10-21]
+PushedFilters: [IsNotNull(is_bot), Not(EqualTo(is_bot,true)), IsNotNull(page_id), IsNotNull(customer_id)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,page_id:bigint,event_type:string,page_url:string,device:string,country:string,is_bot:boolean,revenue:double>
+
+(2) Filter
+Input [12]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, page_url#7, device#11, country#14, is_bot#16, revenue#20, dt#24]
+Condition : (((isnotnull(is_bot#16) AND NOT is_bot#16) AND isnotnull(page_id#5L)) AND isnotnull(customer_id#3L))
+
+(3) Project
+Output [11]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, device#11, country#14, revenue#20, lower(regexp_extract(page_url#7, utm_campaign=([^&]+), 1)) AS campaign#107, dt#24]
+Input [12]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, page_url#7, device#11, country#14, is_bot#16, revenue#20, dt#24]
+
+(4) Scan parquet 
+Output [3]: [page_id#90L, page_type#93, funnel_step#94]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/page_catalog]
+PushedFilters: [IsNotNull(page_id)]
+ReadSchema: struct<page_id:bigint,page_type:string,funnel_step:int>
+
+(5) Filter
+Input [3]: [page_id#90L, page_type#93, funnel_step#94]
+Condition : isnotnull(page_id#90L)
+
+(6) BroadcastExchange
+Input [3]: [page_id#90L, page_type#93, funnel_step#94]
+Arguments: HashedRelationBroadcastMode(List(input[0, bigint, false]),false), [plan_id=44]
+
+(7) BroadcastHashJoin
+Left keys [1]: [page_id#5L]
+Right keys [1]: [page_id#90L]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [13]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94]
+Input [14]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_id#90L, page_type#93, funnel_step#94]
+
+(9) Exchange
+Input [13]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94]
+Arguments: hashpartitioning(customer_id#3L, 2400), ENSURE_REQUIREMENTS, [plan_id=49]
+
+(10) Sort
+Input [13]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94]
+Arguments: [customer_id#3L ASC NULLS FIRST], false, 0
+
+(11) Scan parquet 
+Output [5]: [customer_id#50L, home_country#58, segment#61, loyalty_tier#62, is_deleted#66]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/crm.db/customers_snapshot]
+PushedFilters: [IsNotNull(is_deleted), Not(EqualTo(is_deleted,true)), IsNotNull(customer_id)]
+ReadSchema: struct<customer_id:bigint,home_country:string,segment:string,loyalty_tier:string,is_deleted:boolean>
+
+(12) Filter
+Input [5]: [customer_id#50L, home_country#58, segment#61, loyalty_tier#62, is_deleted#66]
+Condition : ((isnotnull(is_deleted#66) AND NOT is_deleted#66) AND isnotnull(customer_id#50L))
+
+(13) Project
+Output [4]: [customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+Input [5]: [customer_id#50L, home_country#58, segment#61, loyalty_tier#62, is_deleted#66]
+
+(14) Exchange
+Input [4]: [customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+Arguments: hashpartitioning(customer_id#50L, 2400), ENSURE_REQUIREMENTS, [plan_id=50]
+
+(15) Sort
+Input [4]: [customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+Arguments: [customer_id#50L ASC NULLS FIRST], false, 0
+
+(16) SortMergeJoin
+Left keys [1]: [customer_id#3L]
+Right keys [1]: [customer_id#50L]
+Join type: Inner
+Join condition: None
+
+(17) Project
+Output [16]: [customer_id#3L, page_id#5L, event_id#0L, event_ts#1, session_id#2L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94, segment#61, loyalty_tier#62, home_country#58]
+Input [17]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94, customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+
+(18) AdaptiveSparkPlan
+Output [16]: [customer_id#3L, page_id#5L, event_id#0L, event_ts#1, session_id#2L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94, segment#61, loyalty_tier#62, home_country#58]
+Arguments: isFinalPlan=false
+
+
+=== enrich event_date
+== Physical Plan ==
+AdaptiveSparkPlan (18)
++- Project (17)
+   +- SortMergeJoin Inner (16)
+      :- Sort (10)
+      :  +- Exchange (9)
+      :     +- Project (8)
+      :        +- BroadcastHashJoin Inner BuildRight (7)
+      :           :- Project (3)
+      :           :  +- Filter (2)
+      :           :     +- Scan parquet  (1)
+      :           +- BroadcastExchange (6)
+      :              +- Filter (5)
+      :                 +- Scan parquet  (4)
+      +- Sort (15)
+         +- Exchange (14)
+            +- Project (13)
+               +- Filter (12)
+                  +- Scan parquet  (11)
+
+
+(1) Scan parquet 
+Output [12]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, page_url#180, device#184, country#187, is_bot#189, revenue#193, dt#197]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events]
+PushedFilters: [IsNotNull(event_ts), IsNotNull(is_bot), GreaterThanOrEqual(event_ts,2026-10-21 00:00:00.0), LessThan(event_ts,2026-10-22 00:00:00.0), Not(EqualTo(is_bot,true)), IsNotNull(page_id), IsNotNull(customer_id)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,page_id:bigint,event_type:string,page_url:string,device:string,country:string,is_bot:boolean,revenue:double>
+
+(2) Filter
+Input [12]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, page_url#180, device#184, country#187, is_bot#189, revenue#193, dt#197]
+Condition : ((((((isnotnull(event_ts#174) AND isnotnull(is_bot#189)) AND (event_ts#174 >= 2026-10-21 00:00:00)) AND (event_ts#174 < 2026-10-22 00:00:00)) AND NOT is_bot#189) AND isnotnull(page_id#178L)) AND isnotnull(customer_id#176L))
+
+(3) Project
+Output [11]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, device#184, country#187, revenue#193, lower(regexp_extract(page_url#180, utm_campaign=([^&]+), 1)) AS campaign#306, cast(event_ts#174 as date) AS dt#223]
+Input [12]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, page_url#180, device#184, country#187, is_bot#189, revenue#193, dt#197]
+
+(4) Scan parquet 
+Output [3]: [page_id#290L, page_type#293, funnel_step#294]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/page_catalog]
+PushedFilters: [IsNotNull(page_id)]
+ReadSchema: struct<page_id:bigint,page_type:string,funnel_step:int>
+
+(5) Filter
+Input [3]: [page_id#290L, page_type#293, funnel_step#294]
+Condition : isnotnull(page_id#290L)
+
+(6) BroadcastExchange
+Input [3]: [page_id#290L, page_type#293, funnel_step#294]
+Arguments: HashedRelationBroadcastMode(List(input[0, bigint, false]),false), [plan_id=400]
+
+(7) BroadcastHashJoin
+Left keys [1]: [page_id#178L]
+Right keys [1]: [page_id#290L]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [13]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294]
+Input [14]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_id#290L, page_type#293, funnel_step#294]
+
+(9) Exchange
+Input [13]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294]
+Arguments: hashpartitioning(customer_id#176L, 2400), ENSURE_REQUIREMENTS, [plan_id=405]
+
+(10) Sort
+Input [13]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294]
+Arguments: [customer_id#176L ASC NULLS FIRST], false, 0
+
+(11) Scan parquet 
+Output [5]: [customer_id#250L, home_country#258, segment#261, loyalty_tier#262, is_deleted#266]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/crm.db/customers_snapshot]
+PushedFilters: [IsNotNull(is_deleted), Not(EqualTo(is_deleted,true)), IsNotNull(customer_id)]
+ReadSchema: struct<customer_id:bigint,home_country:string,segment:string,loyalty_tier:string,is_deleted:boolean>
+
+(12) Filter
+Input [5]: [customer_id#250L, home_country#258, segment#261, loyalty_tier#262, is_deleted#266]
+Condition : ((isnotnull(is_deleted#266) AND NOT is_deleted#266) AND isnotnull(customer_id#250L))
+
+(13) Project
+Output [4]: [customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+Input [5]: [customer_id#250L, home_country#258, segment#261, loyalty_tier#262, is_deleted#266]
+
+(14) Exchange
+Input [4]: [customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+Arguments: hashpartitioning(customer_id#250L, 2400), ENSURE_REQUIREMENTS, [plan_id=406]
+
+(15) Sort
+Input [4]: [customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+Arguments: [customer_id#250L ASC NULLS FIRST], false, 0
+
+(16) SortMergeJoin
+Left keys [1]: [customer_id#176L]
+Right keys [1]: [customer_id#250L]
+Join type: Inner
+Join condition: None
+
+(17) Project
+Output [16]: [customer_id#176L, page_id#178L, event_id#173L, event_ts#174, session_id#175L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294, segment#261, loyalty_tier#262, home_country#258]
+Input [17]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294, customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+
+(18) AdaptiveSparkPlan
+Output [16]: [customer_id#176L, page_id#178L, event_id#173L, event_ts#174, session_id#175L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294, segment#261, loyalty_tier#262, home_country#258]
+Arguments: isFinalPlan=false
+
+
+=== enrich event_date_pruned
+== Physical Plan ==
+AdaptiveSparkPlan (18)
++- Project (17)
+   +- SortMergeJoin Inner (16)
+      :- Sort (10)
+      :  +- Exchange (9)
+      :     +- Project (8)
+      :        +- BroadcastHashJoin Inner BuildRight (7)
+      :           :- Project (3)
+      :           :  +- Filter (2)
+      :           :     +- Scan parquet  (1)
+      :           +- BroadcastExchange (6)
+      :              +- Filter (5)
+      :                 +- Scan parquet  (4)
+      +- Sort (15)
+         +- Exchange (14)
+            +- Project (13)
+               +- Filter (12)
+                  +- Scan parquet  (11)
+
+
+(1) Scan parquet 
+Output [12]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, page_url#379, device#383, country#386, is_bot#388, revenue#392, dt#396]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events]
+PartitionFilters: [isnotnull(dt#396), (dt#396 >= 2026-10-21), (dt#396 <= 2026-10-22)]
+PushedFilters: [IsNotNull(event_ts), IsNotNull(is_bot), GreaterThanOrEqual(event_ts,2026-10-21 00:00:00.0), LessThan(event_ts,2026-10-22 00:00:00.0), Not(EqualTo(is_bot,true)), IsNotNull(page_id), IsNotNull(customer_id)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,page_id:bigint,event_type:string,page_url:string,device:string,country:string,is_bot:boolean,revenue:double>
+
+(2) Filter
+Input [12]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, page_url#379, device#383, country#386, is_bot#388, revenue#392, dt#396]
+Condition : ((((((isnotnull(event_ts#373) AND isnotnull(is_bot#388)) AND (event_ts#373 >= 2026-10-21 00:00:00)) AND (event_ts#373 < 2026-10-22 00:00:00)) AND NOT is_bot#388) AND isnotnull(page_id#377L)) AND isnotnull(customer_id#375L))
+
+(3) Project
+Output [11]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, device#383, country#386, revenue#392, lower(regexp_extract(page_url#379, utm_campaign=([^&]+), 1)) AS campaign#505, cast(event_ts#373 as date) AS dt#423]
+Input [12]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, page_url#379, device#383, country#386, is_bot#388, revenue#392, dt#396]
+
+(4) Scan parquet 
+Output [3]: [page_id#489L, page_type#492, funnel_step#493]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/page_catalog]
+PushedFilters: [IsNotNull(page_id)]
+ReadSchema: struct<page_id:bigint,page_type:string,funnel_step:int>
+
+(5) Filter
+Input [3]: [page_id#489L, page_type#492, funnel_step#493]
+Condition : isnotnull(page_id#489L)
+
+(6) BroadcastExchange
+Input [3]: [page_id#489L, page_type#492, funnel_step#493]
+Arguments: HashedRelationBroadcastMode(List(input[0, bigint, false]),false), [plan_id=768]
+
+(7) BroadcastHashJoin
+Left keys [1]: [page_id#377L]
+Right keys [1]: [page_id#489L]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [13]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493]
+Input [14]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_id#489L, page_type#492, funnel_step#493]
+
+(9) Exchange
+Input [13]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493]
+Arguments: hashpartitioning(customer_id#375L, 2400), ENSURE_REQUIREMENTS, [plan_id=773]
+
+(10) Sort
+Input [13]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493]
+Arguments: [customer_id#375L ASC NULLS FIRST], false, 0
+
+(11) Scan parquet 
+Output [5]: [customer_id#449L, home_country#457, segment#460, loyalty_tier#461, is_deleted#465]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/crm.db/customers_snapshot]
+PushedFilters: [IsNotNull(is_deleted), Not(EqualTo(is_deleted,true)), IsNotNull(customer_id)]
+ReadSchema: struct<customer_id:bigint,home_country:string,segment:string,loyalty_tier:string,is_deleted:boolean>
+
+(12) Filter
+Input [5]: [customer_id#449L, home_country#457, segment#460, loyalty_tier#461, is_deleted#465]
+Condition : ((isnotnull(is_deleted#465) AND NOT is_deleted#465) AND isnotnull(customer_id#449L))
+
+(13) Project
+Output [4]: [customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+Input [5]: [customer_id#449L, home_country#457, segment#460, loyalty_tier#461, is_deleted#465]
+
+(14) Exchange
+Input [4]: [customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+Arguments: hashpartitioning(customer_id#449L, 2400), ENSURE_REQUIREMENTS, [plan_id=774]
+
+(15) Sort
+Input [4]: [customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+Arguments: [customer_id#449L ASC NULLS FIRST], false, 0
+
+(16) SortMergeJoin
+Left keys [1]: [customer_id#375L]
+Right keys [1]: [customer_id#449L]
+Join type: Inner
+Join condition: None
+
+(17) Project
+Output [16]: [customer_id#375L, page_id#377L, event_id#372L, event_ts#373, session_id#374L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493, segment#460, loyalty_tier#461, home_country#457]
+Input [17]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493, customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+
+(18) AdaptiveSparkPlan
+Output [16]: [customer_id#375L, page_id#377L, event_id#372L, event_ts#373, session_id#374L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493, segment#460, loyalty_tier#461, home_country#457]
+Arguments: isFinalPlan=false
+
+
+=== myth cast(dt as string)
+== Physical Plan ==
+* ColumnarToRow (2)
++- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [25]: [event_id#571L, event_ts#572, session_id#573L, customer_id#574L, anonymous_id#575, page_id#576L, event_type#577, page_url#578, referrer_url#579, user_agent#580, ip_address#581, device#582, os#583, browser#584, country#585, region#586, is_bot#587, consent_flags#588, experiment_ids#589, payload#590, revenue#591, currency#592, app_version#593, ingest_ts#594, dt#595]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events]
+PartitionFilters: [isnotnull(dt#595), (cast(dt#595 as string) = 2026-10-21)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,anonymous_id:string,page_id:bigint,event_type:string,page_url:string,referrer_url:string,user_agent:string,ip_address:string,device:string,os:string,browser:string,country:string,region:string,is_bot:boolean,consent_flags:string,experiment_ids:string,payload:string,revenue:double,currency:string,app_version:string,ingest_ts:timestamp>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [25]: [event_id#571L, event_ts#572, session_id#573L, customer_id#574L, anonymous_id#575, page_id#576L, event_type#577, page_url#578, referrer_url#579, user_agent#580, ip_address#581, device#582, os#583, browser#584, country#585, region#586, is_bot#587, consent_flags#588, experiment_ids#589, payload#590, revenue#591, currency#592, app_version#593, ingest_ts#594, dt#595]
+
+
+=== myth to_date(cast(dt as string), fmt)
+== Physical Plan ==
+* ColumnarToRow (2)
++- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [25]: [event_id#571L, event_ts#572, session_id#573L, customer_id#574L, anonymous_id#575, page_id#576L, event_type#577, page_url#578, referrer_url#579, user_agent#580, ip_address#581, device#582, os#583, browser#584, country#585, region#586, is_bot#587, consent_flags#588, experiment_ids#589, payload#590, revenue#591, currency#592, app_version#593, ingest_ts#594, dt#595]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events]
+PartitionFilters: [(gettimestamp(cast(dt#595 as string), yyyy-MM-dd, TimestampType, Some(UTC), false) >= 2026-10-21 00:00:00), (gettimestamp(cast(dt#595 as string), yyyy-MM-dd, TimestampType, Some(UTC), false) < 2026-10-22 00:00:00)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,anonymous_id:string,page_id:bigint,event_type:string,page_url:string,referrer_url:string,user_agent:string,ip_address:string,device:string,os:string,browser:string,country:string,region:string,is_bot:boolean,consent_flags:string,experiment_ids:string,payload:string,revenue:double,currency:string,app_version:string,ingest_ts:timestamp>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [25]: [event_id#571L, event_ts#572, session_id#573L, customer_id#574L, anonymous_id#575, page_id#576L, event_type#577, page_url#578, referrer_url#579, user_agent#580, ip_address#581, device#582, os#583, browser#584, country#585, region#586, is_bot#587, consent_flags#588, experiment_ids#589, payload#590, revenue#591, currency#592, app_version#593, ingest_ts#594, dt#595]
+
+
+=== int96 event_ts::date
+== Physical Plan ==
+* Filter (3)
++- * ColumnarToRow (2)
+   +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [25]: [event_id#571L, event_ts#572, session_id#573L, customer_id#574L, anonymous_id#575, page_id#576L, event_type#577, page_url#578, referrer_url#579, user_agent#580, ip_address#581, device#582, os#583, browser#584, country#585, region#586, is_bot#587, consent_flags#588, experiment_ids#589, payload#590, revenue#591, currency#592, app_version#593, ingest_ts#594, dt#595]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events]
+PushedFilters: [IsNotNull(event_ts), GreaterThanOrEqual(event_ts,2026-10-21 00:00:00.0), LessThan(event_ts,2026-10-22 00:00:00.0)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,anonymous_id:string,page_id:bigint,event_type:string,page_url:string,referrer_url:string,user_agent:string,ip_address:string,device:string,os:string,browser:string,country:string,region:string,is_bot:boolean,consent_flags:string,experiment_ids:string,payload:string,revenue:double,currency:string,app_version:string,ingest_ts:timestamp>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [25]: [event_id#571L, event_ts#572, session_id#573L, customer_id#574L, anonymous_id#575, page_id#576L, event_type#577, page_url#578, referrer_url#579, user_agent#580, ip_address#581, device#582, os#583, browser#584, country#585, region#586, is_bot#587, consent_flags#588, experiment_ids#589, payload#590, revenue#591, currency#592, app_version#593, ingest_ts#594, dt#595]
+
+(3) Filter [codegen id : 1]
+Input [25]: [event_id#571L, event_ts#572, session_id#573L, customer_id#574L, anonymous_id#575, page_id#576L, event_type#577, page_url#578, referrer_url#579, user_agent#580, ip_address#581, device#582, os#583, browser#584, country#585, region#586, is_bot#587, consent_flags#588, experiment_ids#589, payload#590, revenue#591, currency#592, app_version#593, ingest_ts#594, dt#595]
+Condition : ((isnotnull(event_ts#572) AND (event_ts#572 >= 2026-10-21 00:00:00)) AND (event_ts#572 < 2026-10-22 00:00:00))
+
+
+=== micros event_ts::date
+== Physical Plan ==
+* Filter (3)
++- * ColumnarToRow (2)
+   +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [25]: [event_id#647L, event_ts#648, session_id#649L, customer_id#650L, anonymous_id#651, page_id#652L, event_type#653, page_url#654, referrer_url#655, user_agent#656, ip_address#657, device#658, os#659, browser#660, country#661, region#662, is_bot#663, consent_flags#664, experiment_ids#665, payload#666, revenue#667, currency#668, app_version#669, ingest_ts#670, dt#671]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events_micros]
+PushedFilters: [IsNotNull(event_ts), GreaterThanOrEqual(event_ts,2026-10-21 00:00:00.0), LessThan(event_ts,2026-10-22 00:00:00.0)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,anonymous_id:string,page_id:bigint,event_type:string,page_url:string,referrer_url:string,user_agent:string,ip_address:string,device:string,os:string,browser:string,country:string,region:string,is_bot:boolean,consent_flags:string,experiment_ids:string,payload:string,revenue:double,currency:string,app_version:string,ingest_ts:timestamp>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [25]: [event_id#647L, event_ts#648, session_id#649L, customer_id#650L, anonymous_id#651, page_id#652L, event_type#653, page_url#654, referrer_url#655, user_agent#656, ip_address#657, device#658, os#659, browser#660, country#661, region#662, is_bot#663, consent_flags#664, experiment_ids#665, payload#666, revenue#667, currency#668, app_version#669, ingest_ts#670, dt#671]
+
+(3) Filter [codegen id : 1]
+Input [25]: [event_id#647L, event_ts#648, session_id#649L, customer_id#650L, anonymous_id#651, page_id#652L, event_type#653, page_url#654, referrer_url#655, user_agent#656, ip_address#657, device#658, os#659, browser#660, country#661, region#662, is_bot#663, consent_flags#664, experiment_ids#665, payload#666, revenue#667, currency#668, app_version#669, ingest_ts#670, dt#671]
+Condition : ((isnotnull(event_ts#648) AND (event_ts#648 >= 2026-10-21 00:00:00)) AND (event_ts#648 < 2026-10-22 00:00:00))
+
+
+=== scan metrics (execution: description)
+0: enrich path: number of files read = 5, number of output rows = 11351, number of partitions read = 1, size of files read = 330823
+1: enrich event_date: number of files read = 7, number of output rows = 30551, number of partitions read = 3, size of files read = 891553
+2: enrich event_date_pruned: number of files read = 6, number of output rows = 19754, number of partitions read = 2, size of files read = 580199
+3: enrich event_date_pruned: number of files read = 3, number of output rows = 30000, number of partitions read = 3, size of files read = 873546
+4: myth cast(dt as string): number of files read = 1, number of output rows = 10800, number of partitions read = 1, size of files read = 312816
+5: myth to_date(cast(dt as string), fmt): number of files read = 1, number of output rows = 10800, number of partitions read = 1, size of files read = 312816
+6: int96 event_ts::date: number of files read = 3, number of output rows = 30000, number of partitions read = 3, size of files read = 873546
+7: micros event_ts::date: number of files read = 3, number of output rows = 19203, number of partitions read = 3, size of files read = 678193
+=== SQLExecutionStart physicalPlanDescription of the three enrich writes
+--- execution 0: enrich path
+== Physical Plan ==
+AdaptiveSparkPlan (21)
++- Execute InsertIntoHadoopFsRelationCommand (20)
+   +- WriteFiles (19)
+      +- Sort (18)
+         +- Project (17)
+            +- SortMergeJoin Inner (16)
+               :- Sort (10)
+               :  +- Exchange (9)
+               :     +- Project (8)
+               :        +- BroadcastHashJoin Inner BuildRight (7)
+               :           :- Project (3)
+               :           :  +- Filter (2)
+               :           :     +- Scan parquet  (1)
+               :           +- BroadcastExchange (6)
+               :              +- Filter (5)
+               :                 +- Scan parquet  (4)
+               +- Sort (15)
+                  +- Exchange (14)
+                     +- Project (13)
+                        +- Filter (12)
+                           +- Scan parquet  (11)
+
+
+(1) Scan parquet 
+Output [12]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, page_url#7, device#11, country#14, is_bot#16, revenue#20, dt#24]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events/dt=2026-10-21]
+PushedFilters: [IsNotNull(is_bot), Not(EqualTo(is_bot,true)), IsNotNull(page_id), IsNotNull(customer_id)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,page_id:bigint,event_type:string,page_url:string,device:string,country:string,is_bot:boolean,revenue:double>
+
+(2) Filter
+Input [12]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, page_url#7, device#11, country#14, is_bot#16, revenue#20, dt#24]
+Condition : (((isnotnull(is_bot#16) AND NOT is_bot#16) AND isnotnull(page_id#5L)) AND isnotnull(customer_id#3L))
+
+(3) Project
+Output [11]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, device#11, country#14, revenue#20, lower(regexp_extract(page_url#7, utm_campaign=([^&]+), 1)) AS campaign#107, dt#24]
+Input [12]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, page_url#7, device#11, country#14, is_bot#16, revenue#20, dt#24]
+
+(4) Scan parquet 
+Output [3]: [page_id#90L, page_type#93, funnel_step#94]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/page_catalog]
+PushedFilters: [IsNotNull(page_id)]
+ReadSchema: struct<page_id:bigint,page_type:string,funnel_step:int>
+
+(5) Filter
+Input [3]: [page_id#90L, page_type#93, funnel_step#94]
+Condition : isnotnull(page_id#90L)
+
+(6) BroadcastExchange
+Input [3]: [page_id#90L, page_type#93, funnel_step#94]
+Arguments: HashedRelationBroadcastMode(List(input[0, bigint, false]),false), [plan_id=114]
+
+(7) BroadcastHashJoin
+Left keys [1]: [page_id#5L]
+Right keys [1]: [page_id#90L]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [13]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94]
+Input [14]: [event_id#0L, event_ts#1, session_id#2L, customer_id#3L, page_id#5L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_id#90L, page_type#93, funnel_step#94]
+
+(9) Exchange
+Input [13]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94]
+Arguments: hashpartitioning(customer_id#3L, 2400), ENSURE_REQUIREMENTS, [plan_id=119]
+
+(10) Sort
+Input [13]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94]
+Arguments: [customer_id#3L ASC NULLS FIRST], false, 0
+
+(11) Scan parquet 
+Output [5]: [customer_id#50L, home_country#58, segment#61, loyalty_tier#62, is_deleted#66]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/crm.db/customers_snapshot]
+PushedFilters: [IsNotNull(is_deleted), Not(EqualTo(is_deleted,true)), IsNotNull(customer_id)]
+ReadSchema: struct<customer_id:bigint,home_country:string,segment:string,loyalty_tier:string,is_deleted:boolean>
+
+(12) Filter
+Input [5]: [customer_id#50L, home_country#58, segment#61, loyalty_tier#62, is_deleted#66]
+Condition : ((isnotnull(is_deleted#66) AND NOT is_deleted#66) AND isnotnull(customer_id#50L))
+
+(13) Project
+Output [4]: [customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+Input [5]: [customer_id#50L, home_country#58, segment#61, loyalty_tier#62, is_deleted#66]
+
+(14) Exchange
+Input [4]: [customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+Arguments: hashpartitioning(customer_id#50L, 2400), ENSURE_REQUIREMENTS, [plan_id=120]
+
+(15) Sort
+Input [4]: [customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+Arguments: [customer_id#50L ASC NULLS FIRST], false, 0
+
+(16) SortMergeJoin
+Left keys [1]: [customer_id#3L]
+Right keys [1]: [customer_id#50L]
+Join type: Inner
+Join condition: None
+
+(17) Project
+Output [16]: [customer_id#3L, page_id#5L, event_id#0L, event_ts#1, session_id#2L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94, segment#61, loyalty_tier#62, home_country#58]
+Input [17]: [page_id#5L, event_id#0L, event_ts#1, session_id#2L, customer_id#3L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94, customer_id#50L, segment#61, loyalty_tier#62, home_country#58]
+
+(18) Sort
+Input [16]: [customer_id#3L, page_id#5L, event_id#0L, event_ts#1, session_id#2L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94, segment#61, loyalty_tier#62, home_country#58]
+Arguments: [dt#24 ASC NULLS FIRST], false, 0
+
+(19) WriteFiles
+Input [16]: [customer_id#3L, page_id#5L, event_id#0L, event_ts#1, session_id#2L, event_type#6, device#11, country#14, revenue#20, campaign#107, dt#24, page_type#93, funnel_step#94, segment#61, loyalty_tier#62, home_country#58]
+
+(20) Execute InsertIntoHadoopFsRelationCommand
+Input: []
+Arguments: file:/home/user/spark-ui-simulator/build/pruning/warehouse/analytics.db/events_enriched_path, false, [dt#24], Parquet, [__partition_columns=["dt"], path=file:///home/user/spark-ui-simulator/build/pruning/warehouse/analytics.db/events_enriched_path], Overwrite, [customer_id, page_id, event_id, event_ts, session_id, event_type, device, country, revenue, campaign, dt, page_type, funnel_step, segment, loyalty_tier, home_country]
+
+(21) AdaptiveSparkPlan
+Output: []
+Arguments: isFinalPlan=false
+
+
+--- execution 1: enrich event_date
+== Physical Plan ==
+AdaptiveSparkPlan (21)
++- Execute InsertIntoHadoopFsRelationCommand (20)
+   +- WriteFiles (19)
+      +- Sort (18)
+         +- Project (17)
+            +- SortMergeJoin Inner (16)
+               :- Sort (10)
+               :  +- Exchange (9)
+               :     +- Project (8)
+               :        +- BroadcastHashJoin Inner BuildRight (7)
+               :           :- Project (3)
+               :           :  +- Filter (2)
+               :           :     +- Scan parquet  (1)
+               :           +- BroadcastExchange (6)
+               :              +- Filter (5)
+               :                 +- Scan parquet  (4)
+               +- Sort (15)
+                  +- Exchange (14)
+                     +- Project (13)
+                        +- Filter (12)
+                           +- Scan parquet  (11)
+
+
+(1) Scan parquet 
+Output [12]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, page_url#180, device#184, country#187, is_bot#189, revenue#193, dt#197]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events]
+PushedFilters: [IsNotNull(event_ts), IsNotNull(is_bot), GreaterThanOrEqual(event_ts,2026-10-21 00:00:00.0), LessThan(event_ts,2026-10-22 00:00:00.0), Not(EqualTo(is_bot,true)), IsNotNull(page_id), IsNotNull(customer_id)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,page_id:bigint,event_type:string,page_url:string,device:string,country:string,is_bot:boolean,revenue:double>
+
+(2) Filter
+Input [12]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, page_url#180, device#184, country#187, is_bot#189, revenue#193, dt#197]
+Condition : ((((((isnotnull(event_ts#174) AND isnotnull(is_bot#189)) AND (event_ts#174 >= 2026-10-21 00:00:00)) AND (event_ts#174 < 2026-10-22 00:00:00)) AND NOT is_bot#189) AND isnotnull(page_id#178L)) AND isnotnull(customer_id#176L))
+
+(3) Project
+Output [11]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, device#184, country#187, revenue#193, lower(regexp_extract(page_url#180, utm_campaign=([^&]+), 1)) AS campaign#306, cast(event_ts#174 as date) AS dt#223]
+Input [12]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, page_url#180, device#184, country#187, is_bot#189, revenue#193, dt#197]
+
+(4) Scan parquet 
+Output [3]: [page_id#290L, page_type#293, funnel_step#294]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/page_catalog]
+PushedFilters: [IsNotNull(page_id)]
+ReadSchema: struct<page_id:bigint,page_type:string,funnel_step:int>
+
+(5) Filter
+Input [3]: [page_id#290L, page_type#293, funnel_step#294]
+Condition : isnotnull(page_id#290L)
+
+(6) BroadcastExchange
+Input [3]: [page_id#290L, page_type#293, funnel_step#294]
+Arguments: HashedRelationBroadcastMode(List(input[0, bigint, false]),false), [plan_id=470]
+
+(7) BroadcastHashJoin
+Left keys [1]: [page_id#178L]
+Right keys [1]: [page_id#290L]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [13]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294]
+Input [14]: [event_id#173L, event_ts#174, session_id#175L, customer_id#176L, page_id#178L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_id#290L, page_type#293, funnel_step#294]
+
+(9) Exchange
+Input [13]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294]
+Arguments: hashpartitioning(customer_id#176L, 2400), ENSURE_REQUIREMENTS, [plan_id=475]
+
+(10) Sort
+Input [13]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294]
+Arguments: [customer_id#176L ASC NULLS FIRST], false, 0
+
+(11) Scan parquet 
+Output [5]: [customer_id#250L, home_country#258, segment#261, loyalty_tier#262, is_deleted#266]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/crm.db/customers_snapshot]
+PushedFilters: [IsNotNull(is_deleted), Not(EqualTo(is_deleted,true)), IsNotNull(customer_id)]
+ReadSchema: struct<customer_id:bigint,home_country:string,segment:string,loyalty_tier:string,is_deleted:boolean>
+
+(12) Filter
+Input [5]: [customer_id#250L, home_country#258, segment#261, loyalty_tier#262, is_deleted#266]
+Condition : ((isnotnull(is_deleted#266) AND NOT is_deleted#266) AND isnotnull(customer_id#250L))
+
+(13) Project
+Output [4]: [customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+Input [5]: [customer_id#250L, home_country#258, segment#261, loyalty_tier#262, is_deleted#266]
+
+(14) Exchange
+Input [4]: [customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+Arguments: hashpartitioning(customer_id#250L, 2400), ENSURE_REQUIREMENTS, [plan_id=476]
+
+(15) Sort
+Input [4]: [customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+Arguments: [customer_id#250L ASC NULLS FIRST], false, 0
+
+(16) SortMergeJoin
+Left keys [1]: [customer_id#176L]
+Right keys [1]: [customer_id#250L]
+Join type: Inner
+Join condition: None
+
+(17) Project
+Output [16]: [customer_id#176L, page_id#178L, event_id#173L, event_ts#174, session_id#175L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294, segment#261, loyalty_tier#262, home_country#258]
+Input [17]: [page_id#178L, event_id#173L, event_ts#174, session_id#175L, customer_id#176L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294, customer_id#250L, segment#261, loyalty_tier#262, home_country#258]
+
+(18) Sort
+Input [16]: [customer_id#176L, page_id#178L, event_id#173L, event_ts#174, session_id#175L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294, segment#261, loyalty_tier#262, home_country#258]
+Arguments: [dt#223 ASC NULLS FIRST], false, 0
+
+(19) WriteFiles
+Input [16]: [customer_id#176L, page_id#178L, event_id#173L, event_ts#174, session_id#175L, event_type#179, device#184, country#187, revenue#193, campaign#306, dt#223, page_type#293, funnel_step#294, segment#261, loyalty_tier#262, home_country#258]
+
+(20) Execute InsertIntoHadoopFsRelationCommand
+Input: []
+Arguments: file:/home/user/spark-ui-simulator/build/pruning/warehouse/analytics.db/events_enriched_event_date, false, [dt#223], Parquet, [__partition_columns=["dt"], path=file:///home/user/spark-ui-simulator/build/pruning/warehouse/analytics.db/events_enriched_event_date], Overwrite, [customer_id, page_id, event_id, event_ts, session_id, event_type, device, country, revenue, campaign, dt, page_type, funnel_step, segment, loyalty_tier, home_country]
+
+(21) AdaptiveSparkPlan
+Output: []
+Arguments: isFinalPlan=false
+
+
+--- execution 2: enrich event_date_pruned
+== Physical Plan ==
+AdaptiveSparkPlan (21)
++- Execute InsertIntoHadoopFsRelationCommand (20)
+   +- WriteFiles (19)
+      +- Sort (18)
+         +- Project (17)
+            +- SortMergeJoin Inner (16)
+               :- Sort (10)
+               :  +- Exchange (9)
+               :     +- Project (8)
+               :        +- BroadcastHashJoin Inner BuildRight (7)
+               :           :- Project (3)
+               :           :  +- Filter (2)
+               :           :     +- Scan parquet  (1)
+               :           +- BroadcastExchange (6)
+               :              +- Filter (5)
+               :                 +- Scan parquet  (4)
+               +- Sort (15)
+                  +- Exchange (14)
+                     +- Project (13)
+                        +- Filter (12)
+                           +- Scan parquet  (11)
+
+
+(1) Scan parquet 
+Output [12]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, page_url#379, device#383, country#386, is_bot#388, revenue#392, dt#396]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/events]
+PartitionFilters: [isnotnull(dt#396), (dt#396 >= 2026-10-21), (dt#396 <= 2026-10-22)]
+PushedFilters: [IsNotNull(event_ts), IsNotNull(is_bot), GreaterThanOrEqual(event_ts,2026-10-21 00:00:00.0), LessThan(event_ts,2026-10-22 00:00:00.0), Not(EqualTo(is_bot,true)), IsNotNull(page_id), IsNotNull(customer_id)]
+ReadSchema: struct<event_id:bigint,event_ts:timestamp,session_id:bigint,customer_id:bigint,page_id:bigint,event_type:string,page_url:string,device:string,country:string,is_bot:boolean,revenue:double>
+
+(2) Filter
+Input [12]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, page_url#379, device#383, country#386, is_bot#388, revenue#392, dt#396]
+Condition : ((((((isnotnull(event_ts#373) AND isnotnull(is_bot#388)) AND (event_ts#373 >= 2026-10-21 00:00:00)) AND (event_ts#373 < 2026-10-22 00:00:00)) AND NOT is_bot#388) AND isnotnull(page_id#377L)) AND isnotnull(customer_id#375L))
+
+(3) Project
+Output [11]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, device#383, country#386, revenue#392, lower(regexp_extract(page_url#379, utm_campaign=([^&]+), 1)) AS campaign#505, cast(event_ts#373 as date) AS dt#423]
+Input [12]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, page_url#379, device#383, country#386, is_bot#388, revenue#392, dt#396]
+
+(4) Scan parquet 
+Output [3]: [page_id#489L, page_type#492, funnel_step#493]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/web.db/page_catalog]
+PushedFilters: [IsNotNull(page_id)]
+ReadSchema: struct<page_id:bigint,page_type:string,funnel_step:int>
+
+(5) Filter
+Input [3]: [page_id#489L, page_type#492, funnel_step#493]
+Condition : isnotnull(page_id#489L)
+
+(6) BroadcastExchange
+Input [3]: [page_id#489L, page_type#492, funnel_step#493]
+Arguments: HashedRelationBroadcastMode(List(input[0, bigint, false]),false), [plan_id=838]
+
+(7) BroadcastHashJoin
+Left keys [1]: [page_id#377L]
+Right keys [1]: [page_id#489L]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [13]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493]
+Input [14]: [event_id#372L, event_ts#373, session_id#374L, customer_id#375L, page_id#377L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_id#489L, page_type#492, funnel_step#493]
+
+(9) Exchange
+Input [13]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493]
+Arguments: hashpartitioning(customer_id#375L, 2400), ENSURE_REQUIREMENTS, [plan_id=843]
+
+(10) Sort
+Input [13]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493]
+Arguments: [customer_id#375L ASC NULLS FIRST], false, 0
+
+(11) Scan parquet 
+Output [5]: [customer_id#449L, home_country#457, segment#460, loyalty_tier#461, is_deleted#465]
+Batched: true
+Location: InMemoryFileIndex [file:/home/user/spark-ui-simulator/build/pruning/warehouse/crm.db/customers_snapshot]
+PushedFilters: [IsNotNull(is_deleted), Not(EqualTo(is_deleted,true)), IsNotNull(customer_id)]
+ReadSchema: struct<customer_id:bigint,home_country:string,segment:string,loyalty_tier:string,is_deleted:boolean>
+
+(12) Filter
+Input [5]: [customer_id#449L, home_country#457, segment#460, loyalty_tier#461, is_deleted#465]
+Condition : ((isnotnull(is_deleted#465) AND NOT is_deleted#465) AND isnotnull(customer_id#449L))
+
+(13) Project
+Output [4]: [customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+Input [5]: [customer_id#449L, home_country#457, segment#460, loyalty_tier#461, is_deleted#465]
+
+(14) Exchange
+Input [4]: [customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+Arguments: hashpartitioning(customer_id#449L, 2400), ENSURE_REQUIREMENTS, [plan_id=844]
+
+(15) Sort
+Input [4]: [customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+Arguments: [customer_id#449L ASC NULLS FIRST], false, 0
+
+(16) SortMergeJoin
+Left keys [1]: [customer_id#375L]
+Right keys [1]: [customer_id#449L]
+Join type: Inner
+Join condition: None
+
+(17) Project
+Output [16]: [customer_id#375L, page_id#377L, event_id#372L, event_ts#373, session_id#374L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493, segment#460, loyalty_tier#461, home_country#457]
+Input [17]: [page_id#377L, event_id#372L, event_ts#373, session_id#374L, customer_id#375L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493, customer_id#449L, segment#460, loyalty_tier#461, home_country#457]
+
+(18) Sort
+Input [16]: [customer_id#375L, page_id#377L, event_id#372L, event_ts#373, session_id#374L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493, segment#460, loyalty_tier#461, home_country#457]
+Arguments: [dt#423 ASC NULLS FIRST], false, 0
+
+(19) WriteFiles
+Input [16]: [customer_id#375L, page_id#377L, event_id#372L, event_ts#373, session_id#374L, event_type#378, device#383, country#386, revenue#392, campaign#505, dt#423, page_type#492, funnel_step#493, segment#460, loyalty_tier#461, home_country#457]
+
+(20) Execute InsertIntoHadoopFsRelationCommand
+Input: []
+Arguments: file:/home/user/spark-ui-simulator/build/pruning/warehouse/analytics.db/events_enriched_event_date_pruned, false, [dt#423], Parquet, [__partition_columns=["dt"], path=file:///home/user/spark-ui-simulator/build/pruning/warehouse/analytics.db/events_enriched_event_date_pruned], Overwrite, [customer_id, page_id, event_id, event_ts, session_id, event_type, device, country, revenue, campaign, dt, page_type, funnel_step, segment, loyalty_tier, home_country]
+
+(21) AdaptiveSparkPlan
+Output: []
+Arguments: isFinalPlan=false
+
+

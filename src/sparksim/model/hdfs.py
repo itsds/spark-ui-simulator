@@ -111,14 +111,31 @@ class Hdfs:
     def listdir(self, directory: str) -> list[HdfsFile]:
         return sorted(self.dirs.get(directory, []), key=lambda f: f.path)
 
+    def partition_dirs(self, root: str) -> list[str]:
+        """The `column=value` directories directly below `root` (a partitioned table's partitions)."""
+        prefix = root.rstrip("/") + "/"
+        return sorted(d for d in self.dirs
+                      if d.startswith(prefix) and "/" not in d[len(prefix):] and "=" in d[len(prefix):])
+
+    def list_tree(self, root: str) -> list[HdfsFile]:
+        """Every file under `root`: its own and its partition directories' (InMemoryFileIndex's leaf files)."""
+        return self.listdir(root) + [f for d in self.partition_dirs(root) for f in self.listdir(d)]
+
     def create_dataset(self, directory: str, files: int, mean_bytes: float, sigma: float, bytes_per_row: float,
-                       name_fn, row_group_bytes: int = 96 * MiB) -> list[HdfsFile]:
-        """An existing table written earlier by jobs we don't simulate (writers on random cluster nodes)."""
-        mu = math.log(mean_bytes) - sigma * sigma / 2
-        out = []
-        for i in range(files):
-            size = max(1 * MiB, int(math.exp(self.rng.gauss(mu, sigma))))
-            rows = max(1, round(size / bytes_per_row))
-            out.append(self.write(f"{directory}/{name_fn(i)}", size, rows, writer=None,
-                                  row_group_bytes=row_group_bytes))
+                       name_fn, row_group_bytes: int = 96 * MiB, rng: random.Random | None = None) -> list[HdfsFile]:
+        """An existing table written earlier by jobs we don't simulate (writers on random cluster nodes).
+        `rng`: draw this directory's sizes and placement from its own stream instead of the file system's."""
+        saved = self.rng
+        if rng is not None:
+            self.rng = rng
+        try:
+            mu = math.log(mean_bytes) - sigma * sigma / 2
+            out = []
+            for i in range(files):
+                size = max(1 * MiB, int(math.exp(self.rng.gauss(mu, sigma))))
+                rows = max(1, round(size / bytes_per_row))
+                out.append(self.write(f"{directory}/{name_fn(i)}", size, rows, writer=None,
+                                      row_group_bytes=row_group_bytes))
+        finally:
+            self.rng = saved
         return out

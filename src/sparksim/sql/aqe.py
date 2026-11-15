@@ -246,7 +246,7 @@ def _op(n: SparkPlan) -> Op:
     ns = getattr(n, "ns_per_row", None)
     kw = {"ns": ns} if ns is not None else {}
     if isinstance(n, Filter):
-        op = FilterOp(n.selectivity, **kw)
+        op = FilterOp(n.selectivity, by_partition=n.partition_selectivity, **kw)
     elif isinstance(n, Project):
         op = ProjectOp(out_bytes, **kw)
     elif isinstance(n, BroadcastHashJoin):

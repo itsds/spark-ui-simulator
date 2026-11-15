@@ -323,11 +323,13 @@ class Filter(SparkPlan):
     NODE = "Filter"
     codegen = True
 
-    def __init__(self, condition: Expr, child: SparkPlan, selectivity: float = 1.0, ns_per_row: float | None = None):
+    def __init__(self, condition: Expr, child: SparkPlan, selectivity: float = 1.0, ns_per_row: float | None = None,
+                 partition_selectivity: dict[str, float] | None = None):
         super().__init__([child])
         self.condition = condition
         self.selectivity = selectivity
         self.ns_per_row = ns_per_row
+        self.partition_selectivity = partition_selectivity  # partition directory -> share kept (cost model)
 
     def output(self) -> list[Attr]:
         from .expr import IsNotNull
@@ -377,7 +379,8 @@ class Project(SparkPlan):
         return bracket(self.exprs)
 
     def verbose_fields(self):
-        return [field_string("Output", self.output()), field_string("Input", self.children[0].output())]
+        # ProjectExec.verboseStringWithOperatorId: the project list (expressions with their aliases), then the input
+        return [field_string("Output", self.exprs), field_string("Input", self.children[0].output())]
 
 
 class HashAggregate(SparkPlan):

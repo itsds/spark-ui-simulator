@@ -49,7 +49,9 @@ from .expr import (
     conjuncts,
     null_intolerant_refs,
     source_filter,
+    substitute,
     unsafe_row_bytes,
+    unwrap_date_cast,
 )
 from .nodes import (
     BroadcastExchange,
@@ -81,11 +83,16 @@ class Column:
 
 @dataclass(frozen=True)
 class Table:
-    """A Parquet table directory. `partition_columns` are discovered from `col=value` directories."""
+    """A Parquet table directory. `partition_columns` are discovered from `col=value` directories.
+
+    `timestamp_type`: how its writer stored timestamps. Spark writes INT96 by default
+    (`spark.sql.parquet.outputTimestampType`), which has no column statistics Parquet can filter row groups
+    with: Spark builds no Parquet predicate for INT96 (checked on 3.5.9, `reference/local/`)."""
 
     root: str
     columns: tuple[Column, ...]
     partition_columns: tuple[Column, ...] = ()
+    timestamp_type: str = "INT96"
 
     @property
     def file_bytes_per_row(self) -> float:
@@ -126,6 +133,9 @@ class LRelation(LNode):
     filters: list[Expr] = field(default_factory=list)  # user predicates, in where() order
     inferred: list[Expr] = field(default_factory=list)  # isnotnull from joins above, bottom-up
     selectivity: float = 1.0
+    # A predicate whose pass rate depends on the partition a row is stored in (e.g. the event date of a table
+    # partitioned by ingestion date): partition directory name (`dt=2026-10-21`) -> share of its rows kept.
+    partition_selectivity: dict[str, float] | None = None
     filter_ns: float | None = None
 
     def output(self):
@@ -270,14 +280,51 @@ class DataFrame:
             raise ValueError("where(): predicates must reference the columns of one scanned table")
         return r
 
-    def where(self, cond: Expr, selectivity: float = 1.0, ns: float | None = None) -> DataFrame:
-        """A predicate on scanned columns; pushed down to the scan, as PushDownPredicates does."""
-        rel = self._relation_of(cond.refs())
-        rel.filters.extend(conjuncts(cond))
+    def where(self, cond: Expr, selectivity: float = 1.0, ns: float | None = None,
+              partition_selectivity: dict[str, float] | None = None) -> DataFrame:
+        """A predicate, pushed down to the scan as the optimizer does: through Projects with the columns they
+        compute substituted (PushPredicateThroughNonJoin), to the side of a join it references, with Spark's
+        cast unwrapping (UnwrapCastInBinaryComparison). `partition_selectivity`: the share of rows kept per
+        partition directory, when the predicate's pass rate depends on the partition."""
+        rel, pushed = self._push_down(cond)
+        rel.filters.extend(p for c in conjuncts(pushed) for p in unwrap_date_cast(c))
         rel.selectivity *= selectivity
+        if partition_selectivity is not None:
+            prev = rel.partition_selectivity
+            if prev is not None and set(prev) != set(partition_selectivity):
+                raise ValueError("where(): per-partition pass rates must name the same partition directories")
+            rel.partition_selectivity = {k: v * (prev[k] if prev else 1.0) for k, v in partition_selectivity.items()}
         if ns is not None:
             rel.filter_ns = ns
         return self
+
+    def _push_down(self, cond: Expr) -> tuple[LRelation, Expr]:
+        n = self.plan
+        while True:
+            if isinstance(n, LRelation):
+                if not all(a in n.attrs for a in cond.refs()):
+                    raise ValueError("where(): predicates must reference the columns of one scanned table")
+                return n, cond
+            if isinstance(n, LProject):
+                cond = substitute(cond, {e.expr_id: e.child for e in n.exprs if isinstance(e, Alias)})
+                n = n.child
+            elif isinstance(n, LJoin):
+                refs = cond.refs()
+                side = next((c for c in (n.left, n.right) if all(a in c.output() for a in refs)), None)
+                if side is None:
+                    raise ValueError("where(): a predicate over both sides of a join is not pushed down")
+                n = side
+            else:
+                return self._relation_of(cond.refs()), cond
+
+    def with_column(self, name: str, e: Expr, ns: float | None = None) -> DataFrame:
+        """`withColumn`: a Project of every column, `e AS name` in the place of the column it replaces (or last)."""
+        alias = Alias(e, name, self.spark.ids.next())
+        out = self.plan.output()
+        exprs: list[Expr] = [alias if a.name == name else a for a in out]
+        if not any(a.name == name for a in out):
+            exprs.append(alias)
+        return DataFrame(self.spark, LProject(exprs, self.plan, ns))
 
     def select(self, *exprs: Expr, ns: float | None = None) -> DataFrame:
         out = []
@@ -411,6 +458,8 @@ def _plan(n: LNode, ctx: PlanContext, required: list[Attr] | None) -> SparkPlan:
         need = set(required if required is not None else n.attrs)
         for p in data:
             need.update(p.refs())
+        # FileSourceStrategy: the scan outputs the data columns it reads ++ *all* partition columns
+        need.update(n.partition_attrs)
         scan_out = [a for a in n.attrs if a in need]
         pushed = [f for f in (source_filter(p) for p in data) if f]
         rel = Relation(n.paths, n.attrs[: len(n.attrs) - len(n.partition_attrs)], n.partition_attrs)
@@ -422,7 +471,8 @@ def _plan(n: LNode, ctx: PlanContext, required: list[Attr] | None) -> SparkPlan:
         scan.logical = n
         top: SparkPlan = scan
         if data:
-            top = Filter(and_all(data), scan, selectivity=n.selectivity, ns_per_row=n.filter_ns)
+            top = Filter(and_all(data), scan, selectivity=n.selectivity, ns_per_row=n.filter_ns,
+                         partition_selectivity=n.partition_selectivity)
         if required is not None and len(required) < len(top.output()):
             top = Project(_ordered(required, top.output()), top)
         return top
@@ -436,11 +486,19 @@ def _plan(n: LNode, ctx: PlanContext, required: list[Attr] | None) -> SparkPlan:
                 if a not in child_req:
                     child_req.append(a)
         child = _plan(n.child, ctx, _ordered(child_req, n.child.output()))
-        if isinstance(child, Project) and all(isinstance(e, Attr) for e in child.exprs):
-            child = child.children[0]  # CollapseProject: a column-pruning Project folds into this one
+        ns = n.ns
+        if isinstance(child, Project) and all(isinstance(e, (Attr, Alias)) for e in child.exprs):
+            # CollapseProject: the child's columns fold into this Project; a column it computes is computed
+            # here (an attribute that is the alias keeps the alias, others take its expression).
+            computed = {e.expr_id: e for e in child.exprs if isinstance(e, Alias)}
+            if computed:
+                keep = [computed[e.expr_id] if isinstance(e, Attr) and e.expr_id in computed
+                        else substitute(e, {i: a.child for i, a in computed.items()}) for e in keep]
+                ns = ns if ns is not None else child.ns_per_row
+            child = child.children[0]
         if all(isinstance(e, Attr) for e in keep) and [a.expr_id for a in keep] == [a.expr_id for a in child.output()]:
             return child
-        return Project(keep, child, ns_per_row=n.ns)
+        return Project(keep, child, ns_per_row=ns)
 
     if isinstance(n, LJoin):
         req = required if required is not None else n.output()

@@ -94,14 +94,18 @@ class Op:
     kind: str
     ns_per_row: float
     selectivity: float = 1.0  # filter / bhj: output rows per input row
+    # filter over a scan: the share of each partition's rows it keeps on top of `selectivity`
+    # (partition directory `dt=2026-10-21` -> share), when that depends on where a row is stored
+    by_partition: tuple[tuple[str, float], ...] = ()
     out_row_bytes: int | None = None  # UnsafeRow bytes per output row (None: unchanged)
     groups: KeySpace | None = None  # aggregations: the grouping keys
     buffer_bytes: int = 0  # aggregation buffer bytes per group
     node: object = field(default=None, compare=False)  # the physical plan node (SQL metrics)
 
 
-def Filter(selectivity: float, ns: float = cal.FILTER_PROJECT_NS_PER_ROW) -> Op:  # noqa: N802
-    return Op("filter", ns, selectivity=selectivity)
+def Filter(selectivity: float, ns: float = cal.FILTER_PROJECT_NS_PER_ROW,  # noqa: N802
+           by_partition: dict[str, float] | None = None) -> Op:
+    return Op("filter", ns, selectivity=selectivity, by_partition=tuple(sorted((by_partition or {}).items())))
 
 
 def Project(out_row_bytes: int, ns: float = cal.FILTER_PROJECT_NS_PER_ROW) -> Op:  # noqa: N802

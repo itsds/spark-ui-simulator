@@ -97,12 +97,29 @@ def iso_ms(iso: str) -> int:
 
 
 @dataclass(frozen=True)
+class TablePartition:
+    """One `column=value` directory of a partitioned table, with `volume` x the dataset's `files` files
+    (a day's traffic relative to the dataset's day; a partition still being written holds what has landed)."""
+
+    value: str
+    volume: float = 1.0
+
+
+@dataclass(frozen=True)
 class InputDataset:
     """A table directory that exists before the app runs (written by upstream jobs).
 
     `keys`: how the values of the columns the queries join or group on are distributed in this data
     (distinct values, rows per key, hot keys). The engine doesn't read them; the app's queries take
     their `KeySpace`s from here, which is where key-skew faults change the data (`sparksim.scenario`).
+
+    `partitions`: `path` is the root of a table partitioned by `partition_column`, one directory per
+    partition. Only the directories a job lists need to be described: the first partition's files are drawn
+    exactly as an unpartitioned dataset of `path/column=value` would be (the same day's files whether a job
+    reads the table root or that one directory), the others from random streams of their own.
+    `arrival_lag`: for a table partitioned by the day its rows landed, the share of a day's rows that land
+    k = 0, 1, 2, ... days later (late events); the queries derive the pass rate of an event-date predicate
+    in each partition from it.
     """
 
     path: str
@@ -112,6 +129,12 @@ class InputDataset:
     bytes_per_row: float  # Parquet bytes per row (all columns)
     row_group_bytes: int = 96 * MiB  # compressed Parquet row-group size of the upstream writer
     keys: dict = field(default_factory=dict, compare=False)  # column -> KeySpace
+    partition_column: str = ""
+    partitions: tuple[TablePartition, ...] = ()
+    arrival_lag: tuple[float, ...] = ()
+
+    def partition_dir(self, p: TablePartition) -> str:
+        return f"{self.path}/{self.partition_column}={p.value}"
 
 
 @dataclass(frozen=True)
@@ -304,6 +327,8 @@ class QueryRecord:
     job_ids: list[int] = field(default_factory=list)
     error: str | None = None  # SQLExecutionEnd.errorMessage
     failed: Signal | None = None  # fires when one of its jobs fails
+    planned_at: int = 0  # the driver starts listing the files read and planning the query
+    scans: list = field(default_factory=list)  # [(FileSourceScan of the initial plan, files listed)]
 
 
 class QueryFailed(Exception):
@@ -361,9 +386,14 @@ class AppRun:
         self.scheduling_started: int | None = None
         self.hdfs = Hdfs(self.cluster, substream(world, "hdfs"))
         for d in spec.inputs:
-            self.hdfs.create_dataset(d.path, d.files, d.mean_file_bytes, d.file_size_sigma, d.bytes_per_row,
-                                     _upstream_file_namer(substream(world, f"names/{d.path}")),
-                                     row_group_bytes=d.row_group_bytes)
+            dirs = [(d.path, d.files, None)] if not d.partitions else [
+                (d.partition_dir(p), max(1, round(d.files * p.volume)),
+                 None if i == 0 else f"hdfs/{d.partition_dir(p)}") for i, p in enumerate(d.partitions)]
+            for path, files, stream in dirs:
+                self.hdfs.create_dataset(path, files, d.mean_file_bytes, d.file_size_sigma, d.bytes_per_row,
+                                         _upstream_file_namer(substream(world, f"names/{path}")),
+                                         row_group_bytes=d.row_group_bytes,
+                                         rng=substream(world, stream) if stream else None)
         am = self.am_host
         self.env_app = PySparkYarnApp(
             app=self.yapp, app_name=spec.app_name, user=spec.user, script=spec.script, am_node=am.nm,
@@ -402,7 +432,7 @@ class AppRun:
         self.spark = SparkSession(self.expr_ids, {**self.base_props, **dict(spec.conf)})
         self.scope_sim = ScopeSimulator(self.scope_ids, self.rdd_ids, substream(seed, "scopes"))
         self.stage_stats: dict[str, tuple[int, int]] = {}  # query stage -> (sizeInBytes, rowCount)
-        self.scan_parts: dict[str, list] = {}
+        self.scan_parts: dict[tuple, list] = {}  # (path, selected partition directories) -> file partitions
 
         self.jobs: list[JobRecord] = []
         self.stages: dict[int, StageRecord] = {}
@@ -999,7 +1029,10 @@ class AppRun:
         self.queries.append(qrec)
         logical = q.build(self.spark)
         aqe = AdaptiveExecution(logical, self._plan_context(), self._coalescer, name_prefix=f"e{qi}.")
-        listed = sum(len(self.hdfs.listdir(s.relation.root_paths[0])) for s in _scans(aqe.root.initial))
+        # InMemoryFileIndex lists every leaf file under the paths read (a table root: all its partitions)
+        qrec.scans = [(s, len(self.hdfs.list_tree(s.relation.root_paths[0]))) for s in _scans(aqe.root.initial)]
+        qrec.planned_at = self.sim.now
+        listed = sum(n for _, n in qrec.scans)
         yield self._jitter(q.planning_ms) + int(listed * cal.FILE_LISTING_MS_PER_FILE)
         qrec.start = self.sim.now
         self.scope_sim.skip(cal.FIRST_EXECUTION_SCOPES if qi == 0 else self.rng.randint(*cal.EXECUTION_SCOPES))
@@ -1067,7 +1100,7 @@ class AppRun:
     def _plan_context(self) -> PlanContext:
         stats = {}
         for d in self.spec.inputs:
-            stats[d.path] = sum(f.size for f in self.hdfs.listdir(d.path))
+            stats[d.path] = sum(f.size for f in self.hdfs.list_tree(d.path))
         threshold = self.conf_bytes("spark.sql.autoBroadcastJoinThreshold", 10 * MiB)
         return PlanContext(self.spark, self.plan_ids, dataset_stats=stats,
                            broadcast_threshold=threshold if threshold >= 0 else -1)
@@ -1122,11 +1155,11 @@ class AppRun:
                 r = self.bc_rng
                 self.scan_bc[id(scan)] = self._new_broadcast("hadoop_conf", 40_300 + r.randint(0, 900),
                                                              474_000 + r.randint(0, 4_000), site)
-            path = scan.relation.root_paths[0]
-            files = self.hdfs.listdir(path)
+            dirs = self.selected_partitions(scan)
+            files = [f for d in dirs for f in self.hdfs.listdir(d)]
             listing = max(1, int(len(files) * cal.FILE_LISTING_MS_PER_FILE * self.rng.uniform(0.7, 1.3)))
             self._record("driver_accum", (qrec.execution_id, sqlm.scan_driver_updates(
-                scan, len(files), sum(f.size for f in files), listing, 1 if scan.partitioned else 0)))
+                scan, len(files), sum(f.size for f in files), listing, len(dirs) if scan.partitioned else 0)))
         for read in sqlm.reads_in(root):
             sizes = self.exchanges[read.children[0].name].bytes_by_partition().tolist()
             self._record("driver_accum", (qrec.execution_id, sqlm.read_driver_updates(read, sizes)))
@@ -1472,15 +1505,30 @@ class AppRun:
         self.stage_nprng[sid] = numpy_rng(self.world_seed, f"blocks/{sid}")
         return rec
 
+    def selected_partitions(self, scan: sqln.FileSourceScan) -> list[str]:
+        """`FileSourceScanExec.selectedPartitions`: the directories whose files the scan reads. A table root's
+        partition directories are pruned with the scan's PartitionFilters, evaluated on each directory's
+        partition values (`PartitioningAwareFileIndex.prunePartitions`); a leaf directory (a table, or one
+        partition read with basePath) is read whole."""
+        root = scan.relation.root_paths[0]
+        parts = self.hdfs.partition_dirs(root)
+        if not parts:
+            return [root]
+        schema = scan.relation.partition_schema
+        return [d for d in parts if partition_matches(scan.partition_filters, schema, d[len(root) + 1:])]
+
     def _scan_partitions(self, scan: ScanSource):
-        path = scan.dataset.path
-        if path not in self.scan_parts:
+        if scan.node is not None:
+            _refuse_row_group_skipping(scan.node)
+        dirs = tuple(self.selected_partitions(scan.node)) if scan.node is not None else (scan.dataset.path,)
+        key = (scan.dataset.path, dirs)
+        if key not in self.scan_parts:
             mpb = self.conf_bytes("spark.sql.files.maxPartitionBytes", 128 * MiB)
             oc = self.conf_bytes("spark.sql.files.openCostInBytes", 4 * MiB)
-            files = self.hdfs.listdir(path)
-            self.scan_parts[path] = plan_scan(files, self.default_parallelism, max_partition_bytes=mpb, open_cost=oc)
-            self.scan_split_bytes[path] = (max_split_bytes(files, mpb, oc, self.default_parallelism), oc)
-        return self.scan_parts[path]
+            files = [f for d in dirs for f in self.hdfs.listdir(d)]
+            self.scan_parts[key] = plan_scan(files, self.default_parallelism, max_partition_bytes=mpb, open_cost=oc)
+            self.scan_split_bytes[scan.dataset.path] = (max_split_bytes(files, mpb, oc, self.default_parallelism), oc)
+        return self.scan_parts[key]
 
     def _reduce_preferred(self, exs: list[ShuffleExchange], a: int, b: int) -> tuple[str, ...]:
         """MapOutputTracker.getPreferredLocationsForShuffle: hosts holding ≥ 20 % of the partition's input,
@@ -1704,6 +1752,34 @@ def _native_funcs(plan) -> list:
 
     visit(plan)
     return out
+
+
+def _refuse_row_group_skipping(scan: sqln.FileSourceScan) -> None:
+    """Parquet drops the row groups whose min/max statistics exclude a pushed comparison (and, for equality,
+    those whose dictionary lacks the value). Column statistics aren't modelled: every row group of a split is
+    read. That is exact for the pushed comparisons our tables meet: on booleans (both values in every row
+    group) and on INT96 timestamps (no usable statistics); anything else is refused rather than overcounted."""
+    from ..sql.expr import BinaryOp, source_filter
+
+    table = scan.logical.table if getattr(scan, "logical", None) is not None else None
+    for p in scan.data_filters:
+        if not (isinstance(p, BinaryOp) and p.op in ("=", ">", ">=", "<", "<=") and source_filter(p)):
+            continue
+        dtype = p.left.dtype
+        if dtype == "boolean" or (dtype == "timestamp" and table is not None and table.timestamp_type == "INT96"):
+            continue
+        raise NotImplementedError(
+            f"scan of {scan.relation.root_paths[0]}: the pushed filter {source_filter(p)} could skip Parquet row "
+            "groups by their statistics, which the simulator does not model")
+
+
+def partition_matches(filters: list, schema: list, rel_dir: str) -> bool:
+    """Do a partition directory's values (`dt=2026-10-21` below the root) pass the scan's PartitionFilters?"""
+    from ..sql.expr import eval_predicate
+
+    values = dict(seg.split("=", 1) for seg in rel_dir.split("/"))
+    bound = {a.expr_id: values.get(a.name) for a in schema}
+    return all(eval_predicate(f, bound) for f in filters)
 
 
 def _scans(plan) -> list:
