@@ -52,7 +52,7 @@ Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 | 09 | Bad-node straggler ✅ [`scenarios/09-bad-node-straggler`](scenarios/09-bad-node-straggler/ticket.md) |
 | 10 | Python UDF bottleneck |
 | 11 | Driver bottleneck |
-| 12 | Fetch failure / stage retry |
+| 12 | Fetch failure / stage retry ✅ [`scenarios/12-fetch-failure-stage-retry`](scenarios/12-fetch-failure-stage-retry/ticket.md) |
 | 13 | Missing cache / recomputation |
 | 14 | YARN queue starvation |
 | 15 | Skewed / small-file output |

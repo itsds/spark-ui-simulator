@@ -72,17 +72,18 @@ src/sparksim/          Python package: eventlog/ (typed events, JsonProtocol byt
                        model/ (cluster, container memory, HDFS, file splits, workload, shuffle), cost/ (calibration.py,
                        model.py), sched/ (event kernel, TaskScheduler), sql/ (DataFrame API + planner, AQE, explain,
                        plan info, RDD scopes, SQL metrics), engine/ (driver runtime, yarn_am = YARN allocation +
-                       NodeManager monitor, dynalloc, emit), yarnlogs/ (container stdout/stderr from the run),
+                       NodeManager monitor + preemption, dynalloc, emit, fetchfail), yarnlogs/ (container stdout/stderr from the run),
                        apps/ (workloads: daily_enrichment = clickstream_enrichment; tiny smoke app), scenario/
                        (scenario.yaml schema, loader, fault mechanisms), prepare.py (fingerprints + manifest:
                        generate only what is missing/stale), portal/ (scenario portal: server, Markdown, status,
                        static/), up.py (`sparksim up`), yarn.py, environment.py, cli.py,
                        data/ (Spark archive jars, Hadoop 3.3.6 defaults)
 scenarios/NN-slug/     scenario.yaml (job + runs + faults), ticket.md, hints.md, solution.md (Evidence checked by tests)
-reference/jobs/        real PySpark reference jobs (ref00–ref11) + common.py
+reference/jobs/        real PySpark reference jobs (ref00–ref12) + common.py
 reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
 reference/yarn-logs/   REAL container stdout/stderr for those apps (driver = container ..._000001)
-reference/yarn/        single-node HDFS+YARN config + cluster.sh (REF_SECOND_NM=1: 2nd NodeManager) + slow_node.sh
+reference/yarn/        single-node HDFS+YARN config (two queues, preemption on) + cluster.sh (REF_SECOND_NM=1: 2nd
+                       NodeManager) + slow_node.sh
 reference/capture.sh   runs reference jobs on YARN, collects logs
 services/history-server/  run.sh + spark-defaults.conf (custom executor log URL → nm-logs)
 Dockerfile, docker-compose.yml   the simulator image (prepare, portal, nm-logs) + the stack (HS = apache/spark image)
@@ -130,7 +131,7 @@ JDK 17 and sets `SPARK_HOME` (PySpark's bundled Spark) and the Hadoop vars.
 | Check a solution's evidence numbers | `uv run scripts/evidence.py 01-join-skew` (against a running HS + nm-logs) |
 | Screenshot key UI pages | `uv run scripts/screenshot.py <app-id> [--stage N]` → `build/screenshots/` |
 | Start reference YARN cluster | `reference/yarn/cluster.sh start` (needs Hadoop 3.3.x at `/opt/hadoop`) |
-| Re-capture reference logs | `reference/capture.sh [ref0N_name ...]` (YARN cluster mode; ref09 needs `REF_SECOND_NM=1` + `reference/yarn/slow_node.sh start`; ref10/ref11 fail on purpose: one log per YARN attempt, `<name>_<attempt>`) |
+| Re-capture reference logs | `reference/capture.sh [ref0N_name ...]` (YARN cluster mode; ref09 needs `REF_SECOND_NM=1` + `reference/yarn/slow_node.sh start`; ref10/ref11 fail on purpose: one log per YARN attempt, `<name>_<attempt>`; ref12 gets preempted by a 2nd-queue app it starts; stop the cluster before nm-logs: both use port 8042) |
 | Regenerate event schema doc | `uv run scripts/event_inventory.py` |
 
 Environment notes (cloud dev container): JDK 17 comes from apt

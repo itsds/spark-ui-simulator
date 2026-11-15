@@ -11,6 +11,7 @@ from sparksim.eventlog.ordering import (
     java_properties_order,
     java_string_hash,
     scala_int_hashset_order,
+    scala_long_hashmap_order,
     scala_map_order,
 )
 
@@ -42,7 +43,7 @@ def test_stage_ids_order():
                 assert scala_int_hashset_order(sorted(ids)) == ids, (p.name, e["Job ID"])
                 assert [s["Stage ID"] for s in e["Stage Infos"]] == ids
                 seen += len(ids) > 1
-    assert seen == 42  # ref00–ref11 (ref10/ref11: one log per YARN attempt)
+    assert seen == 43  # ref00–ref12 (ref10/ref11: one log per YARN attempt)
 
 
 def test_hashset_grows_like_flat_hash_table():
@@ -67,3 +68,33 @@ def test_environment_map_order(path):
                 keys = list(e[section])
                 assert len(keys) > 4
                 assert scala_map_order(sorted(keys)) == keys, section
+
+
+def test_executor_loss_task_end_order():
+    """`TaskSetManager.executorLost` walks `taskInfos` (a Scala mutable.HashMap of the task set's task ids in
+    launch order): the Resubmitted and ExecutorLostFailure TaskEnds of one executor loss come in its order."""
+    checked = 0
+    for p in LOGS:
+        launched: dict[tuple[int, int], list[int]] = {}
+        group: tuple | None = None
+        groups = []
+        for line in p.read_text().splitlines():
+            e = json.loads(line)
+            ev = e["Event"]
+            if ev == "SparkListenerTaskStart":
+                launched.setdefault((e["Stage ID"], e["Stage Attempt ID"]), []).append(e["Task Info"]["Task ID"])
+            elif ev == "SparkListenerTaskEnd" and (why := e["Task End Reason"]["Reason"]) in (
+                    "Resubmitted", "ExecutorLostFailure"):
+                key = (e["Stage ID"], e["Stage Attempt ID"], e["Task Info"]["Executor ID"], why)
+                if group is not None and group[0] == key:
+                    group[1].append(e["Task Info"]["Task ID"])
+                else:
+                    group = (key, [e["Task Info"]["Task ID"]], list(launched[key[:2]]))
+                    groups.append(group)
+            elif ev not in ("SparkListenerExecutorRemoved", "SparkListenerBlockManagerRemoved"):
+                group = None
+        for _key, tids, keys in groups:
+            if len(tids) > 1:
+                assert [t for t in scala_long_hashmap_order(keys) if t in tids] == tids, (p.name, _key)
+                checked += 1
+    assert checked == 23  # ref05, ref10, ref11, ref12

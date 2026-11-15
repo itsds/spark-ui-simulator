@@ -22,4 +22,9 @@
   <property><name>yarn.nodemanager.delete.debug-delay-sec</name><value>3600</value></property>
   <property><name>yarn.nodemanager.env-whitelist</name>
     <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_HOME,PATH,LANG,TZ</value></property>
+  <!-- CapacityScheduler preemption (ref12): ProportionalCapacityPreemptionPolicy with Hadoop's default
+       intervals (monitor every 3 s, kill 15 s after a container is marked). -->
+  <property><name>yarn.resourcemanager.scheduler.monitor.enable</name><value>true</value></property>
+  <property><name>yarn.resourcemanager.scheduler.monitor.policies</name>
+    <value>org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy</value></property>
 </configuration>

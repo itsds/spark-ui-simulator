@@ -795,3 +795,80 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   turns the failure into a coin flip (verified). The ticket's suggestion of more heap is the trap. Not modelled:
   mappings of finished tasks that linger until a GC collects their readers (real JVMs can be worse), page cache
   pressure on the host.
+
+## ADR-043 — ref12: YARN preemption without the shuffle service, captured on the reference cluster
+
+- **Date:** 2026-11-14
+- **Status:** accepted
+- **Context:** Scenario 12 needs lost shuffle files: FetchFailed, Resubmitted map tasks and stage retries, in a
+  DataFrame job under AQE, with a realistic reason for the executor loss. `ref05` has a FetchFailed, but in an RDD
+  job (PySpark's writer-thread stack), after a SIGKILL, and nothing about how AQE's re-created (skipped) stages are
+  retried.
+- **Decision:** `ref12-fetch-failure`: the reference cluster's CapacityScheduler gets two elastic queues
+  (`default` 40 %, `ds` 60 %) and the ProportionalCapacityPreemptionPolicy (Hadoop's intervals); the job (AQE, a
+  sort-merge join written as Parquet, ~10 s map and ~25 s reduce tasks of chained SHA-256) starts a small
+  distributed-shell app in `ds` from its driver twice, once in the map stage and once in the write stage, so YARN
+  preempts its youngest executors. `total_preemption_per_round` is 0.5 on the reference cluster: a container is only
+  preempted if it fits in that share of the cluster, and 0.1 of a 12 GB node is less than one 2 GB container (a
+  single-node artifact; production clusters have 10 % to spare). Facts it settled (EVENT_LOG_FORMAT.md §6.5):
+  preempted containers' exit status -102 and Spark's INFO "was preempted." (not caused by the app); without the
+  shuffle service the DAGScheduler unregisters an executor's map output on the dropped connection, before the
+  reason arrives; Resubmitted and ExecutorLostFailure come in `taskInfos` (Scala `mutable.HashMap`) order; a
+  FetchFailed to an executor the driver knows is dead fails at once (ExecutorDeadException, not retried); the stage
+  attempt fails with the first FetchFailed's message; zombie attempts' successes count; **a skipped stage's first
+  run is attempt 1** (`getMissingParentStages` → `increaseAttemptIdOnFirstSkip`, checked in the 3.5.9 bytecode);
+  one epoch increment per handled FetchFailed.
+- **Consequences:** the reference cluster's queue layout changed for every job (all still run in `default` at up to
+  100 %); `capture.sh` passes `REF_HADOOP_HOME` / `REF_HADOOP_CONF_DIR` to the AM. The YARN cluster must be stopped
+  before the nm-logs mock runs (both want port 8042).
+
+## ADR-044 — Stage attempts, lost shuffle files and fetch failures in the engine
+
+- **Date:** 2026-11-14
+- **Status:** accepted
+- **Context:** the engine refused executor loss without the external shuffle service. Real Spark recovers from it
+  through the DAGScheduler's stage attempts, which the engine didn't have (one record per stage, attempt 0).
+- **Decision:** a small DAGScheduler in `engine/runtime.py`: `_submit_stage` (missing parents first, the job's
+  `waiting` list, `increaseAttemptIdOnFirstSkip`), `_submit_missing_tasks` (a new `StageRecord` per attempt over the
+  missing partitions; `run.stages[id]` stays the first record, `run.stage_attempts` holds every attempt,
+  `TaskRecord.partition` is the Partition ID), `_stage_completed` (a map stage that lost outputs meanwhile resubmits
+  itself; `submitWaitingChildStages`). Without the shuffle service: `_lose_map_outputs` on the dropped connection
+  (or the AM's reason if it comes first), `TaskScheduler.remove_executor(resubmit_maps=True)` re-queues a running map
+  stage's finished tasks (`Resubmitted` TaskEnds, the success's TaskInfo), and reduce tasks meet the dead executor in
+  `_doom_fetches` (running tasks, at the JVM's exit) or `_check_fetches` (tasks launched later with a stale
+  map-status cache): each request to it happens at a uniform point of the task's read window (the sort or
+  aggregation below the output consumes the whole input first), and fails at once, or after the 5 s retry wait when
+  it was in flight. `TaskScheduler.fail_fetch` ends the attempt early, turns the task set into a zombie that never
+  completes; `_on_fetch_failed` fails the stage attempt, `_resubmit_failed_stages` runs 200 ms later. The FetchFailed
+  message and the executors' error lines are built from the stage's plan and RDD lineage (`engine/fetchfail.py`:
+  three variants `init` / `next` / `retry`, line numbers from the 3.5.9 bytecode). YARN preemption is a fault
+  (`yarn_preemption`: the policy's rounds of `natural_termination_factor` 0.2 every 3 s, the kill 15 s after marking,
+  the youngest containers first, no grants until `until`).
+- **Consequences:** runs with the shuffle service are byte-identical except the Environment tab's new
+  `yarn.resourcemanager.scheduler.monitor.enable=true`. Refused rather than faked: MetadataFetchFailedException (a
+  fresh map-status fetch with an output missing), FetchFailed outside a write after a sort-merge join (other
+  operators' frames are unverified), a zombie task finishing a partition a newer attempt also runs
+  (TaskCommitDenied), `spark.stage.maxConsecutiveAttempts`. Known gaps: with the shuffle service the lost tasks keep
+  the old task-id order and the epoch still moves per lost executor (Scenario 03's trajectory depends on it); a
+  task's "Getting N blocks … local / remote" line uses where the map output lives at the end of the run.
+
+## ADR-045 — Scenario 12: preemption meets a disabled shuffle service
+
+- **Date:** 2026-11-14
+- **Status:** accepted
+- **Context:** the backlog's 12 was "executor lost during shuffle, no ESS". Executor losses alone are an old
+  topic (Scenario 03); the interview question is why a FetchFailed happens, what Spark does about it, and why losing
+  a few executors can cost minutes.
+- **Decision:** two causes, as in real incidents. A latent one in the job's submit options:
+  `spark.shuffle.service.enabled=false`, a workaround from the 2026-10-13 NodeManager upgrade (DATA-4127) that
+  stayed. A trigger outside the job: the ML platform's retraining in queue `ml` moved into the job's window
+  (ML-2290), and YARN preempts the `etl` queue's youngest containers in two waves (6 during the events scan, 4 during
+  the write), with no replacements. 5.5 → 7.6 min: 707 Resubmitted map tasks, stage 5 attempt 0 failed on 43
+  FetchFailed, stages 3 (attempts 1, 2), 4 (0–2) and 5 (attempt 1, 1,220 tasks). 13 evidence values
+  (`tests/test_scenario12_hs.py`); the fix (the shuffle service back on) is verified at 5.8 min with the same
+  preemptions; the channel's "more retries / timeouts / executors" are explained away.
+- **Consequences:** the solution can show the History Server quirks a learner meets (a Resubmitted task counted as a
+  failed task of the stage but listed as SUCCESS; a skipped stage that also has attempts 1 and 2). Not modelled:
+  YARN's PreemptionMessage (Spark ignores it), the queue's own view (capacity-scheduler properties are not in the
+  driver's Hadoop configuration).
+

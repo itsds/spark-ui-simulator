@@ -281,3 +281,24 @@ PY_NETWORK_BPS = 90e6  # one remote fetch stream
 PY_REMOTE_FETCH_LATENCY_MS = 4
 PY_HOST_SPEED_SIGMA = 0.05
 PY_TASK_NOISE_SIGMA = 0.08
+
+# --------------------------------------------------------------------------- YARN preemption, lost shuffle files
+# [hadoop] ProportionalCapacityPreemptionPolicy defaults (yarn.resourcemanager.monitor.capacity.preemption.*):
+# monitoring_interval 3 s, max_wait_before_kill 15 s, natural_termination_factor 0.2 (ref12 on the reference
+# cluster: the youngest container killed 17 s after the other queue asked)
+PREEMPTION_INTERVAL_MS = 3_000
+PREEMPTION_MAX_WAIT_MS = 15_000
+PREEMPTION_NATURAL_TERMINATION = 0.2
+# [spark] DAGScheduler.RESUBMIT_TIMEOUT, spark.stage.maxConsecutiveAttempts, spark.shuffle.io.retryWait,
+# spark.reducer.maxSizeInFlight (and a FetchRequest's target size: a fifth of it)
+RESUBMIT_TIMEOUT_MS = 200
+MAX_CONSECUTIVE_STAGE_ATTEMPTS = 4
+SHUFFLE_RETRY_WAIT_MS = 5_000
+MAX_BYTES_IN_FLIGHT = 48 * MiB
+FETCH_REQUEST_BYTES = 48 * MiB // 5
+# [ref] ref12: a request to a dead executor (closed port, IsExecutorAlive to the driver) until the task thread
+# throws FetchFailedException: tens to ~150 ms; the failed stage's StageCompleted 4-6 ms after its first one
+FETCH_FAILURE_MS = (8, 150)
+FETCH_FAIL_STAGE_MS = (3, 8)
+# [norm] one fetch connection's throughput (a request in flight when its executor dies)
+FETCH_STREAM_MBPS = 110

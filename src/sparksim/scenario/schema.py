@@ -238,7 +238,33 @@ class ExecutorKilled(_Model):
         return v
 
 
-Fault = Annotated[KeySkew | ConfigFault | SlowNode | MemoryPressure | ExecutorKilled, Field(discriminator="type")]
+class YarnPreemption(_Model):
+    """Another queue's application needs its guaranteed capacity back: from `at` (after the application started)
+    the CapacityScheduler's preemption policy takes `containers` of this app's executor containers, youngest
+    first, and the queue has no room for replacement containers until `until`."""
+
+    type: Literal["yarn_preemption"]
+    at: str | int
+    containers: int = Field(ge=1)
+    until: str | int
+    queue: str = ""  # the queue that reclaimed its share (narrative)
+    note: str = ""
+
+    @field_validator("at", "until")
+    @classmethod
+    def _dur(cls, v):
+        duration_ms(v)
+        return v
+
+    @model_validator(mode="after")
+    def _order(self):
+        if duration_ms(self.until) <= duration_ms(self.at):
+            raise ValueError("yarn_preemption: until must come after at")
+        return self
+
+
+Fault = Annotated[KeySkew | ConfigFault | SlowNode | MemoryPressure | ExecutorKilled | YarnPreemption,
+                  Field(discriminator="type")]
 
 
 # ---------------------------------------------------------------------------- runs and the scenario

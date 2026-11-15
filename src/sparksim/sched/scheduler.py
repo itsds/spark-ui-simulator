@@ -20,7 +20,14 @@
   fails its running tasks (`on_fail`), puts them back in the pending lists
   (`addPendingTask`) and counts the failure towards `spark.task.maxFailures`
   when the exit was caused by the app. The next attempt of a task gets the
-  next attempt number, as `TaskSetManager.taskAttempts` does.
+  next attempt number, as `TaskSetManager.taskAttempts` does. Without the external shuffle service
+  (`resubmit_maps`) a running map stage's finished tasks on that executor lost their output with it: they
+  are re-queued first (`Resubmitted`, `on_resubmitted`). Task sets are handled in pool order, each one's
+  attempts in `taskInfos` order (`scala_long_hashmap_order`, ref05/ref10/ref11/ref12).
+* **Fetch failure.** `fail_fetch` ends a running attempt early with FetchFailed: the task set turns zombie
+  (it launches nothing more; its running attempts go on, `on_finish` decides what their success counts for),
+  the failed index counts as done, `on_fetch_failed` tells the driver, and the task set leaves the pool once
+  its last running attempt has ended (`TaskSetManager.handleFailedTask`, ref12).
 * **Abort.** The failure that brings a task index to `spark.task.maxFailures` (4) aborts the task set
   (`TaskSetManager.abort`): it turns zombie (no more launches), `on_abort` tells the driver (the
   DAGScheduler's taskSetFailed), and the executor's other lost tasks are still handled afterwards, in the
@@ -54,7 +61,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from ..cost import calibration as cal
-from ..eventlog.ordering import ScalaHashSet
+from ..eventlog.ordering import ScalaHashSet, scala_long_hashmap_order
 from ..model.cluster import Executor
 from .sim import Signal, Sim
 
@@ -76,6 +83,7 @@ class Launch:
     lost: bool = False  # its executor was lost before it finished
     speculative: bool = False  # TaskInfo.speculative: launched from the speculatable lists
     killed_by_other: bool = False  # TaskSetManager.killedByOtherAttempt
+    fetch_failed: bool = False  # ended by a FetchFailed (fail_fetch)
     kill_reqs: list[tuple[int, str]] = field(default_factory=list)  # (time the driver asked, reason)
     kill_at: int | None = None  # when the executor acts on the first kill (KILLED reaches the driver)
     kill_reason: str | None = None  # TaskKilled reason it ended with
@@ -141,6 +149,9 @@ class TaskSet:
     records_of: Callable[[Launch], tuple[int, int]] | None = None  # (records read, run ms) of a finished task
     on_abort: Callable[[int, Launch], None] | None = None  # (index, the attempt whose loss was the last straw)
     on_removed: Callable[[], None] | None = None  # an aborted task set left the pool (no attempt running)
+    on_resubmitted: Callable[[Launch], None] | None = None  # a finished map task lost its output (no ESS)
+    on_fetch_failed: Callable[[Launch], None] | None = None  # an attempt ended with FetchFailed
+    shuffle_map: bool = False  # ShuffleMapTasks: their output lives on the executor that ran them
     done: Signal | None = None
     # --- TaskSetManager state
     launched: list[bool] = field(default_factory=list)
@@ -174,7 +185,10 @@ class TaskSet:
     rate_runtime: int = 0
     zombie: bool = False
     aborted: bool = False
+    fetch_failed: bool = False  # zombie after a FetchFailed: never completes, leaves the pool when idle
     submitted_seq: int = 0
+    tids: list[int] = field(default_factory=list)  # taskInfos keys: task ids in launch order
+    winner: dict[int, Launch] = field(default_factory=dict)  # index -> the attempt that succeeded
 
     @property
     def num_tasks(self) -> int:
@@ -236,18 +250,65 @@ class TaskScheduler:
         """No more offers for this executor (CoarseGrainedSchedulerBackend.isExecutorActive is false)."""
         self.disabled.add(eid)
 
-    def remove_executor(self, eid: str, counts_as_failure: bool) -> list[Launch]:
-        """`TaskSchedulerImpl.executorLost`: fail the executor's running tasks and re-queue them.
+    def remove_executor(self, eid: str, counts_as_failure: bool, resubmit_maps: bool = False) -> list[Launch]:
+        """`TaskSchedulerImpl.executorLost` → `rootPool.executorLost`: every task set in pool order
+        (`TaskSetManager.executorLost`): without the shuffle service (`resubmit_maps`) a running map stage's
+        finished tasks on the executor are re-queued (`on_resubmitted`); then the running attempts fail
+        (`on_fail`) and are re-queued. Both in the task set's `taskInfos` order.
 
-        Returns the lost attempts (their `on_fail` has been called). Shuffle outputs on the executor stay
-        available: the engine only allows executor loss with the external shuffle service.
+        Returns the lost running attempts (their `on_fail` has been called).
         """
-        lost = sorted(self.running.pop(eid, {}).values(), key=lambda a: a.task_id)
+        running = self.running.pop(eid, {})
         self.executors.pop(eid, None)
         self.free.pop(eid, None)
         self.disabled.discard(eid)
         if eid in self.order:
             self.order.remove(eid)
+        by_ts: dict[int, list[Launch]] = {}
+        sets: dict[int, TaskSet] = {}
+        for a in running.values():
+            by_ts.setdefault(id(a.taskset), []).append(a)
+            sets[id(a.taskset)] = a.taskset
+        for ts in self.tasksets:
+            sets.setdefault(id(ts), ts)
+        lost_all: list[Launch] = []
+        # With the shuffle service, the attempts are handled in task-id order over all task sets, which Scenarios
+        # 00-09 were generated with (TODO: Spark's pool + taskInfos order there too; it re-routes the retries).
+        groups = (sorted(sets.values(), key=lambda t: t.submitted_seq) if resubmit_maps
+                  else [None])
+        for ts in groups:
+            if ts is None:
+                lost = sorted(running.values(), key=lambda a: a.task_id)
+                lost_all += lost
+                self._fail_lost(lost, counts_as_failure)
+                continue
+            order = {tid: k for k, tid in enumerate(scala_long_hashmap_order(ts.tids))}
+            if resubmit_maps and ts.shuffle_map and not ts.zombie and ts in self.tasksets:
+                done_here = [w for i, w in ts.winner.items() if ts.succeeded[i] and w.executor.id == eid]
+                for w in sorted(done_here, key=lambda w: order[w.task_id]):
+                    i = w.index
+                    del ts.winner[i]
+                    ts.succeeded[i] = False
+                    ts.num_done -= 1
+                    if ts.copies_running[i] == 0:
+                        ts.launched[i] = False
+                        ts.num_launched -= 1
+                    self._add_pending(ts, i)
+                    if ts.on_resubmitted is not None:
+                        ts.on_resubmitted(w)
+            lost = sorted(by_ts.get(id(ts), []), key=lambda a: order[a.task_id])
+            lost_all += lost
+            self._fail_lost(lost, counts_as_failure)
+        for ts in self.tasksets:
+            self._recompute_levels(ts)
+        if lost_all and self.started:
+            self._offer(list(self.order), all_free=True)
+        elif resubmit_maps and self.started:
+            self._offer(list(self.order), all_free=True)
+        return lost_all
+
+    def _fail_lost(self, lost: list[Launch], counts_as_failure: bool) -> None:
+        """`handleFailedTask(ExecutorLostFailure)` for each lost running attempt, in order."""
         for a in lost:
             ts = a.taskset
             a.lost = a.ended = True
@@ -267,11 +328,6 @@ class TaskScheduler:
                 ts.num_launched -= 1
             self._add_pending(ts, a.index)
             self._maybe_remove(ts)
-        for ts in self.tasksets:
-            self._recompute_levels(ts)
-        if lost and self.started:
-            self._offer(list(self.order), all_free=True)
-        return lost
 
     @property
     def num_pending_tasks(self) -> int:
@@ -310,8 +366,9 @@ class TaskScheduler:
         self._maybe_remove(ts)
 
     def _maybe_remove(self, ts: TaskSet) -> None:
-        """`maybeFinishTaskSet`: an aborted (zombie) task set leaves the pool once nothing of it runs."""
-        if ts.aborted and ts in self.tasksets and not ts.running_by_tid:
+        """`maybeFinishTaskSet`: an aborted or fetch-failed (zombie) task set leaves the pool once nothing of it
+        runs."""
+        if (ts.aborted or ts.fetch_failed) and ts in self.tasksets and not ts.running_by_tid:
             self.tasksets.remove(ts)
             if ts.on_removed is not None:
                 ts.on_removed()
@@ -544,6 +601,7 @@ class TaskScheduler:
         attempt = Launch(ts, idx, ex, loc, t, attempt=ts.attempts[idx], task_id=self.next_task_id,
                          speculative=speculative)
         ts.attempts[idx] += 1
+        ts.tids.append(attempt.task_id)
         self.next_task_id += 1
         ts.copies_running[idx] += 1
         ts.attempt_hosts[idx].add(ex.host.name)
@@ -581,6 +639,7 @@ class TaskScheduler:
         del self.running[eid][a.task_id]
         self._stop_running(ts, a)
         ts.succeeded[a.index] = True
+        ts.winner[a.index] = a
         ts.num_done += 1
         if self.spec.enabled:
             bisect.insort(ts.durations, a.finish_time - a.launch_time)
@@ -594,12 +653,44 @@ class TaskScheduler:
         ts.on_finish(a)
         self._maybe_remove(ts)  # an attempt of an aborted task set that finished before its kill landed
         self.free[eid] += 1
-        if ts.num_done == ts.num_tasks and not ts.aborted:
+        if ts.num_done == ts.num_tasks and not ts.aborted and not ts.fetch_failed:
             ts.zombie = True
             self.tasksets.remove(ts)
             ts.done.fire()
         gap = self.rng.randint(*cal.RELAUNCH_GAP_MS)
         self.sim.after(gap, self._offer, [eid], False)
+
+    # ------------------------------------------------------------------ fetch failures
+
+    def fail_fetch(self, a: Launch, at: int) -> None:
+        """The attempt's shuffle read fails at `at` (FetchFailedException reaches the task thread)."""
+        if a.ended or at >= a.finish_time:
+            return
+        self.sim.at(at, self._fetch_failed, a)
+
+    def _fetch_failed(self, a: Launch) -> None:
+        """`handleFailedTask(FetchFailed)`: the index counts as done (the map stage must re-run, not this task),
+        the task set turns zombie; the driver hears of it."""
+        if a.ended:
+            return
+        ts = a.taskset
+        a.ended = a.fetch_failed = True
+        a.finish_time = self.sim.now
+        eid = a.executor.id
+        self.running.get(eid, {}).pop(a.task_id, None)
+        self._stop_running(ts, a)
+        if not ts.succeeded[a.index]:
+            ts.succeeded[a.index] = True
+            ts.num_done += 1
+        ts.zombie = ts.fetch_failed = True
+        ts.speculatable.clear()
+        if ts.on_fetch_failed is not None:
+            ts.on_fetch_failed(a)
+        self._maybe_remove(ts)
+        if eid in self.free:
+            self.free[eid] += 1
+            gap = self.rng.randint(*cal.RELAUNCH_GAP_MS)
+            self.sim.after(gap, self._offer, [eid], False)
 
     # ------------------------------------------------------------------ killing attempts
 

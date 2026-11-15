@@ -181,6 +181,9 @@ def hadoop_site(c: ClusterSpec, nm_local_dirs: str, nm_log_dirs: str) -> dict[st
         "yarn.scheduler.minimum-allocation-mb": str(c.min_allocation_mb),
         "yarn.scheduler.maximum-allocation-mb": str(c.max_allocation_mb),
         "yarn.scheduler.maximum-allocation-vcores": "16",
+        # multi-tenant queues: the CapacityScheduler preempts containers of queues above their share when
+        # another queue needs its guarantee back (ProportionalCapacityPreemptionPolicy, Hadoop's intervals)
+        "yarn.resourcemanager.scheduler.monitor.enable": "true",
         "yarn.nodemanager.resource.memory-mb": str(c.nm_memory_mb),
         "yarn.nodemanager.resource.cpu-vcores": str(c.nm_vcores),
         "yarn.nodemanager.address": "${yarn.nodemanager.hostname}:45454",

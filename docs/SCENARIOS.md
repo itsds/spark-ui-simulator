@@ -19,7 +19,7 @@ must come out of the simulation (see ARCHITECTURE.md, realism rules).
 | 09 ✅ | Bad-node straggler | one NodeManager (`wn063`) power-capped after a PSU failure: CPU at ~1/20; YARN puts an executor on it on some nights only; speculation off (`scenarios/09-bad-node-straggler`) | "The nightly enrichment is randomly slow" (5.5 → 9.3 min) | Stage 2: max 22x the median with a normal input split; the longest tasks of every stage on executor 19 (13–24x the median); Aggregated Metrics by Executor / Executors: 28 tasks vs 225–259, Add Time 88 s late; GC, spill, failures normal; rack neighbours fine; last good run had no executor on that host; stderr: 53 s JVM start, slow codegen | `spark.yarn.exclude.nodes` / drain the node; `spark.speculation=true` (verified); NM health check; `excludeOnFailure` would not help (nothing failed) |
 | 10 | Python UDF bottleneck | row-at-a-time Python UDF in hot path | "PySpark job 5× slower than Scala version" | SQL: `BatchEvalPython`; high task duration with low shuffle; stderr Python worker lines | Native functions, pandas UDF (Arrow) |
 | 11 | Driver bottleneck | `collect()`/`toPandas()` + driver-side loop | "Cluster idle but job takes hours" | Jobs Event Timeline: long gaps between jobs; driver result size; many tiny jobs | Push work to executors, avoid collect, write output |
-| 12 | Fetch failure / stage retry | executor lost during shuffle, no ESS | "Flaky job, sometimes 2× slower" | Stages: attempt 1 (retry), `FetchFailedException`; executor removed | External shuffle service, decommissioning, fix root executor loss |
+| 12 ✅ | Fetch failure / stage retry | the job runs with `spark.shuffle.service.enabled=false` (a 2026-10-13 workaround, DATA-4127) and the ML queue's retraining moved into its window: YARN preempts its youngest executors, 6 during the events scan and 4 during the write, no replacements (`scenarios/12-fetch-failure-stage-retry`, ADR-045) | "Slow on some nights, failed stages and FetchFailedException in the UI; is the data corrupt?" (5.5 → 7.6 min; "raise maxRetries / network.timeout", "more executors" as suggestions) | Stages: stage 5 attempt 0 FAILED (1,180 of 2,400 done, 43 FetchFailed), stage 3 (skipped in job 3) as attempts 1 + 2, stage 4 attempts 0–2, stage 5 attempt 1 with 1,220 tasks; stage 2: 5,907 succeeded for 5,200 partitions, 730 failed (707 Resubmitted counted, listed as SUCCESS); FetchFailed → BlockManagerId of executor 34 → Executors: 10 dead, "Container … was preempted."; Environment: shuffle service off, `spark_shuffle` aux service installed, preemption monitor on; AM log: exit status -102, "Shuffle files lost for executor", "Resubmitting … due to fetch failure"; executor log: ExecutorDeadException | Turn the shuffle service back on (verified: 5.8 min with the same preemptions); queue guarantee / schedule / `disable_preemption` with the platform team; not more retries, timeouts or executors; decommissioning doesn't apply to YARN preemption; a remote shuffle service |
 | 13 | Missing cache / recomputation | DataFrame reused by 3 actions without cache | "Same input read 3 times" | Jobs show identical stage DAGs, no skipped stages; Storage tab empty | cache/persist at the right point, unpersist |
 | 14 | YARN queue starvation / slow ramp | queue at capacity; dynamic allocation can't get containers | "Job sometimes waits 30 min to start working" | Jobs Event Timeline: executors trickle in; tasks pending; few active executors | Queue capacity, min executors, schedule window |
 | 15 | Skewed / small-file output | `repartition(low-cardinality col)` before write | "Write stage takes forever, downstream reads 40k files" | Final stage: a few huge tasks; output size/records per task | Repartition by (col, salt), `maxRecordsPerFile`, AQE rebalance |
@@ -31,13 +31,16 @@ without it), `geo_udf` (release 2.4's `geoip_city` UDF and its `--jars` / `--fil
 `geo_reader` (`per_task`, or `per_executor` for the fixed UDF). A code change like this can be an incident's
 cause on its own (no fault needed). Fault mechanisms available in `scenario.yaml` (Phase 6, ADR-029): `key_skew` (hot keys, Zipf), `config`,
 `slow_node` (CPU/disk/NIC; the CPU factor also stretches deserialization, codegen, JVM start-up, ADR-037),
-`memory_pressure` (native memory per task), `executor_killed` (SIGKILL, exit 137). The engine also models
+`memory_pressure` (native memory per task), `executor_killed` (SIGKILL, exit 137), `yarn_preemption` (another
+queue reclaims containers: exit -102, no replacements until `until`). The engine also models
 speculative execution (`spark.speculation`, ADR-036) and `spark.yarn.exclude.nodes`.
 The planner also follows `spark.sql.adaptive.coalescePartitions.initialPartitionNum` (Scenario 02's durable
 fix). Since Scenario 03 the engine also aborts a job at `spark.task.maxFailures`, fails the
-application and runs YARN's second attempt (ADR-041). Still to build for the backlog: task exceptions
-(`ExceptionFailure`), lost shuffle files without the shuffle service (12), AQE's skew-join split (a "fixed run" for 01), GC pressure
-(08), Python UDF nodes (10), queue capacity (14).
+application and runs YARN's second attempt (ADR-041). Since Scenario 12 it models
+lost shuffle files without the shuffle service (Resubmitted, FetchFailed, stage attempts; ADR-044) and YARN
+preemption (`yarn_preemption`: another queue reclaims its share, the app's youngest containers go first). Still to
+build for the backlog: task exceptions (`ExceptionFailure`), AQE's skew-join split (a "fixed run" for 01), GC
+pressure (08), Python UDF nodes (10), queue capacity (14).
 
 Later: Structured Streaming (ADR-005), dynamic-allocation thrash, broadcast timeout / driver OOM, "AQE working as intended" (to recognize success).
 

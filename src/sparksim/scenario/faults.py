@@ -11,6 +11,10 @@
 | `memory_pressure` | native memory each running task holds             | container RSS, NodeManager pmem kills       |
 | `executor_killed` | a SIGKILL to an executor's JVM at a given time    | exit 137, ExecutorLostFailure, re-runs,     |
 |                   |                                                   | a replacement container                     |
+| `yarn_preemption` | another queue reclaims its share: the RM takes    | exit -102, ExecutorLostFailure (not the     |
+|                   | N of the app's youngest containers, no room for   | app's fault); without the shuffle service:  |
+|                   | replacements until a given time                   | lost map output, Resubmitted, FetchFailed,  |
+|                   |                                                   | stage retries                               |
 
 Faults are applied in the order listed, after the run's `data` overrides.
 """
@@ -19,7 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
-from ..engine.runtime import ExecutorKill, InputDataset
+from ..engine.runtime import ExecutorKill, InputDataset, Preemption
 from ..model.cluster import ClusterSpec, ExecutorSizing, HostFault
 from ..model.workload import HotKey
 from .schema import (
@@ -28,6 +32,7 @@ from .schema import (
     KeySkew,
     MemoryPressure,
     SlowNode,
+    YarnPreemption,
     duration_ms,
     size_mb,
     spark_value,
@@ -54,6 +59,7 @@ class RunSetup:
     cluster: ClusterSpec
     native_per_task: int = 0
     executor_kills: list[ExecutorKill] = field(default_factory=list)
+    preemptions: list[Preemption] = field(default_factory=list)
 
     def set_conf(self, key: str, value: str) -> None:
         for i, (k, _) in enumerate(self.conf):
@@ -75,6 +81,8 @@ def apply_fault(setup: RunSetup, f) -> None:
         setup.native_per_task += size_mb(f.native_per_task) * MiB
     elif isinstance(f, ExecutorKilled):
         setup.executor_kills.append(ExecutorKill(f.executor, duration_ms(f.at)))
+    elif isinstance(f, YarnPreemption):
+        setup.preemptions.append(Preemption(duration_ms(f.at), f.containers, duration_ms(f.until)))
     else:  # pragma: no cover - the schema's discriminator lists every type
         raise TypeError(f)
 

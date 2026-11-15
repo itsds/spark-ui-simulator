@@ -10,6 +10,8 @@ order looks random but is fully determined by the keys' hash codes:
 * `EnvironmentUpdate` maps: `Seq[(String, String)].toMap`, a Scala 2.12
   immutable `HashMap` (a hash trie, 5 bits per level) once it has more than 4
   entries, insertion order up to 4.
+* The TaskEnds an executor loss produces (`Resubmitted`, `ExecutorLostFailure`):
+  `TaskSetManager.taskInfos`, a Scala 2.12 `mutable.HashMap[Long, TaskInfo]` (chained `HashTable`).
 
 `tests/test_ordering.py` checks all three rules against every reference log
 (34 multi-stage jobs, 178 property sets, 36 environment maps). Within a
@@ -133,6 +135,43 @@ class ScalaHashSet:
 
     def __len__(self) -> int:
         return self._count
+
+
+# --------------------------------------------------------------------------- Scala mutable.HashMap[Long, _]
+
+
+def scala_long_hashmap_order(insertion_order: Iterable[int]) -> list[int]:
+    """Iteration order of a Scala 2.12 `mutable.HashMap` with `Long` keys below 2^31 (`##` is the int value),
+    filled in `insertion_order` and never shrunk: `TaskSetManager.taskInfos` (task ids in launch order), which
+    `executorLost` walks for the `Resubmitted` and `ExecutorLostFailure` TaskEnds.
+
+    `HashTable`: 16 buckets, chained (a new entry heads its chain), resize x2 once size > 0.75 x buckets (the old
+    table re-inserted from its last bucket down). The bucket is `_flat_index` with the seed of the *initial*
+    table (bitCount(15) = 4, `seedvalue` is not updated on resize), iterated from the last bucket down. Checked on
+    every executor loss of the reference logs (`tests/test_ordering.py`).
+    """
+    size, seed = 16, 4
+    table: list[list[int]] = [[] for _ in range(size)]
+    n = 0
+    threshold = 12
+
+    def bucket(x: int, length: int) -> int:
+        bits = (length - 1).bit_count()
+        imp = _byteswap32(x & _M32)
+        imp = ((imp >> seed) | (imp << (32 - seed))) & _M32
+        return (imp >> (32 - bits)) & (length - 1)
+
+    for x in insertion_order:
+        table[bucket(x, size)].insert(0, x)
+        n += 1
+        if n > threshold:
+            old, size = table, size * 2
+            table = [[] for _ in range(size)]
+            for chain in reversed(old):
+                for y in chain:
+                    table[bucket(y, size)].insert(0, y)
+            threshold = size * 3 // 4
+    return [x for chain in reversed(table) for x in chain]
 
 
 def _precedes(i: int, j: int, n: int) -> bool:

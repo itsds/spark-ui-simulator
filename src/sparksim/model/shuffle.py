@@ -142,6 +142,7 @@ class ShuffleExchange:
     bytes: np.ndarray = field(init=False, repr=False)
     map_host: list[str | None] = field(init=False)
     map_executor: list[str | None] = field(init=False)
+    map_tid: list[int | None] = field(init=False)  # MapStatus.mapId: the task attempt that wrote the output
     _cache: dict = field(default_factory=dict, repr=False)
     _hosts: np.ndarray | None = field(default=None, repr=False)
     _written: set[int] = field(default_factory=set, repr=False)
@@ -151,6 +152,7 @@ class ShuffleExchange:
         self.bytes = np.zeros((self.num_maps, self.num_partitions), dtype=np.int64)
         self.map_host = [None] * self.num_maps
         self.map_executor = [None] * self.num_maps
+        self.map_tid = [None] * self.num_maps
 
     # ------------------------------------------------------------------ map side
 
@@ -169,12 +171,28 @@ class ShuffleExchange:
         self.bytes[map_index] = byt
         return int(byt.sum()), int(rows)
 
-    def commit(self, map_index: int, executor_id: str, host: str) -> None:
+    def commit(self, map_index: int, executor_id: str, host: str, task_id: int | None = None) -> None:
         """Register the map output (MapOutputTracker) once the map task succeeded."""
         self.map_host[map_index] = host
         self.map_executor[map_index] = executor_id
+        self.map_tid[map_index] = task_id
         self._cache.clear()
         self._hosts = None
+
+    def remove_outputs_on_executor(self, executor_id: str) -> list[int]:
+        """`ShuffleStatus.removeOutputsOnExecutor`: without the external shuffle service an executor serves its
+        own shuffle files, which die with it. Returns the map indices whose output is gone."""
+        lost = [m for m, e in enumerate(self.map_executor) if e == executor_id]
+        for m in lost:
+            self.map_host[m] = self.map_executor[m] = self.map_tid[m] = None
+        if lost:
+            self._cache.clear()
+            self._hosts = None
+        return lost
+
+    def missing(self) -> list[int]:
+        """`ShuffleMapStage.findMissingPartitions`: map partitions without a registered output."""
+        return [m for m, h in enumerate(self.map_host) if h is None]
 
     @property
     def complete(self) -> bool:

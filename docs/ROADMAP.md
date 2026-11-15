@@ -17,7 +17,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 | 7 | Scenario portal + one-command startup | ✅ |
 | 8 | Scenario 02 (too few shuffle partitions → spill) | ✅ |
 | 9 | Speculative execution + Scenario 09 (bad-node straggler) | ✅ |
-| 10+ | Scenario library (one or two scenarios per session) | 🟨 |
+| 10+ | Scenario library (one scenario per session) | 🟨 |
 
 ---
 
@@ -203,8 +203,8 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
 |---|---|---|
 | ✅ | 05 Missed broadcast join | done (ADR-038, ADR-039) |
 | ✅ | 03 YARN memoryOverhead kills | done (ADR-040, ADR-041, ADR-042) |
-| **next** | **12 Fetch failure / stage retry** | lost shuffle files without the shuffle service, FetchFailed, map-stage resubmission (ref05 has it for real; builds on 03) |
-| 3 | 06 Partition pruning failure | the planner keeps `PartitionFilters: []` when the filter casts the partition column; a multi-day table |
+| ✅ | 12 Fetch failure / stage retry | done (ADR-043, ADR-044, ADR-045) |
+| **next** | **06 Partition pruning failure** | the planner keeps `PartitionFilters: []` when the filter casts the partition column; a multi-day table |
 | 4 | 07 Exploding join | duplicate keys on the dimension side (`unique_right=False`): join output rows ≫ input |
 | 5 | 04 Small files / tiny tasks | an input of ~120k small files; check the event log size and the HS heap (1 GiB default) |
 | 6 | 15 Skewed / small-file output | `repartition(col)` in the DataFrame DSL, skewed write tasks, output file counts |
@@ -245,6 +245,22 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
         `prepare` + manifest (`event_logs` per app), portal links per attempt, `hs_api --app-attempt`,
         `evidence.Ctx.attempts`, `stack_check.py`, HS tests; the History Server's 100 retained dead executors
         in `hs_api.validate`
+- [x] 12 Fetch failure / stage retry (`12-fetch-failure-stage-retry`, ADR-045): the job without the shuffle service
+      (a 2026-10-13 workaround) and YARN preempting its youngest executors for the ML queue's retraining (two
+      waves, 10 of 40, no replacements): 5.5 → 7.6 min, 707 Resubmitted map tasks, the write's attempt 0 failed on
+      FetchFailed, the lost map partitions re-run in 5 more stage attempts, the write's attempt 1 for the 1,220
+      unfinished partitions; 13 evidence values (`tests/test_scenario12_hs.py`); the fix verified (shuffle service
+      on: 5.8 min with the same preemptions)
+  - [x] Real reference `ref12-fetch-failure` (ADR-043): two elastic queues and the CapacityScheduler's preemption
+        monitor on the reference cluster, a distributed-shell app in the second queue started by the driver twice;
+        exit -102 / "was preempted.", lost map output on the dropped connection, Resubmitted and ExecutorLostFailure
+        in `taskInfos` (Scala HashMap) order, FetchFailed (ExecutorDeadException, not retried), the zombie attempt,
+        a skipped stage's first run as attempt 1 (`increaseAttemptIdOnFirstSkip`, bytecode), epochs
+  - [x] Engine (ADR-044): stage attempts over missing partitions (`stage_attempts`, `TaskRecord.partition`),
+        `submitWaitingChildStages`, a map stage resubmitting itself, `Resubmitted`, `TaskScheduler.fail_fetch`,
+        `_doom_fetches` / `_check_fetches` (request times in the read window; immediate, `next()` or retried after
+        5 s), `ResubmitFailedStages` after 200 ms, `engine/fetchfail.py` (messages and executor lines from the
+        plan), the `yarn_preemption` fault and the RM's blocked grants; driver and executor log lines
 - [ ] the rest, in the order above
 
 ## Backlog (later)

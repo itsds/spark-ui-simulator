@@ -38,13 +38,19 @@ def _stage_str(st: StageRecord) -> str:
     return f"{'ShuffleMapStage' if st.task_type == 'ShuffleMapTask' else 'ResultStage'} {st.stage_id}"
 
 
+def _task_str(tk) -> str:
+    """`ShuffleMapTask.toString` / `ResultTask.toString`."""
+    return f"{tk.task_type}({tk.stage_id}, {tk.partition})"
+
+
 def _rdd_str(st: StageRecord) -> str:
     r = st.rdds[0]
     return f"{r.name}[{r.rdd_id}] at {r.callsite}"
 
 
-def _vector(n: int) -> str:
-    return "Vector(" + ", ".join(str(i) for i in range(min(15, n))) + ")"
+def _vector(n: int, parts: list[int] | None = None) -> str:
+    parts = list(range(n)) if parts is None else parts
+    return "Vector(" + ", ".join(str(i) for i in parts[:15]) + ")"
 
 
 def _launch_context(run: AppRun) -> str:
@@ -235,15 +241,50 @@ class _Driver:
                 (log.warn if by_app else log.info)(t, YA, reason)
                 log.warn(t, "YarnSchedulerBackend$YarnSchedulerEndpoint",
                          f"Requesting driver to remove executor {ex.id} for reason {reason}")
-            elif kind == "driver_disconnected":
+            elif kind in ("driver_disconnected", "dag_executor_lost"):
                 ex = p
-                log.info(t, DRIVER_EP, f"Disabling executor {ex.id}.")
-                log.info(t, "DAGScheduler", f"Executor lost: {ex.id} (epoch {run_epoch_at(run, t)})")
+                if kind == "driver_disconnected":
+                    log.info(t, DRIVER_EP, f"Disabling executor {ex.id}.")
+                epoch = ex.extra["loss_epoch"] if "loss_epoch" in ex.extra else run_epoch_at(run, t)
+                log.info(t, "DAGScheduler", f"Executor lost: {ex.id} (epoch {epoch})")
                 bmid = f"BlockManagerId({ex.id}, {ex.host.name}, {ex.block_manager_port}, None)"
                 log.info(t, "BlockManagerMasterEndpoint", f"Trying to remove executor {ex.id} from "
                          "BlockManagerMaster.")
                 log.info(t, "BlockManagerMasterEndpoint", f"Removing block manager {bmid}")
                 log.info(t, "BlockManagerMaster", f"Removed {ex.id} successfully in removeExecutor")
+            elif kind == "shuffle_files_lost":  # removeExecutorAndUnregisterOutputs(fileLost = true)
+                ex, epoch, _n = p
+                log.info(t, "DAGScheduler", f"Shuffle files lost for executor: {ex.id} (epoch {epoch})")
+            elif kind == "resubmitted":  # DAGScheduler.handleTaskCompletion(Resubmitted)
+                tk = p
+                log.info(t, "DAGScheduler", f"Resubmitted {_task_str(tk)}, so marking it as still running.")
+            elif kind == "fetch_failed":
+                tk, reason, first, latest, st, map_base = p
+                bm = reason.block_manager_address
+                name = f"task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}.{tk.attempt} (TID {tk.task_id})"
+                log.warn(t, "TaskSetManager", f"Lost {name} ({tk.executor.host.name} executor {tk.executor.id}): "
+                         f"FetchFailed(BlockManagerId({bm.executor_id}, {bm.host}, {bm.port}, None), shuffleId="
+                         f"{reason.shuffle_id}, mapIndex={reason.map_index}, mapId={reason.map_id}, reduceId="
+                         f"{reason.reduce_id}, message=\n{reason.message}\n)")
+                if not latest:
+                    log.info(t, "DAGScheduler", f"Ignoring fetch failure from {_task_str(tk)} as it's from "
+                             f"{_stage_str(st)} attempt {st.attempt} and there is a more recent attempt for that "
+                             f"stage (attempt {st.root.next_attempt - 1}) running")
+                elif first:
+                    log.info(t, "DAGScheduler", f"Marking {_stage_str(st)} ({st.name}) as failed due to a fetch "
+                             f"failure from {_stage_str(map_base)} ({map_base.name})")
+                log.info(t, "TaskSetManager", f"{name} failed, but the task will not be re-executed (either because "
+                         "the task failed with a shuffle data fetch failure, so the previous stage needs to be re-run, "
+                         "or because a different copy of the task has already succeeded).")
+                if first:
+                    log.info(st.completed + 1, "DAGScheduler", f"Resubmitting {_stage_str(map_base)} ({map_base.name}) "
+                             f"and {_stage_str(st)} ({st.name}) due to fetch failure")
+            elif kind == "resubmit_failed_stages":
+                log.info(t, "DAGScheduler", "Resubmitting failed stages")
+            elif kind == "map_stage_missing":  # processShuffleMapStageCompletion: outputs lost meanwhile
+                base, missing = p
+                log.info(t, "DAGScheduler", f"Resubmitting {_stage_str(base)} ({base.name}) because some of its tasks "
+                         f"had failed: {', '.join(str(m) for m in missing)}")
             elif kind == "executor_lost":
                 ex, reason, by_app, released, lost = p
                 if released:
@@ -252,11 +293,17 @@ class _Driver:
                     log.error(t, "YarnClusterScheduler", f"Lost executor {ex.id} on {ex.host.name}: {reason}")
                 for a in lost:
                     tk = run.task_records[a.task_id]
+                    if not by_app and not run.ess_enabled:  # handleFailedTask: not counted towards maxFailures
+                        log.info(t, "TaskSetManager", f"task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}."
+                                 f"{tk.attempt} (TID {tk.task_id}) failed because while it was being computed, its "
+                                 "executor exited for a reason unrelated to the task. Not counting this failure "
+                                 "towards the maximum number of failures for the task.")
+                        continue
                     why = ("caused by one of the running tasks" if by_app else "unrelated to the running tasks")
                     log.warn(t, "TaskSetManager", f"Lost task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}."
                              f"{tk.attempt} (TID {tk.task_id}) ({ex.host.name} executor {ex.id}): ExecutorLostFailure "
                              f"(executor {ex.id} exited {why}) Reason: {reason}")
-                    if run.stages[tk.stage_id].abort_tid == tk.task_id:
+                    if run.stage_rec(tk.stage_id, tk.attempt).abort_tid == tk.task_id:
                         log.error(t, "TaskSetManager", f"Task {tk.index} in stage {tk.stage_id}.{tk.attempt} failed "
                                   f"{run.sched.max_failures} times; aborting job")
                 if run.dynalloc is not None:
@@ -358,7 +405,7 @@ class _Driver:
         losers: dict[int, list] = {}  # winner task id -> the attempts its success killed
         for tk in run.task_records.values():
             if tk.killed is not None:
-                st = run.stages[tk.stage_id]
+                st = run.stage_rec(tk.stage_id, tk.attempt)
                 winner = next((w for w in st.tasks if w.index == tk.index and w.ok), None)
                 if winner is not None and any(rq == "another attempt succeeded" for _, rq in tk.kill_reqs):
                     losers.setdefault(winner.task_id, []).append(tk)
@@ -376,28 +423,29 @@ class _Driver:
                 log.info(t, "DAGScheduler", f"Final stage: {_stage_str(st)} ({st.name})")
                 parents = ", ".join(_stage_str(run.stages[p]) for p in st.parent_ids)
                 log.info(t, "DAGScheduler", f"Parents of final stage: List({parents})")
-                log.info(t, "DAGScheduler", "Missing parents: List()")
+                missing = ", ".join(_stage_str(run.stages[p]) for p in job.missing_parents)
+                log.info(t, "DAGScheduler", f"Missing parents: List({missing})")
             elif kind == "stage_submitted":
                 st = obj
                 log.info(t, "DAGScheduler", f"Submitting {_stage_str(st)} ({_rdd_str(st)}), which has no missing "
                          "parents")
                 log.info(t + 1, "DAGScheduler", f"Submitting {st.num_tasks} missing tasks from {_stage_str(st)} "
-                         f"({_rdd_str(st)}) (first 15 tasks are for partitions {_vector(st.num_tasks)})")
+                         f"({_rdd_str(st)}) (first 15 tasks are for partitions {_vector(st.num_tasks, st.partitions)})")
                 log.info(t + 1, "YarnClusterScheduler", f"Adding task set {st.stage_id}.{st.attempt} with "
                          f"{st.num_tasks} tasks resource profile 0")
                 running.add(st.stage_id)
             elif kind == "task_start":
                 tk = obj
-                st = run.stages[tk.stage_id]
-                plan = st.plans[tk.index]
+                st = run.stage_rec(tk.stage_id, tk.attempt)
+                plan = st.plans[tk.partition]
                 files = plan.scan.files if plan.scan is not None else ()
                 size = 4_700 + props_len + sum(len(pf.file.path) + 64 for pf in files) + 40 * len(plan.reads)
                 log.info(t, "TaskSetManager", f"Starting task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}."
                          f"{tk.attempt} (TID {tk.task_id}) ({tk.executor.host.name}, executor {tk.executor.id}, "
-                         f"partition {tk.index}, {tk.locality}, {size} bytes) ")
+                         f"partition {tk.partition}, {tk.locality}, {size} bytes) ")
             elif kind == "task_end":
                 tk = obj
-                st = run.stages[tk.stage_id]
+                st = run.stage_rec(tk.stage_id, tk.attempt)
                 key = (tk.stage_id, tk.attempt)
                 if tk.killed is not None:  # handleFailedTask(TaskKilled)
                     name = f"task {tk.index}.{tk.task_attempt} in stage {tk.stage_id}.{tk.attempt} (TID {tk.task_id})"
@@ -419,9 +467,10 @@ class _Driver:
                     log.info(t, "TaskSetManager", f"Finished task {tk.index}.{tk.task_attempt} in stage "
                              f"{tk.stage_id}.{tk.attempt} (TID {tk.task_id}) in {tk.finish - tk.launch} ms on "
                              f"{tk.executor.host.name} (executor {tk.executor.id}) ({done[key]}/{st.num_tasks})")
-                else:
+                elif not st.fetch_failed:
                     continue  # ExecutorLostFailure: logged with the executor loss (yarn())
-                if last_end.get(key) == i and done.get(key, 0) == st.num_tasks and st.failure is None:
+                if last_end.get(key) == i and (st.fetch_failed or (done.get(key, 0) == st.num_tasks
+                                                                    and st.failure is None)):
                     log.info(t, "YarnClusterScheduler", f"Removed TaskSet {tk.stage_id}.{tk.attempt}, whose tasks have "
                              "all completed, from pool ")
             elif kind == "stage_completed":
@@ -440,7 +489,7 @@ class _Driver:
                     log.info(t, "DAGScheduler", "failed: Set()")
             elif kind == "job_end":
                 job = obj
-                st = run.stages[job.final_stage]
+                st = run.attempts_of(run.stages[job.final_stage])[-1]
                 if job.failure is not None:  # DAGScheduler.runJob's caller logs it (result stages only)
                     if st.task_type == "ResultTask" and not job.cancelled:
                         took = (t - job.submitted) / 1000 + r.uniform(0.0002, 0.004)

@@ -126,6 +126,7 @@ class Scenario:
             cluster=s.cluster, sizing=s.sizing, inputs=tuple(s.datasets.values()),
             queries=wl.queries(params, s.datasets), conf=tuple(s.conf), queue=job.queue,
             native_memory_per_task=s.native_per_task, executor_kills=tuple(s.executor_kills),
+            preemptions=tuple(s.preemptions),
             dist_resources=tuple(wl.dist_resources(params)),
         )
 
