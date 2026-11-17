@@ -81,6 +81,7 @@ src/sparksim/          Python package: eventlog/ (typed events, JsonProtocol byt
 scenarios/NN-slug/     scenario.yaml (job + runs + faults), ticket.md, hints.md, solution.md (Evidence checked by tests)
 reference/jobs/        real PySpark reference jobs (ref00–ref12) + common.py
 reference/event-logs/  REAL Spark 3.5.9 event logs captured on YARN cluster mode: format truth
+reference/local/       REAL Spark 3.5.9 local-mode checks of planner behaviour (script + its output, e.g. partition pruning)
 reference/yarn-logs/   REAL container stdout/stderr for those apps (driver = container ..._000001)
 reference/yarn/        single-node HDFS+YARN config (two queues, preemption on) + cluster.sh (REF_SECOND_NM=1: 2nd
                        NodeManager) + slow_node.sh

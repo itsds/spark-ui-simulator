@@ -208,7 +208,8 @@ scenario.yaml ──► sparksim.scenario.schema   pydantic models: units (16g, 
       │
       ▼
 apps/<workload>.py   WORKLOAD: params (dt), datasets(params) = the usual input data (files, sizes,
-      │              key distributions per column), queries(params, datasets) = DataFrame code
+      │              key distributions per column, partitions of a partitioned table), queries(params,
+      │              datasets) = DataFrame code (the planner prunes partitions with the scan's PartitionFilters)
       ▼
 sparksim.scenario    the run's data overrides, then its faults (faults.py) → engine.runtime.AppSpec
       │              key_skew → KeySpace.hot / .zipf of a dataset column   (shuffle partition sizes)

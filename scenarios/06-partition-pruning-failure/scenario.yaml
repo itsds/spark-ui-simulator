@@ -1,0 +1,57 @@
+# Scenario 06: the nightly enrichment takes 2.6x as long since DATA-4398 changed how it reads the events.
+# The change attributes late mobile events to the day they happened: the script now reads the events table's
+# root and derives `dt` from `event_ts` (`withColumn("dt", F.to_date("event_ts"))`) before filtering on
+# `dt == DT`. The filter still says `dt`, but that `dt` is no longer the partition column: it shadows it. Spark
+# pushes the predicate into the scan as a range on `event_ts` (PushedFilters), but nothing on the partition
+# column, so every partition of the table is listed and read (7 days + what has landed of the next one), and
+# the INT96 timestamps of the Spark-written events files carry no statistics to skip row groups with.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 06-partition-pruning-failure
+id: 06-partition-pruning-failure
+title: "The enrichment reads the whole events table"
+difficulty: medium
+topics: [partition pruning, PartitionFilters, PushedFilters, SQL tab, scan metrics, late-arriving data]
+summary: >-
+  Since Wednesday the clickstream enrichment needs almost 15 minutes instead of 5.5, and the HDFS team says it
+  reads about 4 TB a night from the events table, 7x as much as before. The only change was a small one to how
+  the job selects the day's events, and the review said the filter on dt is still there. Find out what the job
+  reads, why, and what the change should have been.
+
+job:                                          # the same job and cluster as 00
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377          # the active RM (rm1) started 2026-10-13 14:35 UTC
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # the Airflow task's spark-submit
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false
+
+runs:
+  last_good:
+    label: "Last good run: 2026-10-20 (dt=2026-10-19)"
+    app_seq: 45702
+    seed: 20261019
+    started_at: "2026-10-20T02:10:06.904Z"
+    params: {dt: "2026-10-19"}
+    # The script reads the day's partition directory (basePath): one partition, nothing else listed.
+  incident:
+    label: "Incident run: 2026-10-22 (dt=2026-10-21)"
+    app_seq: 46071
+    seed: 20261021
+    started_at: "2026-10-22T02:10:07.455Z"
+    # DATA-4398 (merged 2026-10-20 16:05, first run 2026-10-21): "events_enriched by event time". The read is
+    #   events = (spark.read.parquet(f"{WH}/web.db/events")
+    #             .withColumn("dt", F.to_date("event_ts"))
+    #             .where(F.col("dt") == DT))
+    # The cause is the code; no fault is injected.
+    params: {dt: "2026-10-21", events_read: event_date}

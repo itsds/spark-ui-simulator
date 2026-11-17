@@ -872,3 +872,84 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
   YARN's PreemptionMessage (Spark ignores it), the queue's own view (capacity-scheduler properties are not in the
   driver's Hadoop configuration).
 
+
+## ADR-046 — Partitioned tables and partition pruning, checked against a local Spark 3.5.9 run
+
+- **Date:** 2026-11-15
+- **Status:** accepted
+- **Context:** Scenario 06 needs a job that reads a partitioned table's root, a predicate that prunes or doesn't,
+  and a scan over several partition directories. The simulator only knew one directory per scan (a table, or one
+  partition read with `basePath`). The backlog's cause, "the filter casts the partition column (`cast(dt as date)`)",
+  had to be checked first. A local PySpark 3.5.9 run over tiny tables with the production schemas
+  (`reference/local/partition_pruning.py`, output in `partition_pruning.txt`: the write's plan, scan metrics, the
+  INFO driver lines) settled it. **Casting the partition column still prunes**: any deterministic predicate over
+  partition columns only is a `PartitionFilters` entry (`cast(dt as string) = …`, even
+  `to_date(cast(dt as string), fmt) = …`). What fails is a predicate on a column that *shadows* the partition column:
+  `withColumn("dt", F.to_date("event_ts")).where(F.col("dt") == DT)`. Spark pushes it below the Project as
+  `cast(event_ts as date) = DT`, rewrites it to `event_ts >= DT 00:00:00 AND event_ts < DT+1 00:00:00`
+  (`UnwrapCastInBinaryComparison`) and pushes that range to Parquet (`PushedFilters`), with no partition filter, so
+  every partition is listed and read. With INT96 timestamps (Spark's default writer type) the pushed range skips no
+  row group; with `TIMESTAMP_MICROS` it skips row groups by their statistics, but every file is still opened.
+  `FileSourceStrategy` outputs *all* partition columns from the scan, used or not. The formatted explain prints a
+  Project's `Output` as its project list (`expr AS name#id`), not its output attributes (also in every YARN
+  reference log with an aliasing Project).
+- **Decision:**
+  - Data: `InputDataset(partition_column, partitions=(TablePartition(value, volume), …), arrival_lag)`. The first
+    partition is drawn from the file system's random stream exactly as the single directory was (so the day's files
+    are identical whether the job reads the root or the day). The others come from their own streams, so runs that
+    don't read the root stay byte-identical. `Hdfs.partition_dirs` / `list_tree` list a root.
+  - Planner: `DataFrame.with_column`; `where()` pushes through Projects (substituting what they compute) and to
+    the side of a join it references; `unwrap_date_cast`; `null_intolerant_refs` sees through `Cast`; the scan
+    outputs every partition column; CollapseProject folds a child's aliases into the parent. The three forms of the
+    enrichment's events read reproduce real Spark's plan text line for line (`tests/test_scenario06.py`).
+  - Engine: `selected_partitions` evaluates the scan's PartitionFilters on each directory's values
+    (`expr.eval_predicate`, `PartitioningAwareFileIndex.prunePartitions`). File splits, the scan's driver metrics
+    (files, size, `number of partitions read`) and the planning gap's listing follow the selected or listed
+    directories. A filter's pass rate can depend on the partition a file is in (`partition_selectivity`; the
+    enrichment derives it from the events' `arrival_lag`).
+  - Column statistics are not modelled: `Table.timestamp_type="INT96"`, and the engine refuses a pushed comparison
+    Parquet could skip row groups with (anything but booleans and INT96 timestamps) instead of overcounting.
+- **Consequences:** every existing scenario is byte-identical in its event log apart from the Project explain fix
+  (ADR-047). Not modelled: partition discovery's listing job (more than 32 directories,
+  `parallelPartitionDiscovery.threshold`), `PrunedInMemoryFileIndex` / catalog tables (`spark.table`), dynamic
+  partition pruning, row-group skipping by statistics or dictionaries, and the HashMap order of a root's partitions
+  (they are listed sorted, which only changes which task reads which file).
+
+## ADR-047 — Driver log lines of a scan's planning; Project's explain Output
+
+- **Date:** 2026-11-15
+- **Status:** accepted
+- **Context:** the simulated driver log only had `FileSourceScanExec: Planning scan with bin packing …`. At INFO,
+  real 3.5.9 also logs, per `spark.read`, `InMemoryFileIndex: It took N ms to list leaf files for 1 paths.`; while
+  planning each scan, `DataSourceStrategy: Pruning directories with: <partition filters>` (partitioned relations
+  only, empty when there are none), `FileSourceStrategy: Pushed Filters: …` and `Post-Scan Filters: …`; and, when
+  the scan's partitions are selected with partition filters, `InMemoryFileIndex: Selected N partitions out of M,
+  pruned X% partitions.` (local INFO run, ADR-046). Scenario 06's learner can find the missing pruning there.
+- **Decision:** `QueryRecord.planned_at` / `.scans` (each scan of the initial plan and the files its read lists);
+  `yarnlogs.driver._scan_planning` and `_partitions_selected` write the lines from them, with a random stream of
+  their own so the driver log's other lines keep their times. `Project.verbose_fields` prints the project list.
+- **Consequences:** every scenario's driver log gains these lines and every physicalPlanDescription with an
+  aliasing Project changes (`lower(regexp_extract(page_url#…)) AS campaign#…` instead of `campaign#…`); no evidence
+  value of another scenario quotes either. The 2026-11-13 session log's note that "a UDF's expressions are not in
+  Spark's formatted explain" was wrong: they are, in the Project's Output.
+
+## ADR-048 — Scenario 06: a `withColumn` that shadows the partition column
+
+- **Date:** 2026-11-15
+- **Status:** accepted
+- **Context:** the backlog's 06 was "filter casts partition column", which real Spark 3.5.9 prunes anyway
+  (ADR-046). The interview question is how to tell from the UI that a job reads more partitions than it should,
+  and why a filter that looks right doesn't prune.
+- **Decision:** a code change as the cause, no fault. DATA-4398 (2026-10-20) attributes late mobile events to the
+  day they happened: the events read becomes the table root, `withColumn("dt", F.to_date("event_ts"))` and
+  `where(F.col("dt") == DT)` (workload param `events_read: event_date`). The events table keeps 7 days, the next
+  day's first two hours have landed at 02:10, and 1.38 % of a day's events land 1–5 days late (`ARRIVAL_LAG`). Last good
+  2026-10-20 (app 45702, path read, 5.6 min); incident 2026-10-22 (app 46071, 15 min): 8 partitions, 31,640
+  files, 8.6 TiB, 38,285 scan tasks, the Filter keeps 12.5 %, the median scan task writes nothing. 14 evidence values
+  from the Jobs, Stages and SQL tabs, the plan's Details, the driver's and an executor's logs
+  (`tests/test_scenario06_hs.py`). The fix (`where(F.col("dt").between(DT, NEXT_DT))` before the `withColumn`,
+  `events_read: event_date_pruned`) is verified at 5.6 min with the same rows; `maxPartitionBytes=1g` is verified not
+  to help (15 min); the cast rule is a myth (planner test against the real capture).
+- **Consequences:** the solution also raises the change's own data problem: events landing after the run are never
+  attributed to their day. The event log is 205 MB (42,538 tasks); the History Server replays it in a few seconds
+  with its default 1 GiB heap (~60 MiB used after GC).

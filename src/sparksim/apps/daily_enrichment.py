@@ -41,16 +41,34 @@ column from the data platform's shared UDF jar,
 
 whose UDF opens its own reader on the IP database in each task (a transient field of the UDF instance) and
 memory-maps the whole 2.0 GiB file (`03-memory-overhead-kills`); `geo_reader="per_executor"` is the fixed
-UDF (one lazily opened reader per JVM). The physical plans, the SQL tab and every
+UDF (one lazily opened reader per JVM).
+
+`events_read` is how the script reads the day's events. `"partition_path"` (the default) reads the day's
+partition directory with basePath, as above. `"event_date"` is DATA-4398's change (2026-10-20), which
+attributes late mobile events to the day they happened:
+
+    events = (spark.read.parquet(f"{WH}/web.db/events")
+              .withColumn("dt", F.to_date("event_ts"))      # the event's day, not the day it landed
+              .where(F.col("dt") == DT))
+
+The filter is on the derived column that now shadows the partition column, so Spark prunes nothing: the scan
+lists and reads every partition of the table (`06-partition-pruning-failure`). `"event_date_pruned"` is the fix,
+`events.where(F.col("dt").between(DT, NEXT_DT))` on the partition column before the `withColumn`. The events
+table (partitioned by the day an event landed, 7 days kept) is described as a partitioned dataset in those
+modes: the run's day, the six before it and the next day's first two hours, with the share of a day's events
+that land 0, 1, 2, ... days late (`arrival_lag`). The physical plans, the SQL tab and every
 number come from the queries and the data through the planner, the cost model and the scheduler.
 """
 
 from __future__ import annotations
 
-from ..engine.runtime import InputDataset
+import datetime as _dt
+from dataclasses import replace
+
+from ..engine.runtime import InputDataset, TablePartition
 from ..model.workload import KeySpace, WriteSink
 from ..sql.dataframe import Column, SparkSession, SqlQuery, Table, agg
-from ..sql.expr import Func, Not
+from ..sql.expr import Func, Lit, Not
 from .base import Params, Workload
 
 MiB = 1024 * 1024
@@ -70,6 +88,16 @@ PARSE_NS = 2_100.0
 # geoip_city(ip_address): parse the IP, walk the database's search tree, decode the city record into Java
 # objects (names in several locales): ~2.5 µs per row [norm, MaxMind-style readers without a cache].
 GEOIP_NS = 2_500.0
+# The events table keeps 7 days (a retention job drops older partitions at 01:30; the archive is elsewhere).
+EVENTS_RETENTION_DAYS = 7
+# Events per day of the week relative to each other (Mon..Sun): weekends sell more.
+WEEKDAY_TRAFFIC = (0.97, 0.95, 0.96, 0.98, 1.0, 1.08, 1.06)
+# Share of a day's events that land in the table 0, 1, 2, ... days after they happened (event_ts): mobile SDKs
+# batch events while the app is offline and upload them later [norm: mobile analytics SDKs, ~1-2 % late].
+ARRIVAL_LAG = (0.9862, 0.0121, 0.0013, 0.0002, 0.0001, 0.0001)
+# The ingestion lands hourly batches; when the job starts (02:10) the hours 00 and 01 of the next day are in,
+# 6.5 % of a day's traffic (night in Europe, evening in the Americas).
+NEXT_DAY_LANDED = 0.065
 UDF_JAR = (f"{NN}/shared/udf/dp-udfs-2.3.1.jar", 18_452_771)
 # the vendor's IP intelligence database (city, ISP, proxy flags; IPv4 + IPv6), Q4 release: 2.0 GiB
 GEO_DB = (f"{NN}/shared/geo/ip-intel-2026q4.mmdb", 2_143_289_344)
@@ -117,13 +145,45 @@ ENRICHED_GEO = Table(ENRICHED_ROOT, _ENRICHED_COLS + _ENRICHED_TAIL[:1] + (C("ge
                      + _ENRICHED_TAIL[1:], (C("dt", "date"),))
 
 
+def _day(d: str, days: int) -> str:
+    return (_dt.date.fromisoformat(d) + _dt.timedelta(days=days)).isoformat()
+
+
+def _traffic(d: str) -> float:
+    return WEEKDAY_TRAFFIC[_dt.date.fromisoformat(d).weekday()]
+
+
+def event_day_share(events: InputDataset, day: str) -> dict[str, float]:
+    """For each partition of the events table (the day events landed), the share of its rows that happened on
+    `day`: that day's events landing there over everything landing there (each landing day mixes the late
+    events of the days before it; a partition still being written holds the same mix)."""
+    lag = events.arrival_lag
+    out = {}
+    for part in events.partitions:
+        k = (_dt.date.fromisoformat(part.value) - _dt.date.fromisoformat(day)).days
+        landed = sum(_traffic(_day(part.value, -j)) * share for j, share in enumerate(lag))
+        out[f"{events.partition_column}={part.value}"] = (
+            _traffic(day) * lag[k] / landed if 0 <= k < len(lag) else 0.0)
+    return out
+
+
 def queries(p: Params, data) -> tuple[SqlQuery, ...]:
     dt = p["dt"]
     customer = data["events"].keys["customer_id"]
     page = data["events"].keys["page_id"]
+    by_event_date = p["events_read"] != "partition_path"
+    shift = 3 if by_event_date else 0  # DATA-4398's read is three lines longer
 
     def enrich(spark: SparkSession):
-        events = spark.read(EVENTS, f"{EVENTS.root}/dt={dt}")
+        if not by_event_date:
+            events = spark.read(EVENTS, f"{EVENTS.root}/dt={dt}")
+        else:
+            events = spark.read(EVENTS)
+            if p["events_read"] == "event_date_pruned":  # the fix: prune on the partition column first
+                events = events.where(events["dt"].ge(Lit(dt, "date")) & events["dt"].le(Lit(_day(dt, 1), "date")))
+            events = events.with_column("dt", events["event_ts"].cast("date"))  # F.to_date("event_ts")
+            events = events.where(events["dt"].eq(Lit(dt, "date")),
+                                  partition_selectivity=event_day_share(data["events"], dt))
         customers = spark.read(CUSTOMERS)
         pages = spark.read(PAGES)
         e = events
@@ -169,23 +229,34 @@ def queries(p: Params, data) -> tuple[SqlQuery, ...]:
 
     return (
         SqlQuery(f"events_enriched dt={dt}: web events + page catalog (broadcast) + customers (sort-merge join)",
-                 enrich, think_ms=(2_400, 4_200), source_line=61 if p["geo_udf"] else 54,
+                 enrich, think_ms=(2_400, 4_200), source_line=(61 if p["geo_udf"] else 54) + shift,
                  source='enriched.write.mode("overwrite").partitionBy("dt").parquet(f"{WH}/analytics.db/events_enriched")'),
         SqlQuery(f"daily_funnel dt={dt}: events by page type, funnel step, device, country", funnel,
-                 source_line=69 if p["geo_udf"] else 62, source='daily.write.mode("overwrite").partitionBy("dt")'
-                 '.parquet(f"{WH}/analytics.db/daily_funnel")'),
+                 source_line=(69 if p["geo_udf"] else 62) + shift,
+                 source='daily.write.mode("overwrite").partitionBy("dt").parquet(f"{WH}/analytics.db/daily_funnel")'),
         SqlQuery(f"customer_daily_activity dt={dt}: events, spend, first and last event per customer", activity,
-                 source_line=78 if p["geo_udf"] else 71, source='per_customer.write.mode("overwrite")'
+                 source_line=(78 if p["geo_udf"] else 71) + shift, source='per_customer.write.mode("overwrite")'
                  '.partitionBy("dt").parquet(f"{WH}/analytics.db/customer_daily_activity")'),
     )
 
 
 def datasets(p: Params) -> dict[str, InputDataset]:
-    """One day of events (~1.2 TiB), the customer snapshot (~60 GB, 210 M rows), the page catalog (3 MB)."""
+    """One day of events (~1.2 TiB), the customer snapshot (~60 GB, 210 M rows), the page catalog (3 MB).
+
+    The script reads the day's partition directory, so only that directory is described; when it reads the
+    table root (`events_read`), the table's partitions: the day first (its files are the same either way),
+    the six days before it and what has landed of the next day."""
+    dt = p["dt"]
+    events = InputDataset(f"{EVENTS.root}/dt={dt}", files=4_300, mean_file_bytes=285 * MiB,
+                          file_size_sigma=0.22, bytes_per_row=EVENTS.file_bytes_per_row,
+                          keys={"customer_id": CUSTOMER, "page_id": PAGE})
+    if p["events_read"] != "partition_path":
+        days = [dt] + [_day(dt, -k) for k in range(EVENTS_RETENTION_DAYS - 1, 0, -1)]
+        parts = tuple(TablePartition(d, round(_traffic(d) / _traffic(dt), 3)) for d in days) + (
+            TablePartition(_day(dt, 1), round(NEXT_DAY_LANDED * _traffic(_day(dt, 1)) / _traffic(dt), 3)),)
+        events = replace(events, path=EVENTS.root, partition_column="dt", partitions=parts, arrival_lag=ARRIVAL_LAG)
     return {
-        "events": InputDataset(f"{EVENTS.root}/dt={p['dt']}", files=4_300, mean_file_bytes=285 * MiB,
-                               file_size_sigma=0.22, bytes_per_row=EVENTS.file_bytes_per_row,
-                               keys={"customer_id": CUSTOMER, "page_id": PAGE}),
+        "events": events,
         "customers": InputDataset(CUSTOMERS.root, files=520, mean_file_bytes=116 * MiB, file_size_sigma=0.12,
                                   bytes_per_row=CUSTOMERS.file_bytes_per_row),
         "pages": InputDataset(PAGES.root, files=1, mean_file_bytes=3 * MiB, file_size_sigma=0.0,
@@ -204,6 +275,9 @@ WORKLOAD = Workload(
     # broadcast_hint: F.broadcast() around the page catalog (in the script since 2026-09-24)
     # geo_udf: the geo_city column from dp-udfs' geoip_city (release 2.4, 2026-11-11); geo_reader: one reader
     # per task (dp-udfs 2.3.1) or one per executor JVM (a fixed UDF)
-    params={"dt": "2026-11-02", "broadcast_hint": True, "geo_udf": False, "geo_reader": "per_task"},
+    # events_read: the day's partition directory (default), or the table root filtered on the event date
+    # (DATA-4398, 2026-10-20), optionally pruned on dt first (the fix)
+    params={"dt": "2026-11-02", "broadcast_hint": True, "geo_udf": False, "geo_reader": "per_task",
+            "events_read": "partition_path"},
     dist_resources=lambda p: (UDF_JAR, GEO_DB) if p["geo_udf"] else (),
 )

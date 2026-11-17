@@ -517,6 +517,9 @@ class _Driver:
 
     def queries(self) -> None:
         run, log, r = self.run, self.log, self.rng
+        rp = substream(run.spec.seed, "yarnlogs/scan-planning")  # its own stream: the other lines keep theirs
+        for q in run.queries:
+            self._scan_planning(q, rp)
         seen: set[str] = set()
         for _t, kind, obj in run.log:
             if kind == "stage_submitted":
@@ -526,9 +529,43 @@ class _Driver:
                     if ds is not None and ds.path not in seen and ds.path in run.scan_split_bytes:
                         seen.add(ds.path)
                         ms, oc = run.scan_split_bytes[ds.path]
-                        log.info(st.submitted - r.randint(30, 160), "FileSourceScanExec",
+                        t = st.submitted - r.randint(30, 160)
+                        scan = getattr(src, "node", None)
+                        if scan is not None and scan.partition_filters:
+                            self._partitions_selected(t - rp.randint(1, 4), scan)
+                        log.info(t, "FileSourceScanExec",
                                  f"Planning scan with bin packing, max size: {ms} bytes, open cost is considered as "
                                  f"scanning {oc} bytes.")
+
+    def _scan_planning(self, q, rp: random.Random) -> None:
+        """What the driver logs while it reads a query's tables and plans it (Spark 3.5.9 at INFO, checked on a
+        local run): one listing line per `spark.read` (the InMemoryFileIndex lists every leaf file under the path,
+        `FILE_LISTING_MS_PER_FILE`); then FileSourceStrategy's lines for each scan, in planning order."""
+        from ..cost import calibration as cal
+
+        log = self.log
+        t = q.planned_at
+        for _scan, files in q.scans:
+            took = max(1, int(files * cal.FILE_LISTING_MS_PER_FILE))
+            t += took
+            log.info(t, "InMemoryFileIndex", f"It took {took} ms to list leaf files for 1 paths.")
+        t = max(t, q.start - rp.randint(20, 60))
+        for scan, _ in q.scans:
+            if scan.partitioned:  # DataSourceStrategy.getPushedDownFilters
+                log.info(t, "DataSourceStrategy", "Pruning directories with: "
+                         + ",".join(str(f) for f in scan.partition_filters))
+            log.info(t, "FileSourceStrategy", "Pushed Filters: " + ",".join(scan.pushed_filters))
+            log.info(t, "FileSourceStrategy", "Post-Scan Filters: " + ",".join(str(f) for f in scan.data_filters))
+            t += rp.randint(0, 2)
+
+    def _partitions_selected(self, t: int, scan) -> None:
+        """PartitioningAwareFileIndex.prunePartitions (only with partition filters): selected out of listed."""
+        run = self.run
+        total = len(run.hdfs.partition_dirs(scan.relation.root_paths[0]))
+        selected = len(run.selected_partitions(scan))
+        pruned = "0" if total == 0 else f"{_java_double((1 - selected / total) * 100)}%"
+        self.log.info(t, "InMemoryFileIndex", f"Selected {selected} partitions out of {total}, pruned {pruned} "
+                      "partitions.")
 
     # ------------------------------------------------------------------ shutdown
 
@@ -581,6 +618,11 @@ class _Driver:
         log.info(t + 22, "ShutdownHookManager",
                  f"Deleting directory {local_dirs(run)[0]}/usercache/{s.user}/appcache/{run.yapp.app_id}/"
                  f"spark-{_uuid(r)}")
+
+
+def _java_double(x: float) -> str:
+    """`Double.toString` of a percentage between 0 and 100 (the same shortest round trip as Python's repr)."""
+    return repr(float(x))
 
 
 def _set(run: AppRun, stage_ids: set[int]) -> str:
