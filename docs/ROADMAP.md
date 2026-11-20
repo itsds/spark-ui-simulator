@@ -205,8 +205,8 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
 | ✅ | 03 YARN memoryOverhead kills | done (ADR-040, ADR-041, ADR-042) |
 | ✅ | 12 Fetch failure / stage retry | done (ADR-043, ADR-044, ADR-045) |
 | ✅ | 06 Partition pruning failure | done (ADR-046, ADR-047, ADR-048) |
-| **next** | **07 Exploding join** | duplicate keys on the dimension side (`unique_right=False`): join output rows ≫ input |
-| 5 | 04 Small files / tiny tasks | an input of ~120k small files; check the event log size and the HS heap (1 GiB default) |
+| ✅ | 07 Exploding join | done (ADR-049, ADR-050) |
+| **next** | **04 Small files / tiny tasks** | an input of ~120k small files; check the event log size and the HS heap (1 GiB default) |
 | 6 | 15 Skewed / small-file output | `repartition(col)` in the DataFrame DSL, skewed write tasks, output file counts |
 | 7 | 13 Missing cache / recomputation | a workload reusing a DataFrame; cache / persist, RDD blocks, the Storage tab (ref04 has it for real) |
 | 8 | 10 Python UDF bottleneck | `BatchEvalPython` / `ArrowEvalPython` plan nodes, Python worker cost and logs (ref06 has them for real) |
@@ -276,6 +276,19 @@ Order (12 sessions; the "needs" column is the simulator work before the scenario
         directory (`selected_partitions`), per-partition filter pass rates, scan metrics over the selected
         directories, unmodelled row-group skipping refused; driver log lines `It took … to list leaf files`,
         `Pruning directories with:`, `Pushed Filters` / `Post-Scan Filters`, `Selected N partitions out of M`
+- [x] 07 Exploding join (`07-exploding-join`, ADR-050): the CRM team turns `customers_snapshot` into an SCD2 history
+      overnight (fault `duplicate_keys`: 2.6 rows per customer, 6.2 per event, three appended columns); the same
+      plan, the sort-merge join outputs 25.1 B rows from 4.1 B events, the write's sort spills 1.6 TiB, 809 GiB
+      written instead of 131 GiB, the aggregates count every event 6x; 5.6 → 15 min; 15 evidence values
+      (`tests/test_scenario07_hs.py`); the fix (`is_current` before the join: 5.5 min, one row per event) and a
+      non-fix (`shuffle.partitions=9600`: no spill, still 25.1 B rows, 10 min) verified
+  - [x] Checked on real Spark 3.5.9 (local run, `reference/local/exploding_join.py` + `.txt`, ADR-049): the plan over
+        a history is the snapshot's; SMJ output rows = Σ events × versions; the SMJ's buffer never spills (in-memory
+        threshold 2,147,483,632 rows; a 200,000-row key: `spill size` 0); 42–47 ns per extra output row; the fix's
+        PushedFilters
+  - [x] Simulator (ADR-049): `KeySpace.rows_per_key` / `rows_per_match`, fault `duplicate_keys` (rows, files,
+        appended columns), `join(right_key_space=)`, the dimension's shuffle partitions, SMJ fan-out per reduce
+        partition and `SMJ_EXTRA_OUTPUT_NS_PER_ROW`; a broadcast join over duplicates is refused
 - [ ] the rest, in the order above
 
 ## Backlog (later)

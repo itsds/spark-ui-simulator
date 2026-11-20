@@ -1357,9 +1357,162 @@ S06 = {
 }
 
 
+# ---------------------------------------------------------------------------- scenario 07 (exploding join)
+
+
+def _join_job(c: Ctx) -> str:
+    """The join + write job (the one with stage 5) and the events scan's job (stage 2), last good → incident."""
+    g = c.runs["last_good"]
+    out = []
+    for sid in (5, 2):
+        jg, jb = _job_of_stage(g, sid), _job_of_stage(c, sid)
+        out.append(f"job {jb['jobId']}: {fmt_duration(_job_ms(g, jg['jobId']))} → "
+                   f"{fmt_duration(_job_ms(c, jb['jobId']))}")
+    return "; ".join(out)
+
+
+def _events_input(c: Ctx) -> str:
+    def row(x: Ctx) -> str:
+        s = x.stage(2)
+        return f"{fmt_bytes(s['inputBytes'])} / {s['inputRecords']:,} records"
+
+    return f"{row(c.runs['last_good'])} → {row(c)}"
+
+
+def _join_stage_rows(c: Ctx) -> str:
+    """Stage 5 (the join and the write): Shuffle Read records → Output records (size)."""
+    def row(x: Ctx) -> str:
+        s = x.stage(5)
+        return (f"{s['shuffleReadRecords']:,} read → {s['outputRecords']:,} written "
+                f"({fmt_bytes(s['outputBytes'])})")
+
+    return f"last good {row(c.runs['last_good'])}; incident {row(c)}"
+
+
+def _join_stage_median(c: Ctx) -> str:
+    """Stage 5's Summary Metrics, median task: duration, shuffle read records, output records."""
+    def row(x: Ctx) -> str:
+        q = x.get("stages/5/0/taskSummary", quantiles="0.5")
+        dur = fmt_duration(q["duration"][0])
+        return (f"{dur}, {int(q['shuffleReadMetrics']['readRecords'][0]):,} → "
+                f"{int(q['outputMetrics']['recordsWritten'][0]):,} records")
+
+    return f"{row(c.runs['last_good'])}; {row(c)}"
+
+
+def _s07_join_inputs(x: Ctx) -> tuple[int, int, int]:
+    """(events rows, customer rows, output rows) of query 0's SortMergeJoin: its two Exchanges' records read."""
+    (smj,) = _nodes(x, 0, "SortMergeJoin")
+    exs = sorted((int(_metric(n, "records read").replace(",", "")) for n in _nodes(x, 0, "Exchange")), reverse=True)
+    return exs[0], exs[1], _rows(smj)
+
+
+def _smj_rows(c: Ctx) -> str:
+    (ge, gc, go), (be, bc, bo) = _s07_join_inputs(c.runs["last_good"]), _s07_join_inputs(c)
+    return f"events {be:,} + customers {bc:,} in → {bo:,} out (last good: {ge:,} + {gc:,} → {go:,})"
+
+
+def _customers_scan(x: Ctx) -> dict:
+    return next(n for n in _nodes(x, 0, "Scan parquet ") if "number of partitions read" not in
+                {m["name"] for m in n["metrics"]} and _rows(n) > 1_000_000)
+
+
+def _customers_scan_rows(c: Ctx) -> str:
+    def row(x: Ctx) -> str:
+        n = _customers_scan(x)
+        return f"{_metric(n, 'number of files read')} files / {_metric(n, 'size of files read')} / {_rows(n):,} rows"
+
+    return f"{row(c.runs['last_good'])} → {row(c)}"
+
+
+def _customers_scan_block(x: Ctx) -> str:
+    desc = x.get("sql/0", details="true", planDescription="true")["planDescription"]
+    return next(b for b in desc.split("\n\n") if "Scan parquet" in b.split("\n", 1)[0] and "customers" in b)
+
+
+def _same_customers_read(c: Ctx) -> str:
+    """The customers scan in the query's Details, both runs: where it reads and the columns it reads."""
+    vals = set()
+    for x in (c.runs["last_good"], c):
+        b = _customers_scan_block(x)
+        loc = re.search(r"Location: InMemoryFileIndex \[\S*/warehouse/([^\]]+)\]", b).group(1)
+        vals.add(f"{loc}, ReadSchema {re.search(r'ReadSchema: (struct<[^>]*>)', b).group(1)}")
+    return (vals.pop() + " in both runs") if len(vals) == 1 else " / ".join(sorted(vals))
+
+
+def _aggregate_rows(c: Ctx, exec_id: int) -> str:
+    """A daily aggregate (query 1 or 2): its scan's rows → its final HashAggregate's rows, last good; incident."""
+    def row(x: Ctx) -> str:
+        (scan,) = _nodes(x, exec_id, "Scan parquet ")
+        final = min(_nodes(x, exec_id, "HashAggregate"), key=lambda n: n["nodeId"])  # the one after the shuffle
+        return f"{_rows(scan):,} → {_rows(final):,}"
+
+    return f"{row(c.runs['last_good'])}; {row(c)}"
+
+
+def _join_stage_spill(c: Ctx) -> str:
+    def row(x: Ctx) -> str:
+        s = x.stage(5)
+        peak = x.quantiles(5, "peakExecutionMemory", "1.0")[0]
+        spill = (f"{fmt_bytes(s['memoryBytesSpilled'])} (memory) / {fmt_bytes(s['diskBytesSpilled'])} (disk)"
+                 if s["memoryBytesSpilled"] else "no spill")
+        return f"{spill}, max peak execution memory {fmt_bytes_js(peak)}"
+
+    return f"{row(c.runs['last_good'])} → {row(c)}"
+
+
+def _spill_nodes(c: Ctx) -> str:
+    """Query 0's spill size: the Sort above the SortMergeJoin (the write's sort) and the join itself."""
+    def total_med(n: dict) -> tuple[str, str]:
+        v = next(m["value"] for m in n["metrics"] if m["name"] == "spill size").split("\n")[1]
+        total, rest = v.split(" (", 1)
+        return total, rest.split(", ")[1]
+
+    (smj,) = _nodes(c, 0, "SortMergeJoin")
+    write_sort = min(_nodes(c, 0, "Sort"), key=lambda n: n["nodeId"])  # the root side: above the join
+    t, med = total_med(write_sort)
+    return f"Sort above the join {t} (median {med} per task); SortMergeJoin {total_med(smj)[0]}"
+
+
+def _bytes_per_written_row(c: Ctx) -> str:
+    def bpr(x: Ctx) -> str:
+        s = x.stage(5)
+        return f"{s['outputBytes'] / s['outputRecords']:.1f} B"
+
+    return f"{bpr(c.runs['last_good'])} → {bpr(c)} per written row"
+
+
+def _s07_spill_log(c07: Ctx) -> str:
+    """Executor 1's stderr: the write sorter's spill lines (all in stage 5)."""
+    e = next(x for x in c07.get("allexecutors") if x["id"] == "1")
+    err = html.unescape(_stderr(e))
+    sizes = [float(v) for v in re.findall(r"INFO UnsafeExternalSorter: Thread \d+ spilling sort data of "
+                                          r"([\d.]+) MiB to disk", err)]
+    return (f"executor 1: {len(sizes)} \"spilling sort data of … to disk\" lines, "
+            f"{min(sizes):.1f}–{max(sizes):.1f} MiB each")
+
+
+S07 = {
+    "E1": lambda c: f"{_app_duration(c.runs['last_good'])} → {_app_duration(c)}",
+    "E2": _join_job,
+    "E3": _events_input,
+    "E4": _join_stage_rows,
+    "E5": _join_stage_median,
+    "E6": _smj_rows,
+    "E7": _customers_scan_rows,
+    "E8": _same_customers_read,
+    "E9": lambda c: _aggregate_rows(c, 2),
+    "E10": lambda c: _aggregate_rows(c, 1),
+    "E11": _join_stage_spill,
+    "E12": _spill_nodes,
+    "E13": _same_conf_both,
+    "E14": _bytes_per_written_row,
+    "E15": _s07_spill_log,
+}
+
 EVIDENCE = {"00-healthy-baseline": S00, "01-join-skew": S01, "02-shuffle-partitions-spill": S02,
             "03-memory-overhead-kills": S03, "05-missed-broadcast-join": S05, "09-bad-node-straggler": S09,
-            "06-partition-pruning-failure": S06, "12-fetch-failure-stage-retry": S12}
+            "06-partition-pruning-failure": S06, "07-exploding-join": S07, "12-fetch-failure-stage-retry": S12}
 
 
 # ---------------------------------------------------------------------------- solution.md

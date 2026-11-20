@@ -463,8 +463,11 @@ class _Join(SparkPlan):
         self.left_keys = left_keys
         self.right_keys = right_keys
         self.join_type = join_type
-        self.match = match  # output rows per streamed-side row
+        self.match = match  # share of the streamed side's rows that find their key
         self.ns_per_row = ns_per_row
+        # rows of the build side each matched row meets (1: unique on the key) and the build side's KeySpace
+        self.fanout = 1.0
+        self.fanout_keys = None
 
     def output(self) -> list[Attr]:
         return self.children[0].output() + self.children[1].output()

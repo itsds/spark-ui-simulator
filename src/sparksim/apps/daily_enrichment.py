@@ -56,8 +56,17 @@ lists and reads every partition of the table (`06-partition-pruning-failure`). `
 `events.where(F.col("dt").between(DT, NEXT_DT))` on the partition column before the `withColumn`. The events
 table (partitioned by the day an event landed, 7 days kept) is described as a partitioned dataset in those
 modes: the run's day, the six before it and the next day's first two hours, with the share of a day's events
-that land 0, 1, 2, ... days late (`arrival_lag`). The physical plans, the SQL tab and every
-number come from the queries and the data through the planner, the cost model and the scheduler.
+that land 0, 1, 2, ... days late (`arrival_lag`).
+
+The customer snapshot has one row per customer (`CUSTOMER_DIM`). When it becomes a history (fault
+`duplicate_keys`: several rows per customer, the columns `valid_from`, `valid_to`, `is_current`), the unchanged
+join meets every version of a customer (`07-exploding-join`); `customers_current=True` is the fix,
+
+    .join(customers.where(F.col("is_current") & ~F.col("is_deleted"))
+                   .select("customer_id", "segment", "loyalty_tier", "home_country"), "customer_id")
+
+The physical plans, the SQL tab and every number come from the queries and the data through the planner, the
+cost model and the scheduler.
 """
 
 from __future__ import annotations
@@ -77,6 +86,9 @@ WH = f"{NN}/warehouse"
 
 # The customer ids of a day of events: the snapshot's 208 M customers, rows per customer spread with CV 2.5.
 CUSTOMER = KeySpace("customer_id", distinct=208_000_000, freq_cv=2.5)
+# The customer snapshot's keys (its rows that aren't deleted): one row per customer. A history of it (fault
+# `duplicate_keys`) has several.
+CUSTOMER_DIM = KeySpace("customer_id", distinct=211_000_000, freq_cv=0.0)
 ACTIVE_CUSTOMER = KeySpace("dt,customer_id", distinct=61_000_000, freq_cv=2.5)
 FUNNEL = KeySpace("dt,page_type,funnel_step,device,country", distinct=57_600)
 # The page ids of a day of events: ~44 k of the catalog's ~46 k pages are visited, and page popularity
@@ -173,6 +185,8 @@ def queries(p: Params, data) -> tuple[SqlQuery, ...]:
     page = data["events"].keys["page_id"]
     by_event_date = p["events_read"] != "partition_path"
     shift = 3 if by_event_date else 0  # DATA-4398's read is three lines longer
+    if p["customers_current"] and not any(c[0] == "is_current" for c in data["customers"].added_columns):
+        raise ValueError("customers_current: the customer table has no is_current column")
 
     def enrich(spark: SparkSession):
         if not by_event_date:
@@ -184,7 +198,7 @@ def queries(p: Params, data) -> tuple[SqlQuery, ...]:
             events = events.with_column("dt", events["event_ts"].cast("date"))  # F.to_date("event_ts")
             events = events.where(events["dt"].eq(Lit(dt, "date")),
                                   partition_selectivity=event_day_share(data["events"], dt))
-        customers = spark.read(CUSTOMERS)
+        customers = spark.read(CUSTOMERS.with_columns(data["customers"].added_columns))
         pages = spark.read(PAGES)
         e = events
         cols = [e[c] for c in ("event_id", "event_ts", "session_id", "customer_id", "page_id", "event_type",
@@ -198,13 +212,21 @@ def queries(p: Params, data) -> tuple[SqlQuery, ...]:
                        native_log=("GeoIpCity", f"Opened IP database ./{db} (2.0 GiB) in MEMORY_MAPPED mode"),
                        native_scope="executor" if p["geo_reader"] == "per_executor" else "task")
             extra, ns = [geo.alias("geo_city")], PARSE_NS + GEOIP_NS
+        dim = data["customers"].keys["customer_id"]
+        if p["customers_current"]:  # the current version of each customer (a history's is_current)
+            current = customers.where(customers["is_current"] & Not(customers["is_deleted"]),
+                                      selectivity=0.97 / dim.rows_per_key)
+            current_dim = None
+        else:
+            current = customers.where(Not(customers["is_deleted"]), selectivity=0.97)
+            current_dim = dim
         enriched = (events.where(Not(e["is_bot"]), selectivity=0.93)
                     .select(*cols, campaign.alias("campaign"), *extra, e["dt"], ns=ns)
                     .join(pages.select(pages["page_id"], pages["page_type"], pages["funnel_step"]), "page_id",
                           broadcast=bool(p["broadcast_hint"]), key_space=page)
-                    .join(customers.where(Not(customers["is_deleted"]), selectivity=0.97)
-                          .select(*(customers[c] for c in ("customer_id", "segment", "loyalty_tier", "home_country"))),
-                          "customer_id", match=0.985, key_space=customer))
+                    .join(current.select(*(customers[c] for c in ("customer_id", "segment", "loyalty_tier",
+                                                                  "home_country"))),
+                          "customer_id", match=0.985, key_space=customer, right_key_space=current_dim))
         table = ENRICHED_GEO if p["geo_udf"] else ENRICHED
         return enriched.write_parquet(ENRICHED_ROOT, ["dt"], WriteSink(f"{ENRICHED_ROOT}/dt={dt}",
                                                                        table.file_bytes_per_row))
@@ -258,7 +280,7 @@ def datasets(p: Params) -> dict[str, InputDataset]:
     return {
         "events": events,
         "customers": InputDataset(CUSTOMERS.root, files=520, mean_file_bytes=116 * MiB, file_size_sigma=0.12,
-                                  bytes_per_row=CUSTOMERS.file_bytes_per_row),
+                                  bytes_per_row=CUSTOMERS.file_bytes_per_row, keys={"customer_id": CUSTOMER_DIM}),
         "pages": InputDataset(PAGES.root, files=1, mean_file_bytes=3 * MiB, file_size_sigma=0.0,
                               bytes_per_row=PAGES.file_bytes_per_row),
     }
@@ -277,7 +299,8 @@ WORKLOAD = Workload(
     # per task (dp-udfs 2.3.1) or one per executor JVM (a fixed UDF)
     # events_read: the day's partition directory (default), or the table root filtered on the event date
     # (DATA-4398, 2026-10-20), optionally pruned on dt first (the fix)
+    # customers_current: keep only the current version of each customer (`is_current`, a history's column)
     params={"dt": "2026-11-02", "broadcast_hint": True, "geo_udf": False, "geo_reader": "per_task",
-            "events_read": "partition_path"},
+            "events_read": "partition_path", "customers_current": False},
     dist_resources=lambda p: (UDF_JAR, GEO_DB) if p["geo_udf"] else (),
 )

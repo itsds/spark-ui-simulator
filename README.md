@@ -47,7 +47,7 @@ Target: **Apache Spark 3.5.9 on YARN** (cluster mode, Hadoop 3.x).
 | 04 | Small files / tiny tasks |
 | 05 | Missed broadcast join ✅ [`scenarios/05-missed-broadcast-join`](scenarios/05-missed-broadcast-join/ticket.md) |
 | 06 | Partition pruning failure ✅ [`scenarios/06-partition-pruning-failure`](scenarios/06-partition-pruning-failure/ticket.md) |
-| 07 | Exploding join (duplicate keys) |
+| 07 | Exploding join (duplicate keys) ✅ [`scenarios/07-exploding-join`](scenarios/07-exploding-join/ticket.md) |
 | 08 | GC pressure |
 | 09 | Bad-node straggler ✅ [`scenarios/09-bad-node-straggler`](scenarios/09-bad-node-straggler/ticket.md) |
 | 10 | Python UDF bottleneck |
@@ -175,8 +175,8 @@ uv run scripts/event_inventory.py    # regenerates docs/event-log-schema.md
 
 Phases 0–9 are done (see [`docs/ROADMAP.md`](docs/ROADMAP.md)): the simulator, YARN realism, the
 scenario DSL with fault injection, Scenarios 00 and 01, the portal and the one-command start, Scenario 02,
-and speculative execution with Scenario 09. Phase 10+, the rest of the scenario library, is under way (one or
-two scenarios per session): Scenarios 05 and 03 are done.
+and speculative execution with Scenario 09. Phase 10+, the rest of the scenario library, is under way (one
+scenario per session): Scenarios 05, 03, 12, 06 and 07 are done.
 
 ## Docs
 

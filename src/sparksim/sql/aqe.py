@@ -252,7 +252,7 @@ def _op(n: SparkPlan) -> Op:
     elif isinstance(n, BroadcastHashJoin):
         op = BHJOp(out_bytes, n.match, **kw)
     elif isinstance(n, SortMergeJoin):
-        op = SMJOp(out_bytes, n.match, **kw)
+        op = SMJOp(out_bytes, n.match, fanout=n.fanout, fanout_keys=n.fanout_keys, **kw)
     elif isinstance(n, Sort):
         op = SortOp(**kw)
     elif isinstance(n, HashAggregate):

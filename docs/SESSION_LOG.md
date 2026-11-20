@@ -591,3 +591,50 @@ what was done, what's next, gotchas.
 - **Still open:** catalog tables (`spark.table`, `PrunedInMemoryFileIndex`, metastore partition pruning),
   partition discovery's listing job above 32 directories, dynamic partition pruning, Parquet row-group skipping by
   statistics or dictionaries (refused), the partition order of a root's listing (sorted, not Spark's HashMap order).
+
+## 2026-11-20 — Phase 10: Scenario 07 (exploding join), joins over duplicate keys
+
+- **Done:**
+  - PR #15 (Scenario 06) merged; this session did Scenario 07, next in the roadmap's order.
+  - Checked on real Spark 3.5.9 first (ADR-049), with a local PySpark run over tiny tables with the production schemas:
+    `reference/local/exploding_join.py` and its output `exploding_join.txt`. Over the customer snapshot rewritten as
+    an SCD2 history the enrichment's plan is the same apart from ids; the SMJ's `number of output rows` is
+    Σ events × versions; its buffer never spills (in-memory threshold 2,147,483,632 rows: a 200,000-row key showed
+    `spill size` 0); an extra output row costs 42–47 ns locally (join + Project + noop); the `is_current` fix's
+    PushedFilters order is the one our planner already produces.
+  - Simulator (ADR-049): `KeySpace.rows_per_key` / `rows_per_match` (`unique` by default), fault `duplicate_keys`
+    (rows × files of the same size, appended columns in `InputDataset.added_columns`, `Table.with_columns`),
+    `DataFrame.join(right_key_space=)` (replaces the unused `unique_right` flag), the dimension's shuffle partitions
+    (`dimension_row_shares`), the SMJ's `fanout` per reduce partition (`fanout_weights`) and
+    `SMJ_EXTRA_OUTPUT_NS_PER_ROW` = 20 ns; a broadcast join over duplicates is refused. The workload declares the
+    customers' key (`CUSTOMER_DIM`) and a `customers_current` param (the fix). Scenario 00's event log is
+    byte-identical.
+  - Scenario 07 (ADR-050): CRM-2231 turns `customers_snapshot` into an SCD2 history on 2026-11-06 (2.6 rows per
+    customer, 6.2 per event). Last good 2026-11-06 (app 48748, 5.6 min), incident 2026-11-07 (app 48925, 15 min):
+    the same plan, the SMJ outputs 25.1 B rows from 4.1 B events, the write's sort spills 1.6 TiB, 809 GiB written,
+    the aggregates read 6x and output the same groups. Ticket (HDFS quota + BI's 6.2x revenue; the channel: Black
+    Friday traffic, more memory / partitions, broadcast or salting, compression), 8 hints, solution with 15
+    evidence values (`scripts/evidence.py` S07, `tests/test_scenario07_hs.py`), data repair, prevention, interview
+    answer. `tests/test_scenario07.py` (19 tests): the cause, the fault's checks, plans vs the real capture, the model,
+    the symptoms, the fix (5.5 min, one row per event) and a non-fix (`shuffle.partitions=9600`: no spill, still
+    25.1 B rows, 10 min). Screenshot of the SQL page reviewed.
+  - Docs: ROADMAP, SCENARIOS, README, ARCHITECTURE, ADR-049–050.
+  - `uv run pytest`: 342 passed (~12 min, integration included); ruff clean; `sparksim up 07-exploding-join` +
+    `scripts/stack_check.py --scenario 07-exploding-join` pass. The first full run caught a helper of Scenario 07 in
+    `scripts/evidence.py` that shadowed Scenario 05's `_join_inputs` (now `_s07_*`, and a test that helper names are
+    unique).
+- **Next:** 04 (small files / tiny tasks: an input of ~120k small files; check the event log size and the HS heap).
+- **Gotchas:**
+  - In the local check, a join on a literal key on both sides (`F.lit(7)`) is constant-folded into a nested loop
+    join: use an expression (`F.col("id") % 1 + 7`) to get a real sort-merge join.
+  - The History Server's REST API needs the attempt id for YARN apps (`/applications/<app>/1/jobs`): a probe without
+    it gets an HTML 404 page, not JSON.
+  - The plan text can't show a table's grain: the incident's Details are identical to the last good run's. The
+    evidence for duplicates is in the row counts (SMJ output vs its inputs, the customers scan's rows).
+  - Changing `spark.sql.shuffle.partitions` changes the fan-out weights' partitioning, so the join's total output
+    moves by ~1e-5: compare such variants approximately.
+  - The harness required branch `claude/scenario-6-status-m8c8sy`.
+- **Still open:** the write's sort gets the whole task memory while the join's input sorts still hold theirs (real
+  Spark would spill the input sorters' unread records first, ADR-028); an SMJ buffer big enough to cause GC
+  pressure or OOM (a key with millions of rows on both sides); many-to-many joins of two fact tables; broadcast and
+  outer joins over duplicates; an as-of (range-conditioned) join on the history.

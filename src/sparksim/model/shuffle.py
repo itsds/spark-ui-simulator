@@ -64,6 +64,31 @@ def row_shares_split(key: KeySpace, num_partitions: int, seed: int) -> tuple[np.
     return tail * (1.0 - head.sum()) + head, tail
 
 
+def dimension_row_shares(key: KeySpace, num_partitions: int, seed: int) -> np.ndarray:
+    """Share of a dimension's rows per partition when it keeps several rows per key (`rows_per_key` > 1): the
+    partition's keys (the same `key_shares` the other side of the join hashes into) times their rows, whose
+    spread between keys is `freq_cv` (its own random stream: how many versions a key has is not how many rows
+    the other side carries for it)."""
+    n = num_partitions
+    base = key_shares(key, n, seed)
+    rng = numpy_rng(seed, f"dim-rows/{key.name}/{n}")
+    w = base * _gamma_spread(rng, math.sqrt(n / max(1, key.distinct)) * key.freq_cv, n)
+    return w / w.sum()
+
+
+def fanout_weights(streamed: KeySpace, build: KeySpace, num_partitions: int, seed: int) -> np.ndarray:
+    """Per reduce partition, a join's output per matched streamed row relative to the mean `rows_per_match`.
+
+    A partition's output is the sum over its keys of streamed rows x build rows: about its streamed rows x
+    `rows_per_match`, off by a relative std of cv_build x sqrt((1 + cv_streamed²) / keys in the partition)
+    (the heavier a key on the streamed side, the more its own number of build rows counts). Mean 1."""
+    n = num_partitions
+    rng = numpy_rng(seed, f"fanout/{streamed.name}/{n}")
+    rel = build.freq_cv * math.sqrt(n * (1.0 + streamed.freq_cv ** 2) / max(1, streamed.distinct))
+    w = _gamma_spread(rng, rel, n)
+    return w / w.mean()
+
+
 # Zipf ranks placed one by one; the rest is summarized by its second moment.
 ZIPF_EXPLICIT_RANKS = 4096
 

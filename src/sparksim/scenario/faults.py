@@ -5,6 +5,9 @@
 | `key_skew`        | a dataset's key distribution (`KeySpace.hot`,     | shuffle partition sizes (Spark's Murmur3    |
 |                   | `KeySpace.zipf`)                                  | partition of each hot value), task sizes,   |
 |                   |                                                   | spill, stragglers                           |
+| `duplicate_keys`  | a dimension's rows per key (`KeySpace.rows_per_   | its files and rows; a join's output rows    |
+|                   | key`, `rows_per_match`), its files, its schema    | per matched row, everything downstream of   |
+|                   | (appended columns)                                | the join (sorts, writes, later reads)       |
 | `config`          | the Spark properties the run is submitted with    | whatever the engine derives from them:      |
 |                   | (executor sizing keys change the containers)      | partitions, join strategy, AQE, memory ...  |
 | `slow_node`       | one NodeManager host's CPU, disk and NIC speed    | every task on executors of that host        |
@@ -28,6 +31,7 @@ from ..model.cluster import ClusterSpec, ExecutorSizing, HostFault
 from ..model.workload import HotKey
 from .schema import (
     ConfigFault,
+    DuplicateKeys,
     ExecutorKilled,
     KeySkew,
     MemoryPressure,
@@ -72,6 +76,8 @@ class RunSetup:
 def apply_fault(setup: RunSetup, f) -> None:
     if isinstance(f, KeySkew):
         _key_skew(setup, f)
+    elif isinstance(f, DuplicateKeys):
+        _duplicate_keys(setup, f)
     elif isinstance(f, ConfigFault):
         _config(setup, f)
     elif isinstance(f, SlowNode):
@@ -104,6 +110,27 @@ def _key_skew(setup: RunSetup, f: KeySkew) -> None:
         hot.append(HotKey(value, h.share))
     skewed = replace(ks, hot=ks.hot + tuple(hot), zipf=f.zipf if f.zipf is not None else ks.zipf)
     setup.datasets[f.dataset] = replace(ds, keys={**ds.keys, f.column: skewed})
+
+
+def _duplicate_keys(setup: RunSetup, f: DuplicateKeys) -> None:
+    ds = setup.datasets.get(f.dataset)
+    if ds is None:
+        raise ValueError(f"duplicate_keys: no dataset {f.dataset!r} (the workload has {sorted(setup.datasets)})")
+    ks = ds.keys.get(f.column)
+    if ks is None:
+        raise ValueError(f"duplicate_keys: {f.dataset}.{f.column} is not a key column of the workload "
+                         f"(its queries join on {sorted(ds.keys) or 'no column'} of {f.dataset})")
+    if not ks.unique:
+        raise ValueError(f"duplicate_keys: {f.dataset}.{f.column} already has several rows per key")
+    if ds.partitions:
+        raise ValueError("duplicate_keys: a partitioned dataset is not supported")
+    added = tuple((c.name, c.type, c.avg_length, c.parquet_bytes) for c in f.added_columns)
+    bpr = ds.bytes_per_row + sum(c.parquet_bytes for c in f.added_columns)
+    # the same writer: files of the same size, `rows_per_key` times the rows, each row a little wider
+    files = round(ds.files * f.rows_per_key * bpr / ds.bytes_per_row)
+    dup = replace(ks, rows_per_key=f.rows_per_key, rows_per_match=f.rows_per_match, freq_cv=f.spread)
+    setup.datasets[f.dataset] = replace(ds, files=files, bytes_per_row=bpr, keys={**ds.keys, f.column: dup},
+                                        added_columns=ds.added_columns + added)
 
 
 def _config(setup: RunSetup, f: ConfigFault) -> None:

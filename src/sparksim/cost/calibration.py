@@ -164,6 +164,12 @@ BROADCAST_PROBE_NS_PER_ROW = 60.0
 HASH_AGG_NS_PER_ROW = 85.0
 SORT_NS_PER_ROW = 150.0  # UnsafeExternalSorter: prefix radix sort + record copy
 SMJ_NS_PER_ROW = 60.0
+# [ref] A sort-merge join's output rows past the first per streamed row (a build side with several rows per key):
+# iterating the buffered matches and joining each with the streamed row. Local Spark 3.5.9
+# (`reference/local/exploding_join.txt`, 8 M streamed rows, 1/4/16 buffered rows per key): 42-47 ns per extra
+# output row for the join + the Project above it + a noop sink, 56 ns with one key of 200,000 buffered rows; the
+# Project is charged by its own operator (FILTER_PROJECT_NS_PER_ROW), which leaves ~20 ns.
+SMJ_EXTRA_OUTPUT_NS_PER_ROW = 20.0
 # Shuffle write (UnsafeShuffleWriter): row copy, partition id, in-memory sort, LZ4 compression.
 SHUFFLE_SERIALIZE_NS_PER_BYTE = 11.0  # per uncompressed UnsafeRow byte ≈ 90 MB/s
 # Shuffle read: LZ4 decompression + UnsafeRow deserialization.

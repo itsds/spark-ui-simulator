@@ -213,11 +213,14 @@ apps/<workload>.py   WORKLOAD: params (dt), datasets(params) = the usual input d
       ▼
 sparksim.scenario    the run's data overrides, then its faults (faults.py) → engine.runtime.AppSpec
       │              key_skew → KeySpace.hot / .zipf of a dataset column   (shuffle partition sizes)
+      │              duplicate_keys → a dimension's rows per key, files,   (a join's output per matched row,
+      │                schema (KeySpace.rows_per_key / rows_per_match)      everything downstream of it)
       │              config → --conf / executor sizing                     (whatever Spark reads)
       │              slow_node → Host.cpu/disk/net factors                 (every task on that host, its JVM
       │                                                                     start-up, codegen, deserialization)
       │              memory_pressure → native memory per running task      (container RSS → pmem kills)
       │              executor_killed → SIGKILL at a time                   (exit 137 → ExecutorLostFailure)
+      │              yarn_preemption → the RM takes containers back        (exit -102, lost shuffle files)
       ▼
 engine → event log (+ container logs) per run: `sparksim generate <id>` writes all of them
 ```
@@ -230,6 +233,13 @@ aggregation map spills its own share, `cost.model._spill_group`). A map task tha
 reduce partitions does so through Spark's UnsafeShuffleWriter, whose ShuffleExternalSorter buffers the
 serialized output in execution memory: its peak counts in the task's Peak Execution Memory, and a map task
 whose output outgrows the task's memory spills in the writer too (`cost.model._shuffle_sorter`, ADR-039).
+
+A join's build side is unique on its key unless the data says otherwise (`KeySpace.rows_per_key`): then its
+shuffle partitions hold its rows per key (`model.shuffle.dimension_row_shares`), and a sort-merge join outputs
+`rows_per_match` rows per matched streamed row, spread a little between reduce partitions
+(`fanout_weights`), each extra row costing the join `SMJ_EXTRA_OUTPUT_NS_PER_ROW` (ADR-049). The SMJ buffers
+a key's matches on the heap (no spill, as on Spark 3.5.9); whatever follows it (the write's sort, the write,
+later reads of the output) sees the multiplied rows.
 
 ## The portal and the one-command stack (built in Phase 7)
 

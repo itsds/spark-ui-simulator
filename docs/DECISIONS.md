@@ -953,3 +953,74 @@ Append new decisions at the bottom. Don't rewrite old ones; supersede them.
 - **Consequences:** the solution also raises the change's own data problem: events landing after the run are never
   attributed to their day. The event log is 205 MB (42,538 tasks); the History Server replays it in a few seconds
   with its default 1 GiB heap (~60 MiB used after GC).
+
+## ADR-049 — Joins whose build side has several rows per key, checked against a local Spark 3.5.9 run
+
+- **Date:** 2026-11-20
+- **Status:** accepted
+- **Context:** Scenario 07 needs an inner join whose dimension side isn't unique on the join key, so that the join
+  outputs more rows than its streamed side. The simulator's joins output `match` rows per streamed row (≤ 1) and
+  hashed a dimension's rows by its key count (`unique_keys`). What real Spark does with duplicates was checked
+  first with a local PySpark 3.5.9 run over tiny tables with the production schemas
+  (`reference/local/exploding_join.py`, output in `exploding_join.txt`):
+  - the enrichment over the customer snapshot and over the same path rewritten as an SCD2 history (1–4 versions
+    per customer, three appended columns) prints **the same plan** apart from expression ids; the history's new
+    columns aren't read. The `SortMergeJoin`'s `number of output rows` is Σ events × versions of their customer
+    (66,887 = the expected count, against 26,753 over the snapshot); its `spill size` stays 0;
+  - the SMJ's buffer thresholds default to `spark.sql.sortMergeJoinExec.buffer.in.memory.threshold` = 2,147,483,632
+    and `…spill.threshold` = `Int.MaxValue`: the buffered matches of a key stay in an on-heap array. One key with
+    200,000 buffered rows × 2,000 streamed rows output 400 M rows with `spill size` 0 and 25 MB peak execution
+    memory (only the sorts), 22 s of run time and 1.6 s of GC in one task;
+  - an extra output row (1 → 4 → 16 buffered rows per key, 8 M streamed rows) costs 42–47 ns locally for the join,
+    the Project above it and a noop sink, 56 ns in the 200,000-row key;
+  - the fix `customers.where(F.col("is_current") & ~F.col("is_deleted"))` (and the two `where()` chains) plans
+    `PushedFilters: [IsNotNull(is_current), IsNotNull(is_deleted), EqualTo(is_current,true),
+    Not(EqualTo(is_deleted,true)), IsNotNull(customer_id)]`, the order our planner already produced.
+- **Decision:**
+  - Data: `KeySpace.rows_per_key` (mean rows per key over a dimension's keys; `freq_cv` their spread) and
+    `rows_per_match` (rows per key as the other side's rows meet them, weighted by how often that side carries each
+    key). `unique` when both are 1, the default: every existing dataset. The workload declares the customer
+    snapshot's key (`CUSTOMER_DIM`), which no engine code read before.
+  - Fault `duplicate_keys` (dataset, column, rows_per_key, rows_per_match, spread, added_columns): the dataset gets
+    `rows_per_key` × the rows as files of the same size, wider by the appended columns' Parquet bytes, and
+    `InputDataset.added_columns`; the queries scan `Table.with_columns(...)`. Refused on a partitioned dataset and on
+    a key that already has duplicates.
+  - Planner: `join(..., right_key_space=)`; a non-unique right side shuffles with its own KeySpace (the same key
+    shares as the streamed side, its rows per key: `model.shuffle.dimension_row_shares`, its own random stream) and
+    the `SortMergeJoin` carries `fanout` = `rows_per_match`. A broadcast hash join over duplicates is refused (its
+    probe cost per extra match is unmeasured).
+  - Cost model: the SMJ outputs `round(matched × fanout × w)`, with `w` the reduce partitions' weight
+    (`fanout_weights`: relative std cv_build × sqrt(n (1 + cv_streamed²) / distinct), mean 1, the same in every
+    attempt); every output row past the first per matched row costs `SMJ_EXTRA_OUTPUT_NS_PER_ROW` = 20 ns [ref]
+    (the local 42–47 ns minus the Project, charged by its own operator). Its buffer holds no execution memory and
+    never spills.
+- **Consequences:** every existing scenario is byte-identical (Scenario 00's event log checked; `fanout` 1 takes the
+  old code path). Downstream operators see the multiplied rows with their existing costs (the write's sort
+  spills, the write and later scans grow). Limitations: ADR-028's spill model gives the write's sort the whole task
+  memory while the join's input sorts still hold theirs (real Spark's TaskMemoryManager would spill the input
+  sorters' unread records first, so their `spill size` would not be 0 in a run that spills as much); an on-heap
+  buffer big enough to cause GC pressure or an OutOfMemoryError (a hot key with millions of rows on both
+  sides) is not modelled; outer joins, broadcast joins over duplicates, many-to-many joins of two fact tables.
+
+## ADR-050 — Scenario 07: the customer dimension becomes an SCD2 history overnight
+
+- **Date:** 2026-11-20
+- **Status:** accepted
+- **Context:** the backlog's 07 was "dimension has duplicate business keys; output 50x bigger than expected". The
+  interview question is how to see in the UI that a join multiplies rows, why, and why the spill it causes is not
+  the problem. 50x on a 4-billion-row day would run for hours; a realistic grain change is a few versions per key.
+- **Decision:** an upstream data change as the cause, no code change, fault `duplicate_keys`. CRM-2231 (live
+  2026-11-06) turns `crm.db/customers_snapshot` into an SCD type 2 history backfilled since 2025-07-01, same path and
+  columns plus `valid_from`, `valid_to`, `is_current`; the announcement says jobs selecting their columns are "not
+  affected". 2.6 rows per customer (219 M → 575 M rows, 520 → 1,395 files), 6.2 per event (active customers'
+  segment and tier change more often) [norm]. Last good 2026-11-06 (app 48748, 5.6 min); incident 2026-11-07 (app
+  48925, 15 min): the same plan, the SMJ outputs 25.1 B rows from 4.1 B events, stage 5's median task reads 1.9 M
+  records and writes 10.5 M, the write's sort spills 1.6 TiB to disk, 809 GiB written instead of 131 GiB, the
+  aggregates read 6x the rows and output the same 61 M customers / 57,594 funnel cells. 15 evidence values
+  (`tests/test_scenario07_hs.py`). The fix (`customers_current`: `is_current` before the join) is verified at 5.5 min
+  with one row per event; `spark.sql.shuffle.partitions=9600` is verified to remove the spill but not the 25.1 B
+  rows (10 min). The ticket's red herrings: Black Friday traffic, more memory / partitions, broadcast or salting,
+  Parquet compression.
+- **Consequences:** the solution covers the data repair (three partitions to rewrite, other consumers of the table),
+  a contract for the table's grain and a cardinality check in the job. The incident's event log is 103 MB (15,836
+  tasks). The dates fit between Scenarios 01 and 12 (2026-11-04 / 2026-11-09).

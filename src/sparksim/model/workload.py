@@ -56,6 +56,15 @@ class KeySpace:
     * `zipf`: rows per key follow a Zipf law with this exponent over the other
       keys (replaces `freq_cv`): the top ranks are placed one by one, the tail's
       spread follows from the law's second moment.
+
+    The build side of a join (a dimension table) is normally unique on the key
+    (`rows_per_key` 1: partition sizes follow the key counts). A dimension that
+    keeps several rows per key (versions of a customer, fault `duplicate_keys`)
+    has `rows_per_key` > 1 on average over its keys, `freq_cv` their spread, and
+    `rows_per_match`: the rows per key the other side's rows meet, weighted by
+    how often that side carries each key (customers active every day have more
+    versions than the average customer). An inner join's output is then
+    `rows_per_match` rows per matched row of the other side.
     """
 
     name: str
@@ -64,6 +73,12 @@ class KeySpace:
     dtypes: tuple[str, ...] = ("bigint",)
     hot: tuple[HotKey, ...] = ()
     zipf: float = 0.0
+    rows_per_key: float = 1.0
+    rows_per_match: float = 1.0
+
+    @property
+    def unique(self) -> bool:
+        return self.rows_per_key == 1.0 and self.rows_per_match == 1.0
 
     @property
     def skewed(self) -> bool:
@@ -93,7 +108,11 @@ class Op:
 
     kind: str
     ns_per_row: float
-    selectivity: float = 1.0  # filter / bhj: output rows per input row
+    selectivity: float = 1.0  # filter / bhj: output rows per input row; joins: share of streamed rows that match
+    # joins: output rows per matched streamed row (rows per key of a build side that isn't unique on the key),
+    # and the build side's key distribution they come from (the spread between reduce partitions)
+    fanout: float = 1.0
+    fanout_keys: KeySpace | None = None
     # filter over a scan: the share of each partition's rows it keeps on top of `selectivity`
     # (partition directory `dt=2026-10-21` -> share), when that depends on where a row is stored
     by_partition: tuple[tuple[str, float], ...] = ()
@@ -130,9 +149,11 @@ def Sort(ns: float = cal.SORT_NS_PER_ROW) -> Op:  # noqa: N802
     return Op("sort", ns)
 
 
-def SortMergeJoin(out_row_bytes: int, match: float = 1.0, ns: float = cal.SMJ_NS_PER_ROW) -> Op:  # noqa: N802
-    """Inner join of a fact side (first source) with a dimension side unique on the key."""
-    return Op("smj", ns, selectivity=match, out_row_bytes=out_row_bytes)
+def SortMergeJoin(out_row_bytes: int, match: float = 1.0, ns: float = cal.SMJ_NS_PER_ROW,  # noqa: N802
+                  fanout: float = 1.0, fanout_keys: KeySpace | None = None) -> Op:
+    """Inner join of a fact side (first source, streamed) with a dimension side (buffered per key): `match` of
+    the streamed rows find their key, each meets `fanout` rows of it (1: the dimension is unique on the key)."""
+    return Op("smj", ns, selectivity=match, out_row_bytes=out_row_bytes, fanout=fanout, fanout_keys=fanout_keys)
 
 
 # --------------------------------------------------------------------------- sources and sinks

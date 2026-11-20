@@ -34,7 +34,7 @@ Cost annotations (selectivity, ns per row, key spaces) ride along on the nodes f
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ..model.workload import Dataset, KeySpace, WriteSink
 from .expr import (
@@ -97,6 +97,12 @@ class Table:
     @property
     def file_bytes_per_row(self) -> float:
         return sum(c.pq_bytes for c in self.columns)
+
+    def with_columns(self, added) -> Table:
+        """The table after an upstream change appended columns `(name, type, avg length, Parquet bytes)`."""
+        if not added:
+            return self
+        return replace(self, columns=self.columns + tuple(Column(n, t, a, pq) for n, t, a, pq in added))
 
 
 @dataclass
@@ -165,7 +171,13 @@ class LJoin(LNode):
     broadcast: bool
     match: float
     ns: float | None
-    unique_right: bool = True  # the right side has one row per key (a dimension)
+    # the right side's key distribution (a dimension): None or `unique`: one row per key; otherwise several
+    # (`KeySpace.rows_per_key`), and every matched left row meets `rows_per_match` of them
+    right_key_space: KeySpace | None = None
+
+    @property
+    def unique_right(self) -> bool:
+        return self.right_key_space is None or self.right_key_space.unique
 
     @property
     def children(self):
@@ -335,12 +347,15 @@ class DataFrame:
         return DataFrame(self.spark, LProject(out, self.plan, ns))
 
     def join(self, other: DataFrame, on: str | list[str], broadcast: bool = False, match: float = 1.0,
-             ns: float | None = None, unique_right: bool = True, key_space: KeySpace | None = None) -> DataFrame:
-        """Inner equi-join USING `on`. `key_space`: the join key's values (shuffle partition sizes)."""
+             ns: float | None = None, key_space: KeySpace | None = None,
+             right_key_space: KeySpace | None = None) -> DataFrame:
+        """Inner equi-join USING `on`. `key_space`: the join key's values (shuffle partition sizes); `match`: the
+        share of this side's rows whose key the other side has; `right_key_space`: the other side's rows per
+        key, if it isn't unique on the key (a dimension that keeps versions)."""
         keys = [on] if isinstance(on, str) else list(on)
         lk = [self[k] for k in keys]
         rk = [other[k] for k in keys]
-        j = LJoin(self.plan, other.plan, lk, rk, broadcast, match, ns, unique_right)
+        j = LJoin(self.plan, other.plan, lk, rk, broadcast, match, ns, right_key_space)
         j.key_space = key_space
         return DataFrame(self.spark, j)
 
@@ -506,6 +521,9 @@ def _plan(n: LNode, ctx: PlanContext, required: list[Attr] | None) -> SparkPlan:
         rreq = _ordered(list(req) + n.right_keys, n.right.output())
         left = _plan(n.left, ctx, lreq)
         if n.broadcast or _estimated_size(n.right, ctx) <= ctx.broadcast_threshold:
+            if not n.unique_right:
+                raise NotImplementedError("a broadcast hash join whose build side has several rows per key is "
+                                          "not modelled")
             key = exchange_key(n.right, "broadcast", n.right_keys)
             build = ctx.stages.get(key)
             if build is None:
@@ -528,6 +546,8 @@ def _plan(n: LNode, ctx: PlanContext, required: list[Attr] | None) -> SparkPlan:
                 sides.append(Sort(keys, ex))
             join = SortMergeJoin(n.left_keys, n.right_keys, "Inner", sides[0], sides[1], match=n.match,
                                  ns_per_row=n.ns)
+            if not n.unique_right:
+                join.fanout, join.fanout_keys = n.right_key_space.rows_per_match, n.right_key_space
         join.logical = n
         if list(req) != join.output():
             return Project(_using_order(req, n), join)
@@ -553,6 +573,10 @@ def _estimated_size(n: LNode, ctx: PlanContext) -> float:
 
 
 def _key_space(n: LJoin, right: bool) -> KeySpace | None:
+    """The key distribution of one side's shuffle: the join key's (`key_space`), or the right side's own when it
+    keeps several rows per key (the same key values hash to the same partitions; its rows per key differ)."""
+    if right and not n.unique_right:
+        return n.right_key_space
     return getattr(n, "key_space", None)
 
 
