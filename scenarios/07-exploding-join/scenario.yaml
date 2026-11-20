@@ -1,0 +1,73 @@
+# Scenario 07: the customer dimension changed its grain overnight and the enrichment's join multiplied its rows.
+# On 2026-11-06 the CRM data team turned crm.db/customers_snapshot into an SCD type 2 history (CRM-2231, for the
+# churn model DS-1187): one row per *version* of a customer, backfilled from the CRM's audit log since 2025-07-01,
+# with three new columns valid_from / valid_to / is_current. The path and every old column stayed, so nothing
+# failed, and the enrichment, which selects five of the old columns, runs the very same plan. But its sort-merge
+# join on customer_id now meets every version of a customer: 2.6 rows per customer in the table, 6.2 for the
+# customers the day's events belong to (active customers change segment and loyalty tier more often), so each
+# event is written 6.2 times. Everything downstream of the join grows with it: the write's sort spills, the
+# partition is 6x the size, and the daily aggregates count every event 6.2 times.
+# Schema: src/sparksim/scenario/schema.py. Generate: uv run sparksim generate 07-exploding-join
+id: 07-exploding-join
+title: "The enrichment writes six times too many rows"
+difficulty: medium
+topics: [exploding join, duplicate keys, sort-merge join, SQL tab, row counts, spill, SCD type 2, data contracts]
+summary: >-
+  Friday's clickstream enrichment took 15 minutes instead of 5.6, filled the analytics space quota with a single
+  809 GiB partition, and BI says the funnel dashboard shows six times the usual traffic and revenue. Nobody on the
+  team changed the job, its configuration or the cluster. Find out where the extra rows come from, prove it from
+  the Spark UI, and say what has to be fixed, in the code and in the data.
+
+job:                                          # the same job and cluster as 00
+  workload: clickstream_enrichment
+  app_name: clickstream-daily-enrichment
+  user: svc_analytics
+  queue: etl
+  cluster:
+    cluster_timestamp: 1791902144377          # the active RM (rm1) started 2026-10-13 14:35 UTC
+    rm_standby_hosts: [rm2.hadoop.prod.internal]
+    rm_cluster_id: yarn-prod
+    rm_epoch: 23
+  executors: {instances: 40, cores: 4, memory: 16g, driver_memory: 8g, driver_cores: 2}
+  conf:                                       # the Airflow task's spark-submit
+    spark.yarn.queue: etl
+    spark.dynamicAllocation.enabled: false
+    spark.sql.shuffle.partitions: 2400
+    spark.sql.files.maxPartitionBytes: 256m
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.serializer: org.apache.spark.serializer.KryoSerializer
+    spark.sql.adaptive.skewJoin.enabled: false
+
+runs:
+  last_good:
+    label: "Last good run: 2026-11-06 (dt=2026-11-05)"
+    app_seq: 48748
+    seed: 20261105
+    started_at: "2026-11-06T02:10:06.388Z"
+    params: {dt: "2026-11-05"}
+    # customers_snapshot as the CRM export wrote it until 2026-11-05: the current state, one row per customer
+  incident:
+    label: "Incident run: 2026-11-07 (dt=2026-11-06)"
+    app_seq: 48925
+    seed: 20261106
+    started_at: "2026-11-07T02:10:07.902Z"
+    params: {dt: "2026-11-06"}
+    # The job is unchanged (no deploy since 2026-10-27, the same spark-submit); the cause is upstream data.
+    faults:
+      - type: duplicate_keys
+        dataset: customers
+        column: customer_id
+        # CRM-2231 (live 2026-11-06 15:00 UTC, the CRM export's 23:30 run wrote the first history): one row per
+        # version since 2025-07-01. Segment is recomputed monthly by marketing's model and the loyalty tier
+        # quarterly; dormant customers rarely change, the ones who browse every day do [norm].
+        rows_per_key: 2.6               # 219 M rows -> 575 M (the same 219 M customers, 212 M not deleted)
+        rows_per_match: 6.2             # versions per customer as the day's events meet them
+        spread: 0.8                     # CV of versions per customer
+        added_columns:
+          - {name: valid_from, type: timestamp, parquet_bytes: 6}
+          - {name: valid_to, type: timestamp, parquet_bytes: 3}      # 9999-12-31 for current rows
+          - {name: is_current, type: boolean, parquet_bytes: 0.1}
+        note: >-
+          announced in #data-announcements on 2026-11-05: "customers_snapshot keeps the history of every customer
+          from tomorrow: one row per version, with valid_from, valid_to and is_current. Jobs that select their
+          columns explicitly are not affected by the new columns. Current state: is_current = true."
