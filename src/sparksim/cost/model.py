@@ -60,6 +60,9 @@ class StageContext:
     batch_fetch: bool = False  # AQE coalesced reads fetch contiguous blocks of one map as one batch
     out_exchange: ShuffleExchange | None = None
     output_partitions: int = 0  # for MapStatus size
+    # a join whose build side isn't unique on the key: its output per matched row, per reduce partition, relative
+    # to the mean (`model.shuffle.fanout_weights`)
+    fanout_weights: object = None
 
     def exchange_for(self, name: str) -> ShuffleExchange:
         return self.exchanges[name]
@@ -244,9 +247,16 @@ def simulate_task(ctx: StageContext, plan: TaskPlan, env: TaskEnv, rng: random.R
     for op in spec.ops:
         if op.kind == "smj":
             right_rows = sum(r for r, _ in sides[1:])
-            cpu_ns += (rows + right_rows) * op.ns_per_row
+            work = (rows + right_rows) * op.ns_per_row
             out = round(rows * op.selectivity)
-            trace.append(OpTrace(op.kind, rows + right_rows, out, op.node, (rows + right_rows) * op.ns_per_row))
+            if op.fanout != 1.0:
+                # every matched streamed row meets `fanout` buffered rows of its key: the rows past the first
+                # are iterated and joined once more each (ADR-049)
+                matched = out
+                out = round(matched * op.fanout * _fanout_weight(ctx, plan))
+                work += max(0, out - matched) * cal.SMJ_EXTRA_OUTPUT_NS_PER_ROW
+            cpu_ns += work
+            trace.append(OpTrace(op.kind, rows + right_rows, out, op.node, work))
             rows, rb = out, op.out_row_bytes or rb
             continue
         out = _apply(op, rows, rb, ctx, plan)
@@ -444,10 +454,23 @@ def _spill_group(trace: list[OpTrace], ix: list[int], available: float) -> None:
         remaining -= x
 
 
+def _fanout_weight(ctx: StageContext, plan: TaskPlan) -> float:
+    """The join output's weight of the reducers [start, end) this task reads, by their share of the rows."""
+    w = ctx.fanout_weights
+    if w is None:
+        return 1.0
+    name, start, end = plan.reads[0]
+    shares = ctx.exchange_for(name).shares[start:end]
+    return float((shares * w[start:end]).sum() / shares.sum()) if shares.sum() > 0 else 1.0
+
+
 def _apply(op: Op, rows: int, row_bytes, ctx: StageContext, plan: TaskPlan) -> int:
     """Output rows of one operator for this task."""
     if op.kind == "filter" and op.by_partition:
         return _partition_filtered(op, rows, plan)
+    if op.kind == "bhj" and op.fanout != 1.0:
+        raise NotImplementedError("a broadcast hash join whose build side has several rows per key is not "
+                                  "modelled (its probe cost per extra match is unmeasured)")
     if op.kind in ("filter", "bhj"):
         return round(rows * op.selectivity)
     if op.kind == "partial_agg":

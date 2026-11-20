@@ -68,7 +68,14 @@ from ..model.cluster import (
 )
 from ..model.files import max_split_bytes, plan_scan
 from ..model.hdfs import Hdfs
-from ..model.shuffle import ShuffleExchange, coalesce_partitions, key_shares, row_shares_split
+from ..model.shuffle import (
+    ShuffleExchange,
+    coalesce_partitions,
+    dimension_row_shares,
+    fanout_weights,
+    key_shares,
+    row_shares_split,
+)
 from ..model.workload import ScanSource, ShuffleSink, ShuffleSource, StageSpec, WriteSink
 from ..rng import lognormal, numpy_rng, substream
 from ..sched.scheduler import LOCALITY_NAMES, Launch, SpeculationConf, TaskScheduler, TaskSet
@@ -120,6 +127,9 @@ class InputDataset:
     `arrival_lag`: for a table partitioned by the day its rows landed, the share of a day's rows that land
     k = 0, 1, 2, ... days later (late events); the queries derive the pass rate of an event-date predicate
     in each partition from it.
+
+    `added_columns`: columns appended to the table's schema since the workload described it (fault
+    `duplicate_keys`: an SCD2 history's validity columns); the queries scan the table with them.
     """
 
     path: str
@@ -132,6 +142,8 @@ class InputDataset:
     partition_column: str = ""
     partitions: tuple[TablePartition, ...] = ()
     arrival_lag: tuple[float, ...] = ()
+    # columns an upstream change appended to the table's schema: (name, type, avg string length, Parquet bytes)
+    added_columns: tuple[tuple[str, str, float, float], ...] = ()
 
     def partition_dir(self, p: TablePartition) -> str:
         return f"{self.path}/{self.partition_column}={p.value}"
@@ -1489,6 +1501,8 @@ class AppRun:
             distinct_rows = sink.unique_keys or (spec.ops and spec.ops[-1].kind == "partial_agg")
             if distinct_rows:  # where the data's keys land: the same in every attempt
                 shares = cluster = key_shares(sink.key, sink.num_partitions, self.world_seed)
+            elif not sink.key.unique:  # a dimension with several rows per key (ADR-049)
+                shares = cluster = dimension_row_shares(sink.key, sink.num_partitions, self.world_seed)
             else:
                 shares, cluster = row_shares_split(sink.key, sink.num_partitions, self.world_seed)
             out_ex = ShuffleExchange(sink.exchange, self.shuffle_ids.next(), len(plans), sink.num_partitions, shares,
@@ -1498,6 +1512,11 @@ class AppRun:
             rec.exchange = sink.exchange
         rec.ctx = StageContext(spec, self.exchanges, batch_fetch=coalesced, out_exchange=out_ex,
                                output_partitions=out_ex.num_partitions if out_ex else 0)
+        fan = next((op for op in spec.ops if op.kind == "smj" and op.fanout != 1.0), None)
+        if fan is not None:  # the streamed side is the join's first shuffle source
+            streamed = self.map_stage_of[shuffle_srcs[0].exchange].spec.sink
+            rec.ctx.fanout_weights = fanout_weights(streamed.key, fan.fanout_keys, streamed.num_partitions,
+                                                    self.world_seed)
         if shuffle_srcs:
             self.fetch_batch_prop = True  # ShuffledRowRDD sets this thread-local property once created
         self.stages[sid] = rec

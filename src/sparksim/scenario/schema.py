@@ -21,9 +21,11 @@
         faults:                            # the injected causes (sparksim.scenario.faults)
           - {type: key_skew, dataset: events, column: customer_id, hot_keys: [{value: -1, share: 0.13}]}
 
-Fault types: `key_skew` (hot keys, Zipf), `config` (Spark properties set/unset), `slow_node` (a degraded
-NodeManager host: CPU, disk, network), `memory_pressure` (native memory per running task, e.g. Arrow/Python
-buffers), `executor_killed` (an executor's container is SIGKILLed at a given time, exit 137).
+Fault types: `key_skew` (hot keys, Zipf), `duplicate_keys` (a dimension that keeps several rows per key, e.g.
+an SCD2 history), `config` (Spark properties set/unset), `slow_node` (a degraded NodeManager host: CPU, disk,
+network), `memory_pressure` (native memory per running task, e.g. Arrow/Python buffers), `executor_killed` (an
+executor's container is SIGKILLed at a given time, exit 137), `yarn_preemption` (another queue reclaims
+containers).
 """
 
 from __future__ import annotations
@@ -188,6 +190,30 @@ class KeySkew(_Model):
         return self
 
 
+class AddedColumn(_Model):
+    name: str
+    type: Literal["bigint", "int", "double", "string", "boolean", "date", "timestamp"]
+    parquet_bytes: float = Field(gt=0)  # encoded + compressed bytes per row in the files
+    avg_length: float = Field(0.0, ge=0)  # strings: average length
+
+
+class DuplicateKeys(_Model):
+    """A dataset that was unique on a key column keeps several rows per key: an upstream table that changed its
+    grain (an SCD type 2 history of a snapshot, versions, one row per source system). Its rows grow by
+    `rows_per_key`, written as files of the same size; `rows_per_match`: the rows per key that the other side of
+    a join meets, weighted by how often that side carries each key; `spread`: CV of rows per key between keys;
+    `added_columns`: the columns the change appended to the table's schema."""
+
+    type: Literal["duplicate_keys"]
+    dataset: str
+    column: str
+    rows_per_key: float = Field(gt=1)
+    rows_per_match: float = Field(ge=1)
+    spread: float = Field(1.0, ge=0)
+    added_columns: tuple[AddedColumn, ...] = ()
+    note: str = ""
+
+
 class ConfigFault(_Model):
     """Spark properties this run was submitted with on top of (or instead of) the job's."""
 
@@ -263,7 +289,7 @@ class YarnPreemption(_Model):
         return self
 
 
-Fault = Annotated[KeySkew | ConfigFault | SlowNode | MemoryPressure | ExecutorKilled | YarnPreemption,
+Fault = Annotated[KeySkew | DuplicateKeys | ConfigFault | SlowNode | MemoryPressure | ExecutorKilled | YarnPreemption,
                   Field(discriminator="type")]
 
 
